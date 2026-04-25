@@ -86,13 +86,6 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
       <!-- Main Content Area -->
       <div class="flex-1 overflow-y-auto relative pb-20" id="main-group">
 
-        <!-- Trash Can for un-scheduling -->
-        <div cdkDropList id="trash-list" [cdkDropListData]="[]" (cdkDropListDropped)="dropToTrash($event)"
-             class="absolute top-2 right-2 w-12 h-12 bg-red-100 rounded-full flex items-center justify-center z-10 border-2 border-dashed border-red-300 opacity-50 hover:opacity-100"
-             title="拖曳至此取消排程">
-          <span class="text-xl">🗑️</span>
-        </div>
-
         <!-- Month View -->
         <div *ngIf="viewMode === 'month'" class="p-4 h-full flex flex-col relative">
           <div class="flex justify-between items-center mb-4">
@@ -147,7 +140,7 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
                         取消排程
                       </div>
 
-                      <div cdkDragHandle class="text-xs p-1.5 bg-white hover:bg-milktea-50 cursor-pointer border border-transparent hover:border-milktea-100 flex items-center justify-between relative z-10 transition-transform duration-200"
+                      <div class="text-xs p-1.5 bg-white hover:bg-milktea-50 cursor-pointer border border-transparent hover:border-milktea-100 flex items-center justify-between relative z-10 transition-transform duration-200"
                            [style.transform]="'translateX(' + getSwipeOffset(t.id) + 'px)'"
                            (mousedown)="onTouchStart($event, t.id)"
                            (touchstart)="onTouchStart($event, t.id)"
@@ -156,10 +149,15 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
                            (mouseup)="onTouchEnd($event, t.id)"
                            (touchend)="onTouchEnd($event, t.id)"
                            (click)="editTask(t); monthExpandDate = null">
-                        <span class="truncate">{{ t.title }}</span>
-                        <span class="w-1.5 h-1.5 rounded-full" [class.bg-red-500]="t.isUrgent" [class.bg-milktea-300]="!t.isUrgent"></span>
+                        <span class="truncate pr-5">{{ t.title }}</span>
+                        <div class="flex items-center gap-1 absolute right-1">
+                          <span class="w-1.5 h-1.5 rounded-full" [class.bg-red-500]="t.isUrgent" [class.bg-milktea-300]="!t.isUrgent"></span>
+                          <div cdkDragHandle class="w-5 h-5 flex items-center justify-center cursor-move z-20 text-milktea-400 hover:bg-milktea-100 rounded" (click)="$event.stopPropagation()">
+                            <span class="material-icons text-[12px]">drag_indicator</span>
+                          </div>
+                        </div>
                       </div>
-                      <div *cdkDragPreview class="bg-white p-2 shadow-lg rounded border z-50">{{ t.title }}</div>
+                      <div *cdkDragPreview class="w-4 h-4 bg-red-500 rounded-full shadow-lg z-[9999]"></div>
                    </div>
                    <div *ngIf="d.tasks.length === 0" class="text-xs text-milktea-400 text-center py-2">無代辦事項</div>
                    </div>
@@ -217,7 +215,7 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
                         (touchend)="onTouchEnd($event, t.id)"
                         (click)="editTask(t); $event.stopPropagation()">
                      <div class="flex flex-col min-w-0 pr-6">
-                         <div cdkDragHandle class="absolute top-1 right-1 w-6 h-6 flex items-center justify-center cursor-move z-20 text-milktea-400 hover:bg-milktea-100 rounded">
+                         <div cdkDragHandle class="absolute top-1 right-1 w-6 h-6 flex items-center justify-center cursor-move z-20 text-milktea-400 hover:bg-milktea-100 rounded" (click)="$event.stopPropagation()">
                              <span class="material-icons text-sm">drag_indicator</span>
                          </div>
                          <span class="font-bold text-milktea-900 truncate">{{ t.title }}</span>
@@ -225,7 +223,7 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
                      </div>
                      <span *ngIf="t.isUrgent" class="w-2 h-2 rounded-full bg-red-500 shrink-0 ml-2"></span>
                    </div>
-                   <div *cdkDragPreview class="bg-white p-2 shadow-lg rounded border z-50 min-w-[200px]">{{ t.title }}</div>
+                   <div *cdkDragPreview class="w-4 h-4 bg-red-500 rounded-full shadow-lg z-[9999]"></div>
                  </div>
 
                  <div *ngIf="d.tasks.length === 0" class="text-sm text-milktea-400 italic py-2">
@@ -261,13 +259,13 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
                      (touchend)="onTouchEnd($event, t.id)"
                      (click)="editTask(t)">
                   <div class="flex items-center w-full pr-6 relative">
-                      <div cdkDragHandle class="absolute top-0 right-0 w-6 h-6 flex items-center justify-center cursor-move z-20 text-milktea-400 hover:bg-milktea-200 rounded">
+                      <div cdkDragHandle class="absolute top-0 right-0 w-6 h-6 flex items-center justify-center cursor-move z-20 text-milktea-400 hover:bg-milktea-200 rounded" (click)="$event.stopPropagation()">
                           <span class="material-icons text-sm">drag_indicator</span>
                       </div>
                       <span class="truncate font-bold">{{ t.title }}</span>
                       <span *ngIf="t.isUrgent" class="w-2 h-2 rounded-full bg-red-500 shrink-0 ml-2 mt-1"></span>
                   </div>
-                  <div *cdkDragPreview class="bg-white p-2 shadow-lg rounded border z-50">{{ t.title }}</div>
+                  <div *cdkDragPreview class="w-4 h-4 bg-red-500 rounded-full shadow-lg z-[9999]"></div>
                 </div>
                 <div *ngIf="allDayTasks.length === 0" class="text-xs text-milktea-400 text-center py-1">無</div>
              </div>
@@ -315,7 +313,7 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
                       取消
                     </div>
 
-                    <div cdkDragHandle class="w-full h-full p-1 relative z-10 transition-transform duration-200 cursor-pointer"
+                    <div class="w-full h-full p-1 relative z-10 transition-transform duration-200 cursor-pointer"
                          [class.bg-milktea-300]="t.endTime"
                          [class.bg-milktea-100]="!t.endTime"
                          [style.transform]="'translateX(' + getSwipeOffset(t.id) + 'px)'"
@@ -326,13 +324,13 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
                          (mouseup)="onTouchEnd($event, t.id)"
                          (touchend)="onTouchEnd($event, t.id)"
                          (click)="editTask(t)">
-                      <div class="absolute top-1 right-1 w-6 h-6 flex items-center justify-center cursor-move z-20 text-milktea-500 bg-white/50 rounded">
+                      <div cdkDragHandle class="absolute top-1 right-1 w-6 h-6 flex items-center justify-center cursor-move z-20 text-milktea-500 bg-white/50 rounded" (click)="$event.stopPropagation()">
                           <span class="material-icons text-sm">drag_indicator</span>
                       </div>
                       <div class="font-bold text-milktea-900 truncate pr-6">{{ t.title }}</div>
                       <div class="text-[10px] text-milktea-800 truncate font-mono" *ngIf="t.startTime">{{ t.startTime }} <ng-container *ngIf="t.endTime">- {{ t.endTime }}</ng-container><ng-container *ngIf="!t.endTime">- ?</ng-container></div>
                     </div>
-                    <div *cdkDragPreview class="bg-white p-2 shadow-lg rounded border z-50 min-w-[200px]">{{ t.title }}</div>
+                    <div *cdkDragPreview class="w-4 h-4 bg-red-500 rounded-full shadow-lg z-[9999]"></div>
                  </div>
              </div>
           </div>
@@ -370,17 +368,19 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
                class="relative bg-milktea-50 p-3 rounded-xl mb-2 shadow-sm cursor-move active:shadow-md touch-none flex items-center justify-between group overflow-hidden">
 
             <!-- Main Content Container -->
-            <div class="relative z-10 w-full flex items-center justify-between transition-transform duration-200 bg-milktea-50 rounded-xl">
-              <div cdkDragHandle class="flex-1 w-full h-full flex flex-col justify-center">
-                <span class="font-bold text-milktea-900">{{ task.title }}</span>
+            <div class="relative z-10 w-full flex items-center justify-between transition-transform duration-200 bg-milktea-50 rounded-xl cursor-pointer" (click)="editTask(task)">
+              <div class="flex-1 flex flex-col justify-center min-w-0 pr-2">
+                <span class="font-bold text-milktea-900 truncate">{{ task.title }}</span>
                 <div class="flex gap-1 mt-1 flex-wrap">
                   <span *ngFor="let tag of task.tags" class="text-[10px] bg-white border border-milktea-200 px-1.5 py-0.5 rounded text-milktea-600">{{ tag }}</span>
                 </div>
               </div>
-              <button class="text-milktea-400 p-2 z-20" (click)="editTask(task); $event.stopPropagation()">⋮</button>
+              <div cdkDragHandle class="w-8 h-8 flex items-center justify-center cursor-move z-20 text-milktea-400 hover:bg-milktea-200 rounded" (click)="$event.stopPropagation()">
+                <span class="material-icons">drag_indicator</span>
+              </div>
             </div>
 
-            <div *cdkDragPreview class="bg-white p-3 shadow-lg rounded-xl border flex items-center w-64 z-50">{{ task.title }}</div>
+            <div *cdkDragPreview class="w-4 h-4 bg-red-500 rounded-full shadow-lg z-[9999]"></div>
           </div>
           <div *ngIf="unassignedTasks.length === 0" class="text-center text-milktea-400 mt-8 text-sm">
             沒有未排程代辦
