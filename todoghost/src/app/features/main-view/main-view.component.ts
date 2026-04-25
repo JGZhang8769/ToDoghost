@@ -8,7 +8,7 @@ import { SvgIconComponent } from '../../core/svg-icon/svg-icon.component';
 import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { FormsModule } from '@angular/forms';
 import { Subject, takeUntil } from 'rxjs';
-import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth, isSameDay } from 'date-fns';
+import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameMonth, isSameDay, addMonths, subMonths } from 'date-fns';
 
 @Component({
   selector: 'app-main-view',
@@ -62,6 +62,19 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
                  [class.border-milktea-200]="!filterUrgent" [class.text-milktea-500]="!filterUrgent"
                  (click)="toggleFilterUrgent(); applyFilter()">緊急</button>
 
+         <!-- Created By Filters -->
+         <ng-container *ngFor="let u of availableUsers">
+           <button class="text-xs px-3 py-1.5 rounded-full border transition-colors flex items-center gap-1"
+                   [class.border-blue-400]="filterCreatedBy === u.id" [class.bg-blue-50]="filterCreatedBy === u.id" [class.text-blue-600]="filterCreatedBy === u.id"
+                   [class.border-milktea-200]="filterCreatedBy !== u.id" [class.text-milktea-500]="filterCreatedBy !== u.id"
+                   (click)="toggleFilterCreatedBy(u.id); applyFilter()">
+               <span class="w-2 h-2 rounded-full" [class.bg-blue-500]="filterCreatedBy === u.id" [class.bg-milktea-300]="filterCreatedBy !== u.id"></span>
+               {{ u.name }}
+           </button>
+         </ng-container>
+
+         <div class="w-[1px] h-4 bg-milktea-200 mx-1"></div>
+
          <button *ngFor="let tag of availableTags" class="text-xs px-3 py-1.5 rounded-full border transition-colors"
                  [class.border-milktea-500]="filterTags.includes(tag)" [class.bg-milktea-100]="filterTags.includes(tag)" [class.text-milktea-800]="filterTags.includes(tag)"
                  [class.border-milktea-200]="!filterTags.includes(tag)" [class.text-milktea-500]="!filterTags.includes(tag)"
@@ -110,9 +123,13 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
 
               <!-- Expanded Task List (Month View) -->
               <div *ngIf="monthExpandDate === d.dateStr"
-                   class="absolute top-full left-1/2 -translate-x-1/2 w-48 bg-white border border-milktea-200 shadow-xl rounded-xl z-30 p-2 mt-2"
+                   class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 bg-white border border-milktea-200 shadow-2xl rounded-xl z-50 p-3"
                    (click)="$event.stopPropagation()">
-                   <div class="text-xs font-bold text-milktea-800 mb-2 border-b pb-1">{{ d.dateStr }}</div>
+                   <div class="flex justify-between items-center mb-2 border-b pb-1">
+                       <span class="text-sm font-bold text-milktea-800">{{ d.dateStr }}</span>
+                       <button class="text-milktea-400 hover:text-milktea-600 font-bold" (click)="monthExpandDate = null; $event.stopPropagation()">&times;</button>
+                   </div>
+                   <div class="max-h-[50vh] overflow-y-auto">
                    <div *ngFor="let t of d.tasks" class="relative group overflow-hidden mb-1 rounded"
                         cdkDrag [cdkDragData]="t" (cdkDragStarted)="dragStarted()" (cdkDragEnded)="dragEnded()">
 
@@ -145,13 +162,14 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
                       <div *cdkDragPreview class="bg-white p-2 shadow-lg rounded border z-50">{{ t.title }}</div>
                    </div>
                    <div *ngIf="d.tasks.length === 0" class="text-xs text-milktea-400 text-center py-2">無代辦事項</div>
+                   </div>
               </div>
             </div>
           </div>
         </div>
 
         <!-- Week View -->
-        <div *ngIf="viewMode === 'week'" class="p-4 h-full flex flex-col relative">
+        <div *ngIf="viewMode === 'week'" class="p-4 h-full flex flex-col relative pb-32">
           <div class="flex justify-between items-center mb-4 sticky top-0 bg-milktea-50 z-20 pb-2">
             <button (click)="prevWeek()" class="text-milktea-800 font-bold px-2">&lt;</button>
             <h2 class="text-xl font-bold text-milktea-900">{{ currentWeekStr }}</h2>
@@ -219,7 +237,7 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
         </div>
 
         <!-- Day View (Time Axis) -->
-        <div *ngIf="viewMode === 'day'" class="p-4 h-full flex flex-col relative overflow-x-hidden">
+        <div *ngIf="viewMode === 'day'" class="p-4 h-full flex flex-col relative overflow-x-hidden pb-32">
           <div class="flex justify-between items-center mb-4 sticky top-0 bg-milktea-50 z-30 pb-2 border-b border-milktea-100">
             <button (click)="prevDay()" class="text-milktea-800 font-bold px-2">&lt;</button>
             <h2 class="text-xl font-bold text-milktea-900">{{ selectedDateStr }}</h2>
@@ -233,9 +251,22 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
                (cdkDropListDropped)="dropToAllDay($event)">
              <div class="text-xs font-bold text-milktea-500 mb-2 border-b border-milktea-100 pb-1">全天 / 未指定時間</div>
              <div class="flex flex-col gap-1 min-h-[30px]">
-                <div *ngFor="let t of allDayTasks" cdkDrag [cdkDragData]="t" (cdkDragStarted)="dragStarted()" (cdkDragEnded)="dragEnded()" class="bg-milktea-100 p-2 rounded text-sm text-milktea-900 border border-milktea-300 cursor-move touch-none flex justify-between" (click)="editTask(t)">
-                  <span class="truncate font-bold">{{ t.title }}</span>
-                  <span *ngIf="t.isUrgent" class="w-2 h-2 rounded-full bg-red-500 shrink-0 ml-2 mt-1"></span>
+                <div *ngFor="let t of allDayTasks" cdkDrag [cdkDragData]="t" (cdkDragStarted)="dragStarted()" (cdkDragEnded)="dragEnded()" class="bg-milktea-100 p-2 rounded text-sm text-milktea-900 border border-milktea-300 touch-none flex justify-between items-center cursor-pointer relative transition-transform duration-200"
+                     [style.transform]="'translateX(' + getSwipeOffset(t.id) + 'px)'"
+                     (mousedown)="onTouchStart($event, t.id)"
+                     (touchstart)="onTouchStart($event, t.id)"
+                     (mousemove)="onTouchMove($event, t.id)"
+                     (touchmove)="onTouchMove($event, t.id)"
+                     (mouseup)="onTouchEnd($event, t.id)"
+                     (touchend)="onTouchEnd($event, t.id)"
+                     (click)="editTask(t)">
+                  <div class="flex items-center w-full pr-6 relative">
+                      <div cdkDragHandle class="absolute top-0 right-0 w-6 h-6 flex items-center justify-center cursor-move z-20 text-milktea-400 hover:bg-milktea-200 rounded">
+                          <span class="material-icons text-sm">drag_indicator</span>
+                      </div>
+                      <span class="truncate font-bold">{{ t.title }}</span>
+                      <span *ngIf="t.isUrgent" class="w-2 h-2 rounded-full bg-red-500 shrink-0 ml-2 mt-1"></span>
+                  </div>
                   <div *cdkDragPreview class="bg-white p-2 shadow-lg rounded border z-50">{{ t.title }}</div>
                 </div>
                 <div *ngIf="allDayTasks.length === 0" class="text-xs text-milktea-400 text-center py-1">無</div>
@@ -259,7 +290,7 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
                  <div *ngFor="let t of timeTasks"
                       cdkDrag [cdkDragData]="t"
                       (cdkDragStarted)="dragStarted()" (cdkDragEnded)="dragEnded()"
-                      class="absolute rounded border border-milktea-500 shadow-sm overflow-hidden text-xs touch-none hover:z-30 pointer-events-auto"
+                      class="absolute rounded border border-milktea-500 shadow-sm overflow-hidden text-xs touch-none hover:z-30 pointer-events-auto flex items-stretch"
                       [class.bg-milktea-300]="t.endTime"
                       [class.bg-milktea-100]="!t.endTime"
                       [class.border-dashed]="!t.endTime"
@@ -267,6 +298,8 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
                       [style.height.px]="t._height"
                       [style.left]="t._left"
                       [style.width]="t._width">
+                      <div *cdkDragPlaceholder class="absolute rounded border-2 border-dashed border-milktea-600 bg-milktea-200 opacity-50 z-10 pointer-events-none"
+                           [style.top.px]="t._top" [style.height.px]="t._height" [style.left]="t._left" [style.width]="t._width"></div>
 
                     <!-- Left Swipe Background (Copy) -->
                     <div class="absolute inset-y-0 right-0 w-16 bg-blue-500 text-white flex items-center justify-center font-bold z-0 text-[10px]"
@@ -282,7 +315,7 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
                       取消
                     </div>
 
-                    <div cdkDragHandle class="w-full h-full p-1 relative z-10 transition-transform duration-200"
+                    <div cdkDragHandle class="w-full h-full p-1 relative z-10 transition-transform duration-200 cursor-pointer"
                          [class.bg-milktea-300]="t.endTime"
                          [class.bg-milktea-100]="!t.endTime"
                          [style.transform]="'translateX(' + getSwipeOffset(t.id) + 'px)'"
@@ -293,10 +326,13 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
                          (mouseup)="onTouchEnd($event, t.id)"
                          (touchend)="onTouchEnd($event, t.id)"
                          (click)="editTask(t)">
-                      <div class="font-bold text-milktea-900 truncate">{{ t.title }}</div>
+                      <div class="absolute top-1 right-1 w-6 h-6 flex items-center justify-center cursor-move z-20 text-milktea-500 bg-white/50 rounded">
+                          <span class="material-icons text-sm">drag_indicator</span>
+                      </div>
+                      <div class="font-bold text-milktea-900 truncate pr-6">{{ t.title }}</div>
                       <div class="text-[10px] text-milktea-800 truncate font-mono" *ngIf="t.startTime">{{ t.startTime }} <ng-container *ngIf="t.endTime">- {{ t.endTime }}</ng-container><ng-container *ngIf="!t.endTime">- ?</ng-container></div>
                     </div>
-                    <div *cdkDragPreview class="bg-white p-2 shadow-lg rounded border z-50">{{ t.title }}</div>
+                    <div *cdkDragPreview class="bg-white p-2 shadow-lg rounded border z-50 min-w-[200px]">{{ t.title }}</div>
                  </div>
              </div>
           </div>
@@ -316,7 +352,7 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
 
       <!-- Bottom Drawer handle & Backdrop -->
       <div *ngIf="drawerOpen" class="fixed inset-0 bg-black/20 z-30 transition-opacity" (click)="drawerOpen = false"></div>
-      <div class="absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-[0_-4px_15px_rgba(0,0,0,0.1)] transition-transform duration-300 z-40"
+      <div class="fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-[0_-4px_15px_rgba(0,0,0,0.1)] transition-transform duration-300 z-40 max-w-3xl mx-auto"
            [style.transform]="drawerOpen ? 'translateY(0)' : 'translateY(calc(100% - 60px))'">
         <div class="h-[60px] flex items-center justify-center cursor-pointer relative" (click)="drawerOpen = !drawerOpen">
           <div class="w-12 h-1.5 bg-milktea-200 rounded-full mb-1"></div>
@@ -447,7 +483,9 @@ export class MainViewComponent implements OnInit, OnDestroy {
   filterUrgent = false;
   filterTags: string[] = [];
   filterLogicAnd = false;
+  filterCreatedBy: string | null = null;
   availableTags: string[] = [];
+  availableUsers: User[] = [];
   filteredTasks: Task[] = [];
 
   // Workspace Edit
@@ -481,6 +519,10 @@ export class MainViewComponent implements OnInit, OnDestroy {
     this.userService.currentUser$.pipe(takeUntil(this.destroy$)).subscribe(u => {
       this.currentUser = u;
     });
+
+    this.userService.getUsers().pipe(takeUntil(this.destroy$)).subscribe(users => {
+      this.availableUsers = users;
+    });
   }
 
   ngOnDestroy() {
@@ -502,11 +544,23 @@ export class MainViewComponent implements OnInit, OnDestroy {
       // We rely on the template calling applyFilter after this
   }
 
+  toggleFilterCreatedBy(userId: string) {
+      if (this.filterCreatedBy === userId) {
+          this.filterCreatedBy = null;
+      } else {
+          this.filterCreatedBy = userId;
+      }
+  }
+
   applyFilter() {
       let filtered = [...this.tasks];
 
       if (this.filterUrgent) {
           filtered = filtered.filter(t => t.isUrgent);
+      }
+
+      if (this.filterCreatedBy) {
+          filtered = filtered.filter(t => t.createdBy === this.filterCreatedBy);
       }
 
       if (this.filterTags.length > 0) {
@@ -525,6 +579,7 @@ export class MainViewComponent implements OnInit, OnDestroy {
   clearFilter() {
       this.filterUrgent = false;
       this.filterTags = [];
+      this.filterCreatedBy = null;
       this.applyFilter();
   }
 
@@ -565,13 +620,11 @@ export class MainViewComponent implements OnInit, OnDestroy {
   }
 
   prevMonth() {
-    this.currentDate = addDays(this.currentDate, -30);
-    this.currentDate = startOfMonth(this.currentDate);
+    this.currentDate = startOfMonth(subMonths(this.currentDate, 1));
     this.refreshViews();
   }
   nextMonth() {
-    this.currentDate = addDays(startOfMonth(this.currentDate), 32);
-    this.currentDate = startOfMonth(this.currentDate);
+    this.currentDate = startOfMonth(addMonths(this.currentDate, 1));
     this.refreshViews();
   }
 
@@ -702,12 +755,22 @@ export class MainViewComponent implements OnInit, OnDestroy {
     this.timeTasks = timed;
   }
 
+  wasDrawerOpenBeforeDrag = false;
+
   dragStarted() {
     this.isDragging = true;
+    this.wasDrawerOpenBeforeDrag = this.drawerOpen;
+    if (this.drawerOpen) {
+      this.drawerOpen = false;
+    }
   }
 
   dragEnded() {
     this.isDragging = false;
+    if (this.wasDrawerOpenBeforeDrag) {
+      this.drawerOpen = true;
+      this.wasDrawerOpenBeforeDrag = false;
+    }
   }
 
   // --- Drag and Drop Logic ---
@@ -767,6 +830,9 @@ export class MainViewComponent implements OnInit, OnDestroy {
          this.taskService.updateTask(task.id, { date: null, startTime: null, endTime: null });
       }
     }
+    // ensure drawer opens back up if they dropped to unassigned
+    this.drawerOpen = true;
+    this.wasDrawerOpenBeforeDrag = false;
   }
 
   dropToTrash(event: CdkDragDrop<any>) {
@@ -908,6 +974,13 @@ export class MainViewComponent implements OnInit, OnDestroy {
 
   saveForm() {
     if(!this.currentWorkspace || !this.currentUser) return;
+
+    if (this.formTask.startTime && this.formTask.endTime) {
+       if (this.formTask.startTime > this.formTask.endTime) {
+           alert('結束時間不能早於開始時間！');
+           return;
+       }
+    }
 
     if (this.formTaskTagInput.trim() && !this.formTaskTags.includes(this.formTaskTagInput.trim())) {
       this.formTaskTags.push(this.formTaskTagInput.trim());
