@@ -36,7 +36,7 @@ import { UserService, User } from '../../core/services/user.service';
 
       <!-- Actions -->
       <div class="mt-auto pt-6 flex flex-col gap-3">
-        <button class="w-full bg-milktea-600 text-white font-bold py-4 rounded-2xl shadow-sm active:scale-[0.98]" (click)="createWorkspace()">
+        <button class="w-full bg-milktea-600 text-white font-bold py-4 rounded-2xl shadow-sm active:scale-[0.98]" (click)="showNewWorkspaceForm = true">
           + 建立新空間
         </button>
         <div class="flex gap-2">
@@ -44,6 +44,18 @@ import { UserService, User } from '../../core/services/user.service';
           <button class="bg-milktea-200 text-milktea-900 font-bold px-6 py-3 rounded-2xl active:scale-[0.98]" (click)="joinWorkspace()" [disabled]="!inviteCodeInput.trim()">
             加入
           </button>
+        </div>
+      </div>
+
+      <!-- New Workspace Modal -->
+      <div *ngIf="showNewWorkspaceForm" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-xl">
+          <h2 class="text-xl font-bold text-milktea-900 mb-4">建立新空間</h2>
+          <input [(ngModel)]="newWorkspaceName" placeholder="輸入空間名稱" class="w-full bg-milktea-50 border border-milktea-200 rounded-xl px-4 py-3 mb-6 focus:outline-none focus:border-milktea-400 transition-colors">
+          <div class="flex gap-3">
+            <button class="flex-1 py-3 rounded-xl bg-milktea-100 text-milktea-800 font-bold" (click)="showNewWorkspaceForm = false">取消</button>
+            <button class="flex-1 py-3 rounded-xl bg-milktea-600 text-white font-bold disabled:opacity-50" [disabled]="!newWorkspaceName.trim()" (click)="createWorkspace()">確定</button>
+          </div>
         </div>
       </div>
     </div>
@@ -57,6 +69,8 @@ export class WorkspaceListComponent implements OnInit {
   currentUser: User | null = null;
   workspaces: Workspace[] = [];
   inviteCodeInput = '';
+  showNewWorkspaceForm = false;
+  newWorkspaceName = '';
 
   ngOnInit() {
     this.userService.currentUser$.subscribe(user => {
@@ -86,9 +100,10 @@ export class WorkspaceListComponent implements OnInit {
   }
 
   async createWorkspace() {
-    if(!this.currentUser) return;
-    const name = prompt('請輸入空間名稱') || '新空間';
-    const ws = await this.workspaceService.createWorkspace(this.currentUser.id, name);
+    if(!this.currentUser || !this.newWorkspaceName.trim()) return;
+    const ws = await this.workspaceService.createWorkspace(this.currentUser.id, this.newWorkspaceName.trim());
+    this.showNewWorkspaceForm = false;
+    this.newWorkspaceName = '';
     this.enterWorkspace(ws);
   }
 

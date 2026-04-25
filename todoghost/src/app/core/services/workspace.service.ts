@@ -66,6 +66,17 @@ export class WorkspaceService {
     return ws;
   }
 
+  async updateWorkspace(workspaceId: string, data: Partial<Workspace>) {
+    const wsRef = doc(this.firestore, `workspaces/${workspaceId}`);
+    await updateDoc(wsRef, data);
+
+    // Update local subject if it is the current workspace
+    const current = this.currentWorkspaceSubject.value;
+    if (current && current.id === workspaceId) {
+      this.currentWorkspaceSubject.next({ ...current, ...data });
+    }
+  }
+
   async joinWorkspaceByCode(userId: string, code: string): Promise<boolean> {
     const wsRef = collection(this.firestore, 'workspaces');
     const q = query(wsRef, where('inviteCode', '==', code));
