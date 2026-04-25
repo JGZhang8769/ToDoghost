@@ -17,7 +17,7 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
   template: `
     <div class="flex flex-col h-full bg-milktea-50 relative" cdkDropListGroup>
       <!-- Header -->
-      <div class="bg-white px-4 py-3 shadow-sm border-b border-milktea-100 flex items-center justify-between z-10">
+      <div class="bg-white px-4 py-3 shadow-sm border-b border-milktea-100 flex items-center justify-between z-10 pt-[env(safe-area-inset-top,12px)]">
         <button (click)="goBack()" class="text-milktea-400 p-2 -ml-2 whitespace-nowrap">
           ← 返回
         </button>
@@ -25,7 +25,11 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
           <span *ngIf="!isEditingWorkspace" class="font-bold text-milktea-900 truncate w-full text-center">{{ currentWorkspace?.name || '未命名空間' }}</span>
           <input *ngIf="isEditingWorkspace" [(ngModel)]="editingWorkspaceName" (blur)="saveWorkspaceName()" (keyup.enter)="saveWorkspaceName()" class="w-full text-center bg-milktea-50 border-b border-milktea-400 focus:outline-none text-milktea-900 font-bold" autofocus>
         </div>
-        <button (click)="logout()" class="text-milktea-600 text-sm font-bold whitespace-nowrap">登出</button>
+        <div class="flex items-center gap-2">
+            <span class="text-sm font-bold text-milktea-800 hidden sm:inline" *ngIf="currentUser">Hi, {{ currentUser.name }}</span>
+            <span class="text-sm font-bold text-milktea-800 sm:hidden" *ngIf="currentUser">Hi, {{ currentUser.name }}</span>
+            <button (click)="logout()" class="text-milktea-600 text-sm font-bold whitespace-nowrap">登出</button>
+        </div>
       </div>
 
       <!-- Filters & View Toggle -->
@@ -111,12 +115,13 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
               <span class="text-sm mt-1" [class.font-bold]="d.isToday" [class.text-milktea-600]="d.isToday">{{ d.dayNum }}</span>
               <div class="flex gap-0.5 mt-1 flex-wrap justify-center flex-1 w-full min-h-[20px]">
                  <!-- Red dot indicator if there are tasks -->
-                 <div *ngIf="d.tasks.length > 0" class="w-2 h-2 rounded-full bg-red-400 mx-auto my-1"></div>
+                 <div *ngIf="hasUrgent(d.tasks)" class="w-1.5 h-1.5 rounded-full bg-red-500 mx-auto my-1"></div>
+                 <div *ngIf="!hasUrgent(d.tasks) && d.tasks.length > 0" class="w-1.5 h-1.5 rounded-full bg-milktea-400 mx-auto my-1"></div>
               </div>
 
               <!-- Expanded Task List (Month View) -->
               <div *ngIf="monthExpandDate === d.dateStr"
-                   class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 bg-white border border-milktea-200 shadow-2xl rounded-xl z-50 p-3"
+                   class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 bg-white border border-milktea-200 shadow-2xl rounded-xl z-[55] p-3"
                    (click)="$event.stopPropagation()">
                    <div class="flex justify-between items-center mb-2 border-b pb-1">
                        <span class="text-sm font-bold text-milktea-800">{{ d.dateStr }}</span>
@@ -137,7 +142,7 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
                       <div class="absolute inset-y-0 left-0 w-16 bg-red-500 text-white flex items-center justify-center font-bold z-0 text-[10px]"
                            [style.opacity]="getSwipeState(t.id) === 'right' ? 1 : 0"
                            (click)="unscheduleTask(t); monthExpandDate = null">
-                        取消排程
+                      取消
                       </div>
 
                       <div class="text-xs p-1.5 bg-white hover:bg-milktea-50 cursor-pointer border border-transparent hover:border-milktea-100 flex items-center justify-between relative z-10 transition-transform duration-200"
@@ -149,15 +154,15 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
                            (mouseup)="onTouchEnd($event, t.id)"
                            (touchend)="onTouchEnd($event, t.id)"
                            (click)="editTask(t); monthExpandDate = null">
-                        <span class="truncate pr-5">{{ t.title }}</span>
+                        <span class="truncate pr-[32px]">{{ t.title }}</span>
                         <div class="flex items-center gap-1 absolute right-1">
-                          <span class="w-1.5 h-1.5 rounded-full" [class.bg-red-500]="t.isUrgent" [class.bg-milktea-300]="!t.isUrgent"></span>
+                          <span *ngIf="t.isUrgent" class="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></span>
                           <div cdkDragHandle class="w-5 h-5 flex items-center justify-center cursor-move z-20 text-milktea-400 hover:bg-milktea-100 rounded" (click)="$event.stopPropagation()">
                             <span class="material-icons text-[12px]">drag_indicator</span>
                           </div>
                         </div>
                       </div>
-                      <div *cdkDragPreview class="w-4 h-4 bg-red-500 rounded-full shadow-lg z-[9999]"></div>
+                      <div *cdkDragPreview class="w-3 h-3 bg-red-500 rounded-full shadow-lg z-[9999]"></div>
                    </div>
                    <div *ngIf="d.tasks.length === 0" class="text-xs text-milktea-400 text-center py-2">無代辦事項</div>
                    </div>
@@ -174,7 +179,7 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
             <button (click)="nextWeek()" class="text-milktea-800 font-bold px-2">&gt;</button>
           </div>
 
-          <div class="flex-1 flex flex-col gap-3 pb-4">
+          <div class="flex-1 flex flex-col gap-3 pb-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
              <div *ngFor="let d of weekDays"
                   class="bg-white rounded-xl p-3 flex border border-milktea-100 shadow-sm min-h-[80px]"
                   [class.bg-milktea-100]="d.isToday"
@@ -214,16 +219,16 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
                         (mouseup)="onTouchEnd($event, t.id)"
                         (touchend)="onTouchEnd($event, t.id)"
                         (click)="editTask(t); $event.stopPropagation()">
-                     <div class="flex flex-col min-w-0 pr-6">
+                     <div class="flex flex-col min-w-0 pr-6 w-full relative">
                          <div cdkDragHandle class="absolute top-1 right-1 w-6 h-6 flex items-center justify-center cursor-move z-20 text-milktea-400 hover:bg-milktea-100 rounded" (click)="$event.stopPropagation()">
                              <span class="material-icons text-sm">drag_indicator</span>
                          </div>
+                         <span *ngIf="t.isUrgent" class="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0 absolute right-8 top-3"></span>
                          <span class="font-bold text-milktea-900 truncate">{{ t.title }}</span>
                          <span class="text-[10px] text-milktea-600 truncate" *ngIf="t.startTime">{{ t.startTime }} <ng-container *ngIf="t.endTime">- {{ t.endTime }}</ng-container></span>
                      </div>
-                     <span *ngIf="t.isUrgent" class="w-2 h-2 rounded-full bg-red-500 shrink-0 ml-2"></span>
                    </div>
-                   <div *cdkDragPreview class="w-4 h-4 bg-red-500 rounded-full shadow-lg z-[9999]"></div>
+                   <div *cdkDragPreview class="w-3 h-3 bg-red-500 rounded-full shadow-lg z-[9999]"></div>
                  </div>
 
                  <div *ngIf="d.tasks.length === 0" class="text-sm text-milktea-400 italic py-2">
@@ -235,7 +240,7 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
         </div>
 
         <!-- Day View (Time Axis) -->
-        <div *ngIf="viewMode === 'day'" class="p-4 h-full flex flex-col relative overflow-x-hidden pb-32">
+        <div *ngIf="viewMode === 'day'" class="p-4 h-full flex flex-col relative overflow-x-hidden pb-[calc(8rem+env(safe-area-inset-bottom,0px))]">
           <div class="flex justify-between items-center mb-4 sticky top-0 bg-milktea-50 z-30 pb-2 border-b border-milktea-100">
             <button (click)="prevDay()" class="text-milktea-800 font-bold px-2">&lt;</button>
             <h2 class="text-xl font-bold text-milktea-900">{{ selectedDateStr }}</h2>
@@ -249,23 +254,39 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
                (cdkDropListDropped)="dropToAllDay($event)">
              <div class="text-xs font-bold text-milktea-500 mb-2 border-b border-milktea-100 pb-1">全天 / 未指定時間</div>
              <div class="flex flex-col gap-1 min-h-[30px]">
-                <div *ngFor="let t of allDayTasks" cdkDrag [cdkDragData]="t" (cdkDragStarted)="dragStarted()" (cdkDragEnded)="dragEnded()" class="bg-milktea-100 p-2 rounded text-sm text-milktea-900 border border-milktea-300 touch-none flex justify-between items-center cursor-pointer relative transition-transform duration-200"
-                     [style.transform]="'translateX(' + getSwipeOffset(t.id) + 'px)'"
-                     (mousedown)="onTouchStart($event, t.id)"
-                     (touchstart)="onTouchStart($event, t.id)"
-                     (mousemove)="onTouchMove($event, t.id)"
-                     (touchmove)="onTouchMove($event, t.id)"
-                     (mouseup)="onTouchEnd($event, t.id)"
-                     (touchend)="onTouchEnd($event, t.id)"
-                     (click)="editTask(t)">
-                  <div class="flex items-center w-full pr-6 relative">
-                      <div cdkDragHandle class="absolute top-0 right-0 w-6 h-6 flex items-center justify-center cursor-move z-20 text-milktea-400 hover:bg-milktea-200 rounded" (click)="$event.stopPropagation()">
-                          <span class="material-icons text-sm">drag_indicator</span>
-                      </div>
-                      <span class="truncate font-bold">{{ t.title }}</span>
-                      <span *ngIf="t.isUrgent" class="w-2 h-2 rounded-full bg-red-500 shrink-0 ml-2 mt-1"></span>
-                  </div>
-                  <div *cdkDragPreview class="w-4 h-4 bg-red-500 rounded-full shadow-lg z-[9999]"></div>
+                <div *ngFor="let t of allDayTasks" cdkDrag [cdkDragData]="t" (cdkDragStarted)="dragStarted()" (cdkDragEnded)="dragEnded()" class="relative overflow-hidden rounded bg-milktea-100 border border-milktea-300 group">
+                   <!-- Left Swipe Background (Copy) -->
+                   <div class="absolute inset-y-0 right-0 w-16 bg-blue-500 text-white flex items-center justify-center font-bold z-0 text-[10px]"
+                        [style.opacity]="getSwipeState(t.id) === 'left' ? 1 : 0"
+                        (click)="copyTask(t); $event.stopPropagation()">
+                     複製
+                   </div>
+
+                   <!-- Right Swipe Background (Unschedule) -->
+                   <div class="absolute inset-y-0 left-0 w-16 bg-red-500 text-white flex items-center justify-center font-bold z-0 text-[10px]"
+                        [style.opacity]="getSwipeState(t.id) === 'right' ? 1 : 0"
+                        (click)="unscheduleTask(t); $event.stopPropagation()">
+                     取消
+                   </div>
+
+                   <div class="p-2 text-sm text-milktea-900 touch-none flex justify-between items-center cursor-pointer relative z-10 transition-transform duration-200 bg-milktea-100"
+                        [style.transform]="'translateX(' + getSwipeOffset(t.id) + 'px)'"
+                        (mousedown)="onTouchStart($event, t.id)"
+                        (touchstart)="onTouchStart($event, t.id)"
+                        (mousemove)="onTouchMove($event, t.id)"
+                        (touchmove)="onTouchMove($event, t.id)"
+                        (mouseup)="onTouchEnd($event, t.id)"
+                        (touchend)="onTouchEnd($event, t.id)"
+                        (click)="editTask(t)">
+                     <div class="flex items-center justify-between w-full pr-6 relative">
+                         <span class="truncate font-bold">{{ t.title }}</span>
+                         <span *ngIf="t.isUrgent" class="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0 absolute right-6 top-1"></span>
+                         <div cdkDragHandle class="absolute top-0 right-0 w-6 h-6 flex items-center justify-center cursor-move z-20 text-milktea-400 hover:bg-milktea-200 rounded" (click)="$event.stopPropagation()">
+                             <span class="material-icons text-sm">drag_indicator</span>
+                         </div>
+                     </div>
+                   </div>
+                   <div *cdkDragPreview class="w-3 h-3 bg-red-500 rounded-full shadow-lg z-[9999]"></div>
                 </div>
                 <div *ngIf="allDayTasks.length === 0" class="text-xs text-milktea-400 text-center py-1">無</div>
              </div>
@@ -296,8 +317,6 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
                       [style.height.px]="t._height"
                       [style.left]="t._left"
                       [style.width]="t._width">
-                      <div *cdkDragPlaceholder class="absolute rounded border-2 border-dashed border-milktea-600 bg-milktea-200 opacity-50 z-10 pointer-events-none"
-                           [style.top.px]="t._top" [style.height.px]="t._height" [style.left]="t._left" [style.width]="t._width"></div>
 
                     <!-- Left Swipe Background (Copy) -->
                     <div class="absolute inset-y-0 right-0 w-16 bg-blue-500 text-white flex items-center justify-center font-bold z-0 text-[10px]"
@@ -327,10 +346,11 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
                       <div cdkDragHandle class="absolute top-1 right-1 w-6 h-6 flex items-center justify-center cursor-move z-20 text-milktea-500 bg-white/50 rounded" (click)="$event.stopPropagation()">
                           <span class="material-icons text-sm">drag_indicator</span>
                       </div>
+                      <span *ngIf="t.isUrgent" class="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0 absolute right-8 top-3"></span>
                       <div class="font-bold text-milktea-900 truncate pr-6">{{ t.title }}</div>
                       <div class="text-[10px] text-milktea-800 truncate font-mono" *ngIf="t.startTime">{{ t.startTime }} <ng-container *ngIf="t.endTime">- {{ t.endTime }}</ng-container><ng-container *ngIf="!t.endTime">- ?</ng-container></div>
                     </div>
-                    <div *cdkDragPreview class="w-4 h-4 bg-red-500 rounded-full shadow-lg z-[9999]"></div>
+                    <div *cdkDragPreview class="w-3 h-3 bg-red-500 rounded-full shadow-lg z-[9999]"></div>
                  </div>
              </div>
           </div>
@@ -350,8 +370,8 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
 
       <!-- Bottom Drawer handle & Backdrop -->
       <div *ngIf="drawerOpen" class="fixed inset-0 bg-black/20 z-30 transition-opacity" (click)="drawerOpen = false"></div>
-      <div class="fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-[0_-4px_15px_rgba(0,0,0,0.1)] transition-transform duration-300 z-40 max-w-3xl mx-auto"
-           [style.transform]="drawerOpen ? 'translateY(0)' : 'translateY(calc(100% - 60px))'">
+      <div class="fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-[0_-4px_15px_rgba(0,0,0,0.1)] transition-transform duration-300 z-40 max-w-3xl mx-auto pb-[env(safe-area-inset-bottom,0px)]"
+           [style.transform]="drawerOpen ? 'translateY(0)' : 'translateY(calc(100% - 60px - env(safe-area-inset-bottom,0px)))'">
         <div class="h-[60px] flex items-center justify-center cursor-pointer relative" (click)="drawerOpen = !drawerOpen">
           <div class="w-12 h-1.5 bg-milktea-200 rounded-full mb-1"></div>
           <span class="absolute right-6 bg-milktea-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">未排程 ({{ unassignedTasks.length }})</span>
@@ -380,7 +400,7 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
               </div>
             </div>
 
-            <div *cdkDragPreview class="w-4 h-4 bg-red-500 rounded-full shadow-lg z-[9999]"></div>
+            <div *cdkDragPreview class="w-3 h-3 bg-red-500 rounded-full shadow-lg z-[9999]"></div>
           </div>
           <div *ngIf="unassignedTasks.length === 0" class="text-center text-milktea-400 mt-8 text-sm">
             沒有未排程代辦
@@ -395,44 +415,46 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
       </button>
 
       <!-- Overlay form for demo -->
-      <div *ngIf="showForm" class="absolute inset-0 bg-black/30 z-40 flex items-center justify-center p-4">
-        <div class="bg-white p-6 rounded-2xl w-full max-w-sm shadow-xl relative">
-          <h2 class="font-bold mb-4">{{ editingTask?.id ? '編輯代辦' : '新增代辦' }}</h2>
-          <input [(ngModel)]="formTask.title" placeholder="標題" class="w-full p-2 mb-2 border rounded">
-          <textarea [(ngModel)]="formTask.description" placeholder="詳細內容" class="w-full p-2 mb-2 border rounded" rows="2"></textarea>
-          <input [(ngModel)]="formTask.date" type="date" placeholder="日期" class="w-full p-2 mb-2 border rounded">
-          <div class="flex gap-2 mb-2">
-            <input [(ngModel)]="formTask.startTime" type="time" placeholder="開始時間" class="w-1/2 p-2 border rounded">
-            <input [(ngModel)]="formTask.endTime" type="time" placeholder="結束時間" class="w-1/2 p-2 border rounded">
+      <div *ngIf="showForm" class="fixed inset-0 bg-black/30 z-[60] flex items-center justify-center p-4">
+        <div class="bg-white p-6 rounded-2xl w-full max-w-sm shadow-xl relative max-h-[90vh] flex flex-col">
+          <h2 class="font-bold mb-4 shrink-0">{{ editingTask?.id ? '編輯代辦' : '新增代辦' }}</h2>
+          <div class="overflow-y-auto flex-1 pb-4">
+            <input [(ngModel)]="formTask.title" placeholder="標題" class="w-full p-2 mb-2 border rounded">
+            <textarea [(ngModel)]="formTask.description" placeholder="詳細內容" class="w-full p-2 mb-2 border rounded" rows="2"></textarea>
+            <input [(ngModel)]="formTask.date" type="date" placeholder="日期" class="w-full p-2 mb-2 border rounded">
+            <div class="flex gap-2 mb-2">
+              <input [(ngModel)]="formTask.startTime" type="time" placeholder="開始時間" class="w-1/2 p-2 border rounded">
+              <input [(ngModel)]="formTask.endTime" type="time" placeholder="結束時間" class="w-1/2 p-2 border rounded" [disabled]="!formTask.startTime">
+            </div>
+
+            <div class="flex flex-col gap-2 mb-2 border rounded p-2 bg-white">
+               <div class="flex gap-2 items-center mb-1">
+                   <span class="text-sm text-milktea-600 font-bold">標籤</span>
+                   <label class="flex items-center gap-1 text-sm text-red-500 font-bold whitespace-nowrap ml-auto">
+                       <input type="checkbox" [(ngModel)]="formTask.isUrgent" class="rounded text-red-500"> 緊急
+                   </label>
+               </div>
+               <div class="flex flex-wrap gap-1 mb-1" *ngIf="formTaskTags.length > 0">
+                   <span *ngFor="let tag of formTaskTags" class="text-xs bg-milktea-100 text-milktea-800 px-2 py-1 rounded-full flex items-center gap-1">
+                       {{ tag }}
+                       <button class="text-milktea-400 hover:text-red-500 font-bold" (click)="removeFormTag(tag)">&times;</button>
+                   </span>
+               </div>
+               <input [(ngModel)]="formTaskTagInput" (keydown.enter)="addFormTag()" placeholder="輸入標籤後按 Enter" class="w-full p-2 border rounded text-sm bg-gray-50 focus:bg-white outline-none">
+            </div>
+
+            <div class="flex items-center gap-2 mb-2">
+               <span class="text-sm text-milktea-600">提醒:</span>
+               <select [(ngModel)]="formTask.reminderOffset" class="flex-1 p-2 border rounded bg-white text-milktea-900" [disabled]="!formTask.startTime">
+                  <option [ngValue]="null">不提醒</option>
+                  <option [ngValue]="15">提前 15 分鐘</option>
+                  <option [ngValue]="30">提前 30 分鐘</option>
+                  <option [ngValue]="60">提前 1 小時</option>
+               </select>
+            </div>
           </div>
 
-          <div class="flex flex-col gap-2 mb-2 border rounded p-2 bg-white">
-             <div class="flex gap-2 items-center mb-1">
-                 <span class="text-sm text-milktea-600 font-bold">標籤</span>
-                 <label class="flex items-center gap-1 text-sm text-red-500 font-bold whitespace-nowrap ml-auto">
-                     <input type="checkbox" [(ngModel)]="formTask.isUrgent" class="rounded text-red-500"> 緊急
-                 </label>
-             </div>
-             <div class="flex flex-wrap gap-1 mb-1" *ngIf="formTaskTags.length > 0">
-                 <span *ngFor="let tag of formTaskTags" class="text-xs bg-milktea-100 text-milktea-800 px-2 py-1 rounded-full flex items-center gap-1">
-                     {{ tag }}
-                     <button class="text-milktea-400 hover:text-red-500 font-bold" (click)="removeFormTag(tag)">&times;</button>
-                 </span>
-             </div>
-             <input [(ngModel)]="formTaskTagInput" (keydown.enter)="addFormTag()" placeholder="輸入標籤後按 Enter" class="w-full p-2 border rounded text-sm bg-gray-50 focus:bg-white outline-none">
-          </div>
-
-          <div class="flex items-center gap-2 mb-2">
-             <span class="text-sm text-milktea-600">提醒:</span>
-             <select [(ngModel)]="formTask.reminderOffset" class="flex-1 p-2 border rounded bg-white text-milktea-900">
-                <option [ngValue]="null">不提醒</option>
-                <option [ngValue]="15">提前 15 分鐘</option>
-                <option [ngValue]="30">提前 30 分鐘</option>
-                <option [ngValue]="60">提前 1 小時</option>
-             </select>
-          </div>
-
-          <div class="flex gap-2 justify-end mt-4">
+          <div class="flex gap-2 justify-end mt-4 shrink-0 pt-2 border-t border-milktea-100">
              <button class="text-milktea-600 px-4 py-2" (click)="showForm = false">取消</button>
              <button class="bg-milktea-600 text-white px-4 py-2 rounded" (click)="saveForm()">儲存</button>
           </div>
@@ -571,6 +593,14 @@ export class MainViewComponent implements OnInit, OnDestroy {
           }
       }
 
+      // Sort by time (tasks without start time go first)
+      filtered.sort((a, b) => {
+          if (!a.startTime && b.startTime) return -1;
+          if (a.startTime && !b.startTime) return 1;
+          if (!a.startTime && !b.startTime) return 0;
+          return a.startTime!.localeCompare(b.startTime!);
+      });
+
       this.filteredTasks = filtered;
       this.unassignedTasks = this.filteredTasks.filter(t => !t.date);
       this.refreshViews();
@@ -691,6 +721,10 @@ export class MainViewComponent implements OnInit, OnDestroy {
       day = addDays(day, 1);
     }
     this.weekDays = days;
+  }
+
+  hasUrgent(tasks: Task[]): boolean {
+    return tasks.some(t => t.isUrgent);
   }
 
   generateDayView() {
@@ -953,6 +987,10 @@ export class MainViewComponent implements OnInit, OnDestroy {
   }
 
   editTask(task: Task) {
+    const s = this.swipeState[task.id];
+    if (s && (s.active || Math.abs(s.offset) > 10)) {
+        return; // ignore click if swiping or swiped open
+    }
     this.editingTask = task;
     this.formTask = { ...task };
     this.formTaskTags = task.tags ? [...task.tags] : [];
@@ -974,6 +1012,11 @@ export class MainViewComponent implements OnInit, OnDestroy {
 
   saveForm() {
     if(!this.currentWorkspace || !this.currentUser) return;
+
+    if (!this.formTask.startTime && this.formTask.endTime) {
+        alert('請先選擇開始時間，再選擇結束時間！');
+        return;
+    }
 
     if (this.formTask.startTime && this.formTask.endTime) {
        if (this.formTask.startTime > this.formTask.endTime) {
