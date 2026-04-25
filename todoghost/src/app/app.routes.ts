@@ -1,0 +1,9 @@
+import { Routes } from '@angular/router';
+
+export const routes: Routes = [
+  { path: 'login', loadComponent: () => import('./features/login/login.component').then(m => m.LoginComponent) },
+  { path: 'workspaces', loadComponent: () => import('./features/workspace-list/workspace-list.component').then(m => m.WorkspaceListComponent) },
+  { path: 'main', loadComponent: () => import('./features/main-view/main-view.component').then(m => m.MainViewComponent) },
+  { path: '', redirectTo: 'login', pathMatch: 'full' },
+  { path: '**', redirectTo: 'login' }
+];
