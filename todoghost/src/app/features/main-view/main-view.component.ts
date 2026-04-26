@@ -1045,6 +1045,9 @@ export class MainViewComponent implements OnInit, OnDestroy {
   }
 
   onTouchStart(e: any, taskId: string) {
+    if (e.type.startsWith('mouse')) return; // Disable desktop swipe
+    if (this.isDragging) return;
+
     this.swipeState[taskId] = {
       offset: 0,
       startX: this.getClientX(e),
@@ -1052,6 +1055,13 @@ export class MainViewComponent implements OnInit, OnDestroy {
       active: true,
       state: ''
     };
+
+    this.longPressTriggered = false;
+    this.longPressTimer = setTimeout(() => {
+        this.longPressTriggered = true;
+        const task = this.filteredTasks.find(t => t.id === taskId);
+        if(task) this.toggleCompletion(task);
+    }, 600);
   }
 
   onTouchMove(e: any, taskId: string) {
@@ -1060,6 +1070,10 @@ export class MainViewComponent implements OnInit, OnDestroy {
 
     const dx = this.getClientX(e) - s.startX;
     const dy = this.getClientY(e) - s.startY;
+
+    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+        clearTimeout(this.longPressTimer);
+    }
 
     // Only swipe if horizontally moving more than vertically (and enough threshold)
     if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 10) {
