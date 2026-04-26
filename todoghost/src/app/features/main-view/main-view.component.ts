@@ -129,7 +129,7 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
                    </div>
                    <div class="max-h-[50vh] overflow-y-auto">
                    <div *ngFor="let t of d.tasks" class="relative group overflow-hidden mb-1 rounded"
-                        cdkDrag [cdkDragData]="t" (cdkDragStarted)="dragStarted(t.id)" (cdkDragEnded)="dragEnded()" [class.opacity-0]="draggingId === t.id">
+                        cdkDrag [cdkDragData]="t" (cdkDragStarted)="dragStarted()" (cdkDragEnded)="dragEnded()">
 
                       <!-- Left Swipe Background (Copy) -->
                       <div class="absolute inset-y-0 right-0 w-16 bg-blue-500 text-white flex items-center justify-center font-bold z-0 text-[10px]"
@@ -194,7 +194,7 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
                </div>
 
                <div class="flex-1 flex flex-col gap-2 justify-center">
-                 <div *ngFor="let t of d.tasks" cdkDrag [cdkDragData]="t" (cdkDragStarted)="dragStarted(t.id)" (cdkDragEnded)="dragEnded()" class="relative overflow-hidden rounded bg-milktea-50 border border-milktea-200 shadow-sm group" [class.opacity-0]="draggingId === t.id">
+                 <div *ngFor="let t of d.tasks" cdkDrag [cdkDragData]="t" (cdkDragStarted)="dragStarted()" (cdkDragEnded)="dragEnded()" class="relative overflow-hidden rounded bg-milktea-50 border border-milktea-200 shadow-sm group">
 
                    <!-- Left Swipe Background (Copy) -->
                    <div class="absolute inset-y-0 right-0 w-16 bg-blue-500 text-white flex items-center justify-center font-bold z-0 text-[10px]"
@@ -254,7 +254,7 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
                (cdkDropListDropped)="dropToAllDay($event)">
              <div class="text-xs font-bold text-milktea-500 mb-2 border-b border-milktea-100 pb-1">全天 / 未指定時間</div>
              <div class="flex flex-col gap-1 min-h-[30px]">
-                <div *ngFor="let t of allDayTasks" cdkDrag [cdkDragData]="t" (cdkDragStarted)="dragStarted(t.id)" (cdkDragEnded)="dragEnded()" class="relative overflow-hidden rounded bg-milktea-100 border border-milktea-300 group" [class.opacity-0]="draggingId === t.id">
+                <div *ngFor="let t of allDayTasks" cdkDrag [cdkDragData]="t" (cdkDragStarted)="dragStarted()" (cdkDragEnded)="dragEnded()" class="relative overflow-hidden rounded bg-milktea-100 border border-milktea-300 group">
                    <!-- Left Swipe Background (Copy) -->
                    <div class="absolute inset-y-0 right-0 w-16 bg-blue-500 text-white flex items-center justify-center font-bold z-0 text-[10px]"
                         [style.opacity]="getSwipeState(t.id) === 'left' ? 1 : 0"
@@ -308,8 +308,8 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
              <div cdkDropList id="day-task-wrapper" [cdkDropListData]="timeTasks" class="absolute inset-0 z-10 pointer-events-none">
                  <div *ngFor="let t of timeTasks"
                       cdkDrag [cdkDragData]="t"
-                      (cdkDragStarted)="dragStarted(t.id)" (cdkDragEnded)="dragEnded()"
-                      class="absolute rounded border border-milktea-500 shadow-sm overflow-hidden text-xs touch-none hover:z-30 pointer-events-auto flex items-stretch" [class.opacity-0]="draggingId === t.id"
+                      (cdkDragStarted)="dragStarted()" (cdkDragEnded)="dragEnded()"
+                      class="absolute rounded border border-milktea-500 shadow-sm overflow-hidden text-xs touch-none hover:z-30 pointer-events-auto flex items-stretch"
                       [class.bg-milktea-300]="t.endTime"
                       [class.bg-milktea-100]="!t.endTime"
                       [class.border-dashed]="!t.endTime"
@@ -377,16 +377,16 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
           <span class="absolute right-6 bg-milktea-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">未排程 ({{ unassignedTasks.length }})</span>
         </div>
 
-        <div *ngIf="drawerOpen" class="h-[50vh] overflow-y-auto px-4 pb-8 overflow-x-hidden"
+        <div class="h-[50vh] overflow-y-auto px-4 pb-8 overflow-x-hidden" [class.hidden]="!drawerOpen"
              cdkDropList
              id="unassigned-list"
              [cdkDropListData]="unassignedTasks"
              (cdkDropListDropped)="dropToUnassigned($event)">
           <div *ngFor="let task of unassignedTasks"
                cdkDrag [cdkDragData]="task"
-               (cdkDragStarted)="dragStarted(task.id)" (cdkDragEnded)="dragEnded()"
-               class="relative bg-milktea-50 p-3 rounded-xl mb-2 shadow-sm cursor-move active:shadow-md touch-none flex items-center justify-between group overflow-hidden" [class.opacity-0]="draggingId === task.id">
-
+               (cdkDragStarted)="dragStarted()" (cdkDragEnded)="dragEnded()"
+               class="relative bg-milktea-50 p-3 rounded-xl mb-2 shadow-sm cursor-move active:shadow-md touch-none flex items-center justify-between group overflow-hidden">
+            <div *cdkDragPreview class="w-3 h-3 bg-red-500 rounded-full shadow-lg z-[9999]"></div>
             <!-- Main Content Container -->
             <div class="relative z-10 w-full flex items-center justify-between transition-transform duration-200 bg-milktea-50 rounded-xl cursor-pointer" (click)="editTask(task)">
               <div class="flex-1 flex flex-col justify-center min-w-0 pr-2">
@@ -792,12 +792,10 @@ export class MainViewComponent implements OnInit, OnDestroy {
   wasDrawerOpenBeforeDrag = false;
 
   // Track reminder timeouts to prevent duplicates
-  reminderTimeouts: { [taskId: string]: { timeoutId: any, time: number } } = {};
-  draggingId: string | null = null;
+  reminderTimeouts: { [taskId: string]: any } = {};
 
-  dragStarted(taskId: string) {
+  dragStarted() {
     this.isDragging = true;
-    this.draggingId = taskId;
     this.wasDrawerOpenBeforeDrag = this.drawerOpen;
     if (this.drawerOpen) {
       this.drawerOpen = false;
@@ -806,7 +804,6 @@ export class MainViewComponent implements OnInit, OnDestroy {
 
   dragEnded() {
     this.isDragging = false;
-    this.draggingId = null;
     if (this.wasDrawerOpenBeforeDrag) {
       this.drawerOpen = true;
       this.wasDrawerOpenBeforeDrag = false;
@@ -905,7 +902,7 @@ export class MainViewComponent implements OnInit, OnDestroy {
             }
 
             if (this.reminderTimeouts[task.id]) {
-                clearTimeout(this.reminderTimeouts[task.id].timeoutId);
+                clearTimeout(this.reminderTimeouts[task.id].id || this.reminderTimeouts[task.id]);
                 delete this.reminderTimeouts[task.id];
             }
 
@@ -928,11 +925,11 @@ export class MainViewComponent implements OnInit, OnDestroy {
                       }
                   }
                }, timeDiff);
-               this.reminderTimeouts[task.id] = { timeoutId, time: reminderTime.getTime() };
+               this.reminderTimeouts[task.id] = { id: timeoutId, time: reminderTime.getTime() };
             }
         } else {
             if (this.reminderTimeouts[task.id]) {
-                clearTimeout(this.reminderTimeouts[task.id].timeoutId);
+                clearTimeout(this.reminderTimeouts[task.id].id || this.reminderTimeouts[task.id]);
                 delete this.reminderTimeouts[task.id];
             }
         }
@@ -1052,6 +1049,11 @@ export class MainViewComponent implements OnInit, OnDestroy {
     if (!this.formTask.startTime && this.formTask.endTime) {
         alert('請先選擇開始時間，再選擇結束時間！');
         return;
+    }
+
+    // Auto-clear reminder if start time is empty
+    if (!this.formTask.startTime) {
+        this.formTask.reminderOffset = null;
     }
 
     if (this.formTask.reminderOffset && !this.formTask.startTime) {
