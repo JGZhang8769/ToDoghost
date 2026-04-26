@@ -92,7 +92,7 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
 
         <!-- Month View -->
         <div *ngIf="viewMode === 'month'" class="p-4 h-full flex flex-col relative pb-32">
-          <div class="flex justify-between items-center mb-4 sticky top-0 bg-milktea-50 z-20 pb-2">
+          <div class="flex justify-between items-center mb-4 sticky top-0 bg-milktea-50 z-20 pb-2 pt-4 -mt-4 -mx-4 px-4">
             <button (click)="prevMonth()" class="text-milktea-800 font-bold px-2">&lt;</button>
             <h2 class="text-xl font-bold text-milktea-900">{{ currentMonthStr }}</h2>
             <button (click)="nextMonth()" class="text-milktea-800 font-bold px-2">&gt;</button>
@@ -173,7 +173,7 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
 
         <!-- Week View -->
         <div *ngIf="viewMode === 'week'" class="p-4 h-full flex flex-col relative pb-32">
-          <div class="flex justify-between items-center mb-4 sticky top-0 bg-milktea-50 z-20 pb-2">
+          <div class="flex justify-between items-center mb-4 sticky top-0 bg-milktea-50 z-20 pb-2 pt-4 -mt-4 -mx-4 px-4">
             <button (click)="prevWeek()" class="text-milktea-800 font-bold px-2">&lt;</button>
             <h2 class="text-xl font-bold text-milktea-900">{{ currentWeekStr }}</h2>
             <button (click)="nextWeek()" class="text-milktea-800 font-bold px-2">&gt;</button>
@@ -241,7 +241,7 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
 
         <!-- Day View (Time Axis) -->
         <div *ngIf="viewMode === 'day'" class="p-4 h-full flex flex-col relative overflow-x-hidden pb-32">
-          <div class="flex justify-between items-center mb-4 sticky top-0 bg-milktea-50 z-30 pb-2">
+          <div class="flex justify-between items-center mb-4 sticky top-0 bg-milktea-50 z-30 pb-2 pt-4 -mt-4 -mx-4 px-4">
             <button (click)="prevDay()" class="text-milktea-800 font-bold px-2">&lt;</button>
             <h2 class="text-xl font-bold text-milktea-900">{{ selectedDateStr }}</h2>
             <button (click)="nextDay()" class="text-milktea-800 font-bold px-2">&gt;</button>
@@ -293,7 +293,7 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
           </div>
 
           <!-- Time Grid -->
-          <div class="relative flex-1 min-h-[1440px] mt-2"> <!-- 24 hours * 60px -->
+          <div class="relative flex-1 min-h-[1440px] mt-2 overflow-y-auto"> <!-- 24 hours * 60px -->
              <!-- Background hours -->
              <div *ngFor="let hour of dayHours" class="absolute w-full h-[60px] border-b border-milktea-200 flex" [style.top.px]="hour * 60">
                 <div class="w-12 text-xs text-milktea-400 text-right pr-2 -mt-2">{{ hour }}:00</div>
