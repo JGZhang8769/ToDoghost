@@ -1,0 +1,28 @@
+
+> todoghost@0.0.0 start
+> ng serve
+
+❯ Building...
+✔ Building...
+Initial chunk files | Names                    |  Raw size
+styles.css          | styles                   | 100.81 kB |
+polyfills.js        | polyfills                |  90.20 kB |
+main.js             | main                     |   3.42 kB |
+chunk-5TT5BP3K.js   | -                        |   2.10 kB |
+chunk-Y5RQAIA6.js   | -                        |   1.50 kB |
+
+                    | Initial total            | 198.04 kB
+
+Lazy chunk files    | Names                    |  Raw size
+chunk-UIJ6PUJU.js   | main-view-component      | 118.22 kB |
+chunk-3UNFOECG.js   | workspace-list-component |  12.18 kB |
+chunk-NZRRUI7I.js   | login-component          |   9.45 kB |
+chunk-7VK6HSXZ.js   | -                        |   3.89 kB |
+chunk-S7NFMT37.js   | -                        |   3.64 kB |
+chunk-BF2QG7L3.js   | -                        |   2.72 kB |
+
+Application bundle generation complete. [4.676 seconds]
+
+Watch mode enabled. Watching for file changes...
+NOTE: Raw file sizes do not reflect development server per-request transformations.
+  ➜  Local:   http://localhost:4200/

@@ -15,6 +15,7 @@ html, body {
     -webkit-touch-callout: none;
     touch-action: pan-y; /* Allow vertical scroll, disable pinch-zoom */
     overscroll-behavior-x: none; /* Prevent swipe navigation */
+    overscroll-behavior-y: none; /* Safest for complete PWA isolation, enable scroll on inner containers */
 }
 
 /* Allow selection in inputs and textareas */

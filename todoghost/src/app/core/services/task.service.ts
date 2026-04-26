@@ -15,6 +15,7 @@ export interface Task {
   createdBy: string;       // User ID
   status: 'pending' | 'completed';
   reminderOffset: number | null; // minutes before start time to notify
+  order: number;
   createdAt?: any;
   updatedAt?: any;
 }

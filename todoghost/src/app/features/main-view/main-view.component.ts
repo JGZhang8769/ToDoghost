@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, OnDestroy } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { WorkspaceService, Workspace } from '../../core/services/workspace.service';
@@ -108,65 +108,27 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
                  [class.opacity-50]="!d.isCurrentMonth"
                  [class.border-2]="d.dateStr === selectedDateStr"
                  [class.border-milktea-400]="d.dateStr === selectedDateStr"
-                 (click)="selectDate(d.dateStr); monthExpandDate = monthExpandDate === d.dateStr ? null : d.dateStr"
+                 (click)="openScheduledDrawer(d.dateStr, d.tasks)"
                  cdkDropList
                  [cdkDropListData]="d.tasks"
                  (cdkDropListDropped)="dropToDate($event, d.dateStr)">
               <span class="text-sm mt-1" [class.font-bold]="d.isToday" [class.text-milktea-600]="d.isToday">{{ d.dayNum }}</span>
               <div class="flex gap-0.5 mt-1 flex-wrap justify-center flex-1 w-full min-h-[20px]">
                  <!-- Red dot indicator if there are tasks -->
-                 <div *ngIf="hasUrgent(d.tasks)" class="w-1.5 h-1.5 rounded-full bg-red-500 mx-auto my-1"></div>
-                 <div *ngIf="!hasUrgent(d.tasks) && d.tasks.length > 0" class="w-1.5 h-1.5 rounded-full bg-milktea-400 mx-auto my-1"></div>
+                 <div *ngIf="hasUrgent(d.tasks)" class="w-1.5 h-1.5 rounded-full bg-red-500 mx-auto my-1 lg:hidden"></div>
+                 <div *ngIf="!hasUrgent(d.tasks) && d.tasks.length > 0" class="w-1.5 h-1.5 rounded-full bg-milktea-400 mx-auto my-1 lg:hidden"></div>
+              <!-- Desktop Task Previews (RWD) -->
+              <div class="hidden lg:flex flex-col w-full px-1 overflow-hidden mt-1 gap-1 max-h-[80px] text-left">
+                 <ng-container *ngFor="let t of d.tasks; let i = index">
+                    <div *ngIf="i < 3" class="text-[10px] truncate leading-tight w-full" [class.text-red-500]="t.isUrgent" [class.text-milktea-700]="!t.isUrgent">
+                        <span class="font-bold" *ngIf="t.startTime">{{t.startTime}} </span>{{t.title}}
+                    </div>
+                 </ng-container>
+                 <div *ngIf="d.tasks.length > 3" class="text-[10px] text-milktea-400 cursor-pointer text-center mt-1">...+{{ d.tasks.length - 3 }}</div>
+              </div>
               </div>
 
-              <!-- Expanded Task List (Month View) -->
-              <div *ngIf="monthExpandDate === d.dateStr"
-                   class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 bg-white border border-milktea-200 shadow-2xl rounded-xl z-[55] p-3"
-                   (click)="$event.stopPropagation()">
-                   <div class="flex justify-between items-center mb-2 border-b pb-1">
-                       <span class="text-sm font-bold text-milktea-800">{{ d.dateStr }}</span>
-                       <button class="text-milktea-400 hover:text-milktea-600 font-bold" (click)="monthExpandDate = null; $event.stopPropagation()">&times;</button>
-                   </div>
-                   <div class="max-h-[50vh] overflow-y-auto">
-                   <div *ngFor="let t of d.tasks" class="relative group overflow-hidden mb-1 rounded"
-                        cdkDrag [cdkDragData]="t" (cdkDragStarted)="dragStarted(t.id)" (cdkDragEnded)="dragEnded()" [class.opacity-0]="draggingId === t.id">
-
-                      <!-- Left Swipe Background (Copy) -->
-                      <div class="absolute inset-y-0 right-0 w-16 bg-blue-500 text-white flex items-center justify-center font-bold z-0 text-[10px]"
-                           [style.opacity]="getSwipeState(t.id) === 'left' ? 1 : 0"
-                           (click)="copyTask(t); monthExpandDate = null">
-                        複製
-                      </div>
-
-                      <!-- Right Swipe Background (Unschedule) -->
-                      <div class="absolute inset-y-0 left-0 w-16 bg-red-500 text-white flex items-center justify-center font-bold z-0 text-[10px]"
-                           [style.opacity]="getSwipeState(t.id) === 'right' ? 1 : 0"
-                           (click)="unscheduleTask(t); monthExpandDate = null">
-                      取消
-                      </div>
-
-                      <div class="text-xs p-1.5 bg-white hover:bg-milktea-50 cursor-pointer border border-transparent hover:border-milktea-100 flex items-center justify-between relative z-10 transition-transform duration-200"
-                           [style.transform]="'translateX(' + getSwipeOffset(t.id) + 'px)'"
-                           (mousedown)="onTouchStart($event, t.id)"
-                           (touchstart)="onTouchStart($event, t.id)"
-                           (mousemove)="onTouchMove($event, t.id)"
-                           (touchmove)="onTouchMove($event, t.id)"
-                           (mouseup)="onTouchEnd($event, t.id)"
-                           (touchend)="onTouchEnd($event, t.id)"
-                           (click)="editTask(t); monthExpandDate = null">
-                        <span class="truncate pr-[32px]">{{ t.title }}</span>
-                        <div class="flex items-center gap-1 absolute right-1">
-                          <span *ngIf="t.isUrgent" class="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></span>
-                          <div cdkDragHandle class="w-5 h-5 flex items-center justify-center cursor-move z-20 text-milktea-400 hover:bg-milktea-100 rounded" (click)="$event.stopPropagation()">
-                            <span class="material-icons text-[12px]">drag_indicator</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div *cdkDragPreview class="w-3 h-3 bg-red-500 rounded-full shadow-lg z-[9999]"></div>
-                   </div>
-                   <div *ngIf="d.tasks.length === 0" class="text-xs text-milktea-400 text-center py-2">無代辦事項</div>
-                   </div>
-              </div>
+<!-- Expanded List replaced by new drawer -->
             </div>
           </div>
         </div>
@@ -183,6 +145,8 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
              <div *ngFor="let d of weekDays"
                   class="bg-white rounded-xl p-3 flex border border-milktea-100 shadow-sm min-h-[80px]"
                   [class.bg-milktea-100]="d.isToday"
+                  [class.ring-2]="d.dateStr === selectedDateStr"
+                  [class.ring-milktea-400]="d.dateStr === selectedDateStr"
                   (click)="selectDate(d.dateStr)"
                   cdkDropList
                   [cdkDropListData]="d.tasks"
@@ -241,10 +205,13 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
 
         <!-- Day View (Time Axis) -->
         <div *ngIf="viewMode === 'day'" class="p-4 h-full flex flex-col relative overflow-x-hidden pb-32">
-          <div class="flex justify-between items-center mb-4 sticky top-0 bg-milktea-50 z-30 pb-2 pt-4 -mt-4 -mx-4 px-4">
+          <!-- Solid backdrop for the header area to prevent timeline bleeding -->
+          <div class="sticky top-0 z-30 bg-milktea-50 -mx-4 px-4 pt-4 pb-2 -mt-4 mb-4 shadow-[0_4px_6px_-6px_rgba(0,0,0,0.1)]">
+            <div class="flex justify-between items-center">
             <button (click)="prevDay()" class="text-milktea-800 font-bold px-2">&lt;</button>
             <h2 class="text-xl font-bold text-milktea-900">{{ selectedDateStr }}</h2>
             <button (click)="nextDay()" class="text-milktea-800 font-bold px-2">&gt;</button>
+            </div>
           </div>
 
           <!-- All Day / No Time Section -->
@@ -416,7 +383,77 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
       </button>
 
       <!-- Overlay form for demo -->
-      <div *ngIf="showForm" class="fixed inset-0 bg-black/30 z-[60] flex items-center justify-center p-4">
+
+      <!-- Scheduled Task Drawer -->
+      <div *ngIf="scheduledDrawerOpen" class="fixed inset-0 bg-black/20 z-[60] transition-opacity" (click)="scheduledDrawerOpen = false"></div>
+      <div class="fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-[0_-4px_15px_rgba(0,0,0,0.1)] transition-transform duration-300 z-[65] max-w-3xl mx-auto "
+           [style.transform]="scheduledDrawerOpen ? 'translateY(0)' : 'translateY(100%)'">
+        <div class="h-[60px] flex items-center justify-between px-6 cursor-pointer relative border-b border-milktea-100" (click)="scheduledDrawerOpen = !scheduledDrawerOpen">
+          <span class="font-bold text-milktea-900">{{ scheduledDrawerDate }} 排程</span>
+          <div class="w-12 h-1.5 bg-milktea-200 rounded-full absolute left-1/2 -translate-x-1/2 top-2"></div>
+          <span class="bg-milktea-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">{{ scheduledDrawerTasks.length }}</span>
+        </div>
+
+        <div class="h-[50vh] overflow-y-auto px-4 py-4 overflow-x-hidden"
+             cdkDropList
+             id="scheduled-list"
+             [cdkDropListConnectedTo]="['trash-list', 'unassigned-list']"
+             [cdkDropListData]="scheduledDrawerTasks"
+             (cdkDropListDropped)="dropToDate($event, scheduledDrawerDate!)">
+          <div *ngFor="let task of scheduledDrawerTasks"
+               cdkDrag [cdkDragData]="task"
+               (cdkDragStarted)="dragStarted(task.id)" (cdkDragEnded)="dragEnded()"
+               class="relative bg-milktea-50 p-3 rounded-xl mb-2 shadow-sm touch-none flex items-center justify-between group overflow-hidden"
+               [class.opacity-50]="task.status === 'completed'"
+               [class.opacity-0]="draggingId === task.id"
+               (contextmenu)="onContextMenu($event, task)">
+
+            <!-- Mobile Swipe Actions -->
+            <div class="absolute inset-y-0 right-0 w-16 bg-blue-500 text-white flex items-center justify-center font-bold z-0 text-[10px]"
+                 [style.opacity]="getSwipeState(task.id) === 'left' ? 1 : 0"
+                 (click)="copyTask(task); scheduledDrawerOpen = false">複製</div>
+            <div class="absolute inset-y-0 left-0 w-16 bg-red-500 text-white flex items-center justify-center font-bold z-0 text-[10px]"
+                 [style.opacity]="getSwipeState(task.id) === 'right' ? 1 : 0"
+                 (click)="unscheduleTask(task); scheduledDrawerOpen = false">取消</div>
+
+            <!-- Main Content Container -->
+            <div class="relative z-10 w-full flex items-center justify-between transition-transform duration-200 bg-milktea-50 rounded-xl cursor-pointer"
+                 [style.transform]="'translateX(' + getSwipeOffset(task.id) + 'px)'"
+                 (mousedown)="onTouchStart($event, task.id)" (touchstart)="onTouchStart($event, task.id)"
+                 (mousemove)="onTouchMove($event, task.id)" (touchmove)="onTouchMove($event, task.id)"
+                 (mouseup)="onTouchEnd($event, task.id)" (touchend)="onTouchEnd($event, task.id)"
+                 (click)="editTask(task)">
+
+              <div class="flex items-center gap-2 flex-1 min-w-0">
+                  <div class="flex-1 flex flex-col justify-center min-w-0 pr-2 pl-2">
+                    <span class="font-bold truncate" [class.text-milktea-400]="task.status === 'completed'" [class.line-through]="task.status === 'completed'" [class.text-milktea-900]="task.status !== 'completed'">{{ task.title }}</span>
+                    <span class="text-[10px] text-milktea-500" *ngIf="task.startTime">{{ task.startTime }}</span>
+                  </div>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                  <span *ngIf="task.isUrgent" class="w-2 h-2 rounded-full bg-red-500"></span>
+                  <div cdkDragHandle class="w-8 h-8 flex items-center justify-center cursor-move z-20 text-milktea-400 hover:bg-milktea-200 rounded" (click)="$event.stopPropagation()">
+                    <span class="material-icons">drag_indicator</span>
+                  </div>
+              </div>
+            </div>
+            <div *cdkDragPreview class="w-3 h-3 bg-red-500 rounded-full shadow-lg z-[9999]"></div>
+          </div>
+          <div *ngIf="scheduledDrawerTasks.length === 0" class="text-center text-milktea-400 mt-8 text-sm">
+            無代辦事項
+          </div>
+        </div>
+      </div>
+
+      <!-- Context Menu Desktop -->
+      <div *ngIf="contextMenuState.show" class="fixed bg-white border border-milktea-200 shadow-xl rounded-lg z-[80] py-1 w-32"
+           [style.left.px]="contextMenuState.x" [style.top.px]="contextMenuState.y">
+         <button class="w-full text-left px-4 py-2 hover:bg-milktea-50 text-sm" (click)="copyTask(contextMenuState.task); contextMenuState.show = false">複製</button>
+         <button class="w-full text-left px-4 py-2 hover:bg-milktea-50 text-sm" (click)="toggleCompletion(contextMenuState.task); contextMenuState.show = false">{{ contextMenuState.task?.status === 'completed' ? '標為未完成' : '標為已完成' }}</button>
+         <button class="w-full text-left px-4 py-2 hover:bg-red-50 text-red-600 text-sm" (click)="unscheduleTask(contextMenuState.task); contextMenuState.show = false">取消排程</button>
+      </div>
+
+      <div *ngIf="showForm" class="fixed inset-0 bg-black/30 z-[70] flex items-center justify-center p-4">
         <div class="bg-white p-6 rounded-2xl w-full max-w-sm shadow-xl relative max-h-[90vh] flex flex-col">
           <h2 class="font-bold mb-4 shrink-0">{{ editingTask?.id ? '編輯代辦' : '新增代辦' }}</h2>
           <div class="overflow-y-auto flex-1 pb-4">
@@ -469,6 +506,12 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
   `]
 })
 export class MainViewComponent implements OnInit, OnDestroy {
+
+  @HostListener('document:click')
+  closeContextMenu() {
+      this.contextMenuState.show = false;
+  }
+
   private workspaceService = inject(WorkspaceService);
   private taskService = inject(TaskService);
   private userService = inject(UserService);
@@ -524,10 +567,46 @@ export class MainViewComponent implements OnInit, OnDestroy {
 
   // Interactions
   monthExpandDate: string | null = null;
+  scheduledDrawerOpen = false;
+  scheduledDrawerDate: string | null = null;
+  get scheduledDrawerTasks() {
+      if (!this.scheduledDrawerDate) return [];
+      return this.filteredTasks.filter(t => t.date === this.scheduledDrawerDate);
+  }
+
+
+  contextMenuState = { show: false, x: 0, y: 0, task: null as any };
   isDragging = false;
 
   // Swipe logic
   swipeState: Record<string, { offset: number, startX: number, startY: number, active: boolean, state: string }> = {};
+  longPressTimer: any;
+  longPressTriggered = false;
+
+
+  openScheduledDrawer(dateStr: string, tasks: any[]) {
+      this.scheduledDrawerDate = dateStr;
+
+      this.scheduledDrawerOpen = true;
+      this.monthExpandDate = null;
+  }
+
+  onContextMenu(event: MouseEvent, task: Task) {
+      event.preventDefault();
+      this.contextMenuState = {
+          show: true,
+          x: event.clientX,
+          y: event.clientY,
+          task: task
+      };
+  }
+
+  toggleCompletion(task: Task) {
+      const newStatus = task.status === 'completed' ? 'pending' : 'completed';
+      this.taskService.updateTask(task.id, { status: newStatus }).then(() => {
+         // Auto updates via loadTasks observable
+      });
+  }
 
   ngOnInit() {
     this.workspaceService.currentWorkspace$.pipe(takeUntil(this.destroy$)).subscribe(ws => {
@@ -594,8 +673,20 @@ export class MainViewComponent implements OnInit, OnDestroy {
           }
       }
 
-      // Sort by time (tasks without start time go first)
+      // Sort by completion, then manual order, then time (tasks without start time go first)
       filtered.sort((a, b) => {
+          // 1. Completed tasks always go to bottom
+          if (a.status === 'completed' && b.status !== 'completed') return 1;
+          if (a.status !== 'completed' && b.status === 'completed') return -1;
+
+          // 2. User defined order
+          const orderA = (a as any).order ?? 0;
+          const orderB = (b as any).order ?? 0;
+          if (orderA !== orderB) {
+              return orderA - orderB;
+          }
+
+          // 3. Fallback to time
           if (!a.startTime && b.startTime) return -1;
           if (a.startTime && !b.startTime) return 1;
           if (!a.startTime && !b.startTime) return 0;
@@ -818,10 +909,13 @@ export class MainViewComponent implements OnInit, OnDestroy {
   dropToDate(event: CdkDragDrop<Task[]>, targetDateStr: string) {
     if (event.previousContainer === event.container) {
       moveItemInArray(event.container.data, event.previousIndex, event.currentIndex);
+      event.container.data.forEach((task, index) => {
+         this.taskService.updateTask(task.id, { order: index });
+      });
     } else {
       const task = event.item.data;
       if(task) {
-        this.taskService.updateTask(task.id, { date: targetDateStr });
+        this.taskService.updateTask(task.id, { date: targetDateStr, order: Date.now() });
       }
     }
   }
@@ -893,6 +987,8 @@ export class MainViewComponent implements OnInit, OnDestroy {
 
     const now = new Date();
     tasks.forEach(task => {
+        if (task.status === 'completed') return; // Skip completed tasks
+
         if (task.date && task.startTime && task.reminderOffset) {
             const [h, m] = task.startTime.split(':').map(Number);
             const taskDate = new Date(task.date);
@@ -1024,6 +1120,7 @@ export class MainViewComponent implements OnInit, OnDestroy {
   }
 
   editTask(task: Task) {
+    if (this.longPressTriggered) return;
     const s = this.swipeState[task.id];
     if (s && (s.active || Math.abs(s.offset) > 10)) {
         return; // ignore click if swiping or swiped open
