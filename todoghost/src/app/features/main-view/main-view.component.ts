@@ -17,7 +17,7 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
   template: `
     <div class="flex flex-col h-full bg-milktea-50 relative" cdkDropListGroup>
       <!-- Header -->
-      <div class="bg-white px-4 py-3 shadow-sm border-b border-milktea-100 flex items-center justify-between z-10 pt-[env(safe-area-inset-top,12px)]">
+      <div class="bg-white px-4 py-3 shadow-sm border-b border-milktea-100 flex items-center justify-between z-10 ">
         <button (click)="goBack()" class="text-milktea-400 p-2 -ml-2 whitespace-nowrap">
           ← 返回
         </button>
@@ -91,8 +91,8 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
       <div class="flex-1 overflow-y-auto relative pb-20" id="main-group">
 
         <!-- Month View -->
-        <div *ngIf="viewMode === 'month'" class="p-4 h-full flex flex-col relative">
-          <div class="flex justify-between items-center mb-4">
+        <div *ngIf="viewMode === 'month'" class="p-4 h-full flex flex-col relative pb-32">
+          <div class="flex justify-between items-center mb-4 sticky top-0 bg-milktea-50 z-20 pb-2">
             <button (click)="prevMonth()" class="text-milktea-800 font-bold px-2">&lt;</button>
             <h2 class="text-xl font-bold text-milktea-900">{{ currentMonthStr }}</h2>
             <button (click)="nextMonth()" class="text-milktea-800 font-bold px-2">&gt;</button>
@@ -179,7 +179,7 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
             <button (click)="nextWeek()" class="text-milktea-800 font-bold px-2">&gt;</button>
           </div>
 
-          <div class="flex-1 flex flex-col gap-3 pb-4 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
+          <div class="flex-1 flex flex-col gap-3 pb-4 pb-4">
              <div *ngFor="let d of weekDays"
                   class="bg-white rounded-xl p-3 flex border border-milktea-100 shadow-sm min-h-[80px]"
                   [class.bg-milktea-100]="d.isToday"
@@ -240,8 +240,8 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
         </div>
 
         <!-- Day View (Time Axis) -->
-        <div *ngIf="viewMode === 'day'" class="p-4 h-full flex flex-col relative overflow-x-hidden pb-[calc(8rem+env(safe-area-inset-bottom,0px))]">
-          <div class="flex justify-between items-center mb-4 sticky top-0 bg-milktea-50 z-30 pb-2 border-b border-milktea-100">
+        <div *ngIf="viewMode === 'day'" class="p-4 h-full flex flex-col relative overflow-x-hidden pb-32">
+          <div class="flex justify-between items-center mb-4 sticky top-0 bg-milktea-50 z-30 pb-2">
             <button (click)="prevDay()" class="text-milktea-800 font-bold px-2">&lt;</button>
             <h2 class="text-xl font-bold text-milktea-900">{{ selectedDateStr }}</h2>
             <button (click)="nextDay()" class="text-milktea-800 font-bold px-2">&gt;</button>
@@ -370,8 +370,8 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
 
       <!-- Bottom Drawer handle & Backdrop -->
       <div *ngIf="drawerOpen" class="fixed inset-0 bg-black/20 z-30 transition-opacity" (click)="drawerOpen = false"></div>
-      <div class="fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-[0_-4px_15px_rgba(0,0,0,0.1)] transition-transform duration-300 z-40 max-w-3xl mx-auto pb-[env(safe-area-inset-bottom,0px)]"
-           [style.transform]="drawerOpen ? 'translateY(0)' : 'translateY(calc(100% - 60px - env(safe-area-inset-bottom,0px)))'">
+      <div class="fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-[0_-4px_15px_rgba(0,0,0,0.1)] transition-transform duration-300 z-40 max-w-3xl mx-auto "
+           [style.transform]="drawerOpen ? 'translateY(0)' : 'translateY(calc(100% - 60px))'">
         <div class="h-[60px] flex items-center justify-center cursor-pointer relative" (click)="drawerOpen = !drawerOpen">
           <div class="w-12 h-1.5 bg-milktea-200 rounded-full mb-1"></div>
           <span class="absolute right-6 bg-milktea-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">未排程 ({{ unassignedTasks.length }})</span>
@@ -791,6 +791,9 @@ export class MainViewComponent implements OnInit, OnDestroy {
 
   wasDrawerOpenBeforeDrag = false;
 
+  // Track reminder timeouts to prevent duplicates
+  reminderTimeouts: { [taskId: string]: any } = {};
+
   dragStarted() {
     this.isDragging = true;
     this.wasDrawerOpenBeforeDrag = this.drawerOpen;
@@ -878,9 +881,20 @@ export class MainViewComponent implements OnInit, OnDestroy {
 
   // Calculate local time reminders
   scheduleLocalReminders(tasks: Task[]) {
-    // This is a naive frontend implementation to demonstrate the local reminder behavior
+    if (!('Notification' in window)) return;
+
+    if (Notification.permission !== 'granted') {
+        Notification.requestPermission();
+    }
+
     const now = new Date();
     tasks.forEach(task => {
+        // Clear any existing timeout for this task first to prevent duplicates
+        if (this.reminderTimeouts[task.id]) {
+            clearTimeout(this.reminderTimeouts[task.id]);
+            delete this.reminderTimeouts[task.id];
+        }
+
         if (task.date && task.startTime && task.reminderOffset) {
             const [h, m] = task.startTime.split(':').map(Number);
             const taskDate = new Date(task.date);
@@ -891,11 +905,22 @@ export class MainViewComponent implements OnInit, OnDestroy {
 
             // If the reminder time is in the future and within the next 24 hours, set a timeout
             if (timeDiff > 0 && timeDiff < 86400000) {
-               setTimeout(() => {
+               this.reminderTimeouts[task.id] = setTimeout(() => {
                   if (Notification.permission === 'granted') {
-                      new Notification('即將到期的代辦事項', {
-                          body: `${task.title} 將於 ${task.startTime} 開始`
-                      });
+                      if ('serviceWorker' in navigator) {
+                          navigator.serviceWorker.ready.then(registration => {
+                              registration.showNotification('即將到期的代辦事項', {
+                                  body: `${task.title} 將於 ${task.startTime} 開始`,
+                                  icon: '/icons/icon-192x192.png',
+                                  tag: task.id // Prevent multiple notifications for the same task
+                              });
+                          });
+                      } else {
+                          new Notification('即將到期的代辦事項', {
+                              body: `${task.title} 將於 ${task.startTime} 開始`,
+                              tag: task.id
+                          });
+                      }
                   }
                }, timeDiff);
             }
@@ -1015,6 +1040,11 @@ export class MainViewComponent implements OnInit, OnDestroy {
 
     if (!this.formTask.startTime && this.formTask.endTime) {
         alert('請先選擇開始時間，再選擇結束時間！');
+        return;
+    }
+
+    if (this.formTask.reminderOffset && !this.formTask.startTime) {
+        alert('設定提醒時間前，必須先設定開始時間！');
         return;
     }
 

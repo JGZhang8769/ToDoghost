@@ -13,7 +13,8 @@ export class PushNotificationService {
         console.log('Notification permission granted.');
         getToken(this.messaging!, { vapidKey: 'BB-vGylQchRkRrPcBz1p6ucJixvaeWwSLeGnXdaCk-iTRJB5neMSG5XexyyziDylvBsT4wh65KfGd_RcXbqqtEg' }).then(token => {
             console.log('FCM Token generated');
-            // Token can be saved to user profile here.
+            console.log("Token:", token);
+            // In a real app with backend, you would send this token to your server.
         }).catch(err => {
             console.error('An error occurred while retrieving token. ', err);
         });
