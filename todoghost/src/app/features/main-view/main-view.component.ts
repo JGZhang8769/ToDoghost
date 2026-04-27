@@ -449,9 +449,9 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
       <!-- Context Menu Desktop -->
       <div *ngIf="contextMenuState.show" class="fixed bg-white border border-milktea-200 shadow-xl rounded-lg z-[80] py-1 w-32"
            [style.left.px]="contextMenuState.x" [style.top.px]="contextMenuState.y">
-         <button class="w-full text-left px-4 py-2 hover:bg-milktea-50 text-sm" (click)="copyTask(contextMenuState.task); contextMenuState.show = false">複製</button>
-         <button class="w-full text-left px-4 py-2 hover:bg-milktea-50 text-sm" (click)="toggleCompletion(contextMenuState.task); contextMenuState.show = false">{{ contextMenuState.task?.status === 'completed' ? '標為未完成' : '標為已完成' }}</button>
-         <button class="w-full text-left px-4 py-2 hover:bg-red-50 text-red-600 text-sm" (click)="unscheduleTask(contextMenuState.task); contextMenuState.show = false">取消排程</button>
+         <button class="w-full text-left px-4 py-2 hover:bg-milktea-50 text-sm" (click)="copyTask(contextMenuState.task); contextMenuState.show = false; $event.stopPropagation()">複製</button>
+         <button class="w-full text-left px-4 py-2 hover:bg-milktea-50 text-sm" (click)="toggleCompletion(contextMenuState.task); contextMenuState.show = false; $event.stopPropagation()">{{ contextMenuState.task?.status === 'completed' ? '標為未完成' : '標為已完成' }}</button>
+         <button class="w-full text-left px-4 py-2 hover:bg-red-50 text-red-600 text-sm" (click)="unscheduleTask(contextMenuState.task); contextMenuState.show = false; $event.stopPropagation()">取消排程</button>
       </div>
 
       <div *ngIf="showForm" class="fixed inset-0 bg-black/30 z-[70] flex items-center justify-center p-4">
