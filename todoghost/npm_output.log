@@ -1,8 +1,0 @@
-
-> todoghost@0.0.0 start
-> ng serve
-
- [1mPort 4200 is already in use.
-Would you like to use a different port?[22m [2m(Y/n)[22m[47G
-[?25hAn unhandled exception occurred: Port 4200 is already in use. Use '--port' to specify a different port.
-See "/tmp/ng-byBom4/angular-errors.log" for further details.

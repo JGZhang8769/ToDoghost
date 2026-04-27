@@ -422,6 +422,7 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
                  (mousedown)="onTouchStart($event, task.id)" (touchstart)="onTouchStart($event, task.id)"
                  (mousemove)="onTouchMove($event, task.id)" (touchmove)="onTouchMove($event, task.id)"
                  (mouseup)="onTouchEnd($event, task.id)" (touchend)="onTouchEnd($event, task.id)"
+                 (contextmenu)="onContextMenuMobile($event)"
                  (click)="editTask(task)">
 
               <div class="flex items-center gap-2 flex-1 min-w-0">
@@ -466,6 +467,10 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
             </div>
 
             <div class="flex flex-col gap-2 mb-2 border rounded p-2 bg-white">
+               <label class="flex items-center gap-2 mb-2" *ngIf="editingTask?.id">
+                   <input type="checkbox" [checked]="formTask.status === 'completed'" (change)="formTask.status = formTask.status === 'completed' ? 'pending' : 'completed'" class="rounded w-4 h-4 text-milktea-600 border-milktea-300">
+                   <span class="text-sm font-bold text-milktea-900">標記為已完成</span>
+               </label>
                <div class="flex gap-2 items-center mb-1">
                    <span class="text-sm text-milktea-600 font-bold">標籤</span>
                    <label class="flex items-center gap-1 text-sm text-red-500 font-bold whitespace-nowrap ml-auto">
@@ -586,6 +591,9 @@ export class MainViewComponent implements OnInit, OnDestroy {
 
   openScheduledDrawer(dateStr: string, tasks: any[]) {
       this.scheduledDrawerDate = dateStr;
+
+      // Update form context
+      this.selectedDateStr = dateStr;
 
       this.scheduledDrawerOpen = true;
       this.monthExpandDate = null;
@@ -738,6 +746,8 @@ export class MainViewComponent implements OnInit, OnDestroy {
     this.selectedDateStr = dateStr;
     const dateObj = new Date(dateStr);
     this.currentDate = dateObj;
+    // ensure we update drawer context
+    this.scheduledDrawerDate = dateStr;
     this.refreshViews();
   }
 
@@ -1069,6 +1079,13 @@ export class MainViewComponent implements OnInit, OnDestroy {
            };
         }
     }, 600);
+  }
+
+  onContextMenuMobile(event: any) {
+    if (this.longPressTriggered) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
   }
 
   onTouchMove(e: any, taskId: string) {
