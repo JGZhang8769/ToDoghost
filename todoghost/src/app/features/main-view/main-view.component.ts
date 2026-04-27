@@ -108,7 +108,7 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
                  [class.opacity-50]="!d.isCurrentMonth"
                  [class.border-2]="d.dateStr === selectedDateStr"
                  [class.border-milktea-400]="d.dateStr === selectedDateStr"
-                 (click)="openScheduledDrawer(d.dateStr, d.tasks)"
+                 (click)="selectDate(d.dateStr); openScheduledDrawer(d.dateStr, d.tasks)"
                  cdkDropList
                  [cdkDropListData]="d.tasks"
                  (cdkDropListDropped)="dropToDate($event, d.dateStr)">
@@ -145,9 +145,9 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
              <div *ngFor="let d of weekDays"
                   class="bg-white rounded-xl p-3 flex border border-milktea-100 shadow-sm min-h-[80px]"
                   [class.bg-milktea-100]="d.isToday"
-                  [class.ring-2]="d.dateStr === selectedDateStr"
-                  [class.ring-milktea-400]="d.dateStr === selectedDateStr"
-                  (click)="selectDate(d.dateStr)"
+                  [class.border-2]="d.dateStr === selectedDateStr"
+                  [class.border-milktea-400]="d.dateStr === selectedDateStr"
+                  (click)="selectDate(d.dateStr); openScheduledDrawer(d.dateStr, d.tasks)"
                   cdkDropList
                   [cdkDropListData]="d.tasks"
                   (cdkDropListDropped)="dropToDate($event, d.dateStr)">
@@ -1060,7 +1060,14 @@ export class MainViewComponent implements OnInit, OnDestroy {
     this.longPressTimer = setTimeout(() => {
         this.longPressTriggered = true;
         const task = this.filteredTasks.find(t => t.id === taskId);
-        if(task) this.toggleCompletion(task);
+        if(task) {
+           this.contextMenuState = {
+              show: true,
+              x: this.swipeState[taskId].startX,
+              y: this.swipeState[taskId].startY,
+              task: task
+           };
+        }
     }, 600);
   }
 
@@ -1118,15 +1125,10 @@ export class MainViewComponent implements OnInit, OnDestroy {
   }
 
   // --- Form & Actions ---
-  openCreateTask() {
+    openCreateTask() {
     this.editingTask = null;
     this.formTask = {
-      title: '',
-      description: '',
-      date: this.selectedDateStr,
-      startTime: '',
-      endTime: '',
-      isUrgent: false
+       date: this.selectedDateStr
     };
     this.formTaskTags = [];
     this.formTaskTagInput = '';
