@@ -5,6 +5,7 @@ import { Observable } from 'rxjs';
 export interface Task {
   id: string;
   workspaceId: string;
+  categoryId?: string;     // Category ID
   title: string;
   description?: string;
   date: string | null;     // 'yyyy-MM-dd' or null if unscheduled
@@ -52,7 +53,7 @@ export class TaskService {
   }
 
   async updateTask(taskId: string, data: Partial<Task>) {
-    const taskRef = doc(this.firestore, `tasks/${taskId}`);
+    const taskRef = doc(this.firestore, `tasks/\${taskId}`);
     try {
       await updateDoc(taskRef, {
         ...data,
@@ -65,7 +66,7 @@ export class TaskService {
   }
 
   async deleteTask(taskId: string) {
-    const taskRef = doc(this.firestore, `tasks/${taskId}`);
+    const taskRef = doc(this.firestore, `tasks/\${taskId}`);
     try {
       await deleteDoc(taskRef);
     } catch (e) {

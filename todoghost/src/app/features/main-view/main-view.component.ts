@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { WorkspaceService, Workspace } from '../../core/services/workspace.service';
 import { TaskService, Task } from '../../core/services/task.service';
+import { CategoryService, Category } from '../../core/services/category.service';
 import { UserService, User } from '../../core/services/user.service';
 import { SvgIconComponent } from '../../core/svg-icon/svg-icon.component';
 import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
@@ -21,9 +22,10 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
         <button (click)="goBack()" class="text-milktea-400 p-2 -ml-2 whitespace-nowrap">
           ← 返回
         </button>
-        <div class="flex flex-col items-center flex-1 mx-4 min-w-0" (click)="editWorkspaceName()">
-          <span *ngIf="!isEditingWorkspace" class="font-bold text-milktea-900 truncate w-full text-center">{{ currentWorkspace?.name || '未命名空間' }}</span>
-          <input *ngIf="isEditingWorkspace" [(ngModel)]="editingWorkspaceName" (blur)="saveWorkspaceName()" (keyup.enter)="saveWorkspaceName()" class="w-full text-center bg-milktea-50 border-b border-milktea-400 focus:outline-none text-milktea-900 font-bold" autofocus>
+        <div class="flex items-center justify-center flex-1 mx-2 min-w-0" (click)="editWorkspaceName()">
+          <app-svg-icon name="logo_main" width="28px" height="28px" class="mr-2 flex-shrink-0"></app-svg-icon>
+          <span *ngIf="!isEditingWorkspace" class="font-bold text-milktea-900 truncate w-full max-w-[200px] text-center">{{ currentWorkspace?.name || '未命名空間' }}</span>
+          <input *ngIf="isEditingWorkspace" [(ngModel)]="editingWorkspaceName" (blur)="saveWorkspaceName()" (keyup.enter)="saveWorkspaceName()" class="w-full max-w-[200px] text-center bg-milktea-50 border-b border-milktea-400 focus:outline-none text-milktea-900 font-bold" autofocus>
         </div>
         <div class="flex items-center gap-2">
             <span class="text-sm font-bold text-milktea-800 hidden sm:inline" *ngIf="currentUser">Hi, {{ currentUser.name }}</span>
@@ -47,9 +49,13 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
                 [class.bg-white]="viewMode !== 'day'" [class.text-milktea-600]="viewMode !== 'day'"
                 (click)="viewMode = 'day'">日曆</button>
         <div class="flex-1"></div>
-        <button class="px-3 py-1.5 rounded-full bg-white text-milktea-600 border border-milktea-200 text-sm flex items-center gap-1"
+        <button class="px-3 py-1.5 rounded-full bg-white text-milktea-600 border border-milktea-200 text-sm flex items-center gap-1 shrink-0"
                 (click)="showFilter = !showFilter">
           篩選
+        </button>
+        <button class="px-2 py-1.5 rounded-full bg-white text-milktea-600 border border-milktea-200 flex items-center justify-center shrink-0"
+                (click)="goToSettings()">
+          <span class="material-icons text-sm">settings</span>
         </button>
       </div>
 
@@ -79,12 +85,43 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
 
          <div class="w-[1px] h-4 bg-milktea-200 mx-1"></div>
 
-         <button *ngFor="let tag of availableTags" class="text-xs px-3 py-1.5 rounded-full border transition-colors"
-                 [class.border-milktea-500]="filterTags.includes(tag)" [class.bg-milktea-100]="filterTags.includes(tag)" [class.text-milktea-800]="filterTags.includes(tag)"
-                 [class.border-milktea-200]="!filterTags.includes(tag)" [class.text-milktea-500]="!filterTags.includes(tag)"
-                 (click)="toggleFilterTag(tag)">{{ tag }}</button>
+         <!-- Category Filter (Dropdown) -->
+         <div class="relative flex items-center shrink-0">
+           <select [(ngModel)]="filterCategoryId" (change)="applyFilter()" class="text-xs bg-white border border-milktea-200 text-milktea-800 rounded-full px-3 py-1.5 focus:outline-none focus:border-milktea-500 appearance-none pr-8">
+             <option [ngValue]="null">所有分類</option>
+             <option *ngFor="let cat of availableCategories" [value]="cat.id">
+               {{ cat.name }}
+             </option>
+           </select>
+           <span class="material-icons absolute right-2 text-milktea-400 pointer-events-none" style="font-size: 14px;">arrow_drop_down</span>
+         </div>
 
-         <button class="text-xs text-milktea-400 ml-auto" (click)="clearFilter()">清除</button>
+         <!-- Tag Input -->
+         <div class="relative flex items-center shrink-0 min-w-[120px]">
+           <span class="absolute left-2 text-milktea-400">#</span>
+           <input type="text"
+                  [(ngModel)]="tagFilterInput"
+                  (keyup.enter)="addTagToFilter()"
+                  (focus)="showTagAutocomplete = true"
+                  (blur)="hideTagAutocomplete()"
+                  placeholder="輸入標籤..."
+                  class="pl-6 pr-2 py-1 text-xs border border-milktea-200 rounded-full bg-white focus:outline-none focus:border-milktea-400 text-milktea-800 w-full" />
+           <div *ngIf="showTagAutocomplete && autocompleteTags.length > 0" class="absolute top-full left-0 mt-1 w-full max-h-40 bg-white shadow-lg rounded-lg border border-milktea-100 overflow-y-auto z-50">
+             <div *ngFor="let t of autocompleteTags" (mousedown)="selectAutocompleteTag(t)" class="px-3 py-2 text-xs text-milktea-700 hover:bg-milktea-50 cursor-pointer">
+               {{ t }}
+             </div>
+           </div>
+         </div>
+
+         <!-- Selected Tags -->
+         <div class="flex items-center space-x-1 shrink-0">
+            <span *ngFor="let t of filterTags" class="text-xs bg-milktea-100 text-milktea-800 px-2 py-1 rounded-full flex items-center border border-milktea-200">
+               {{ t }}
+               <span class="material-icons text-[10px] ml-1 cursor-pointer" (click)="removeTagFromFilter(t)">close</span>
+            </span>
+         </div>
+
+         <button class="text-xs text-milktea-400 ml-auto flex-shrink-0" (click)="clearFilter()">清除</button>
       </div>
 
       <!-- Main Content Area -->
@@ -481,6 +518,14 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
           <div class="overflow-y-auto flex-1 pb-4">
             <input [(ngModel)]="formTask.title" placeholder="標題" class="w-full p-2 mb-2 border rounded">
             <textarea [(ngModel)]="formTask.description" placeholder="詳細內容" class="w-full p-2 mb-2 border rounded" rows="2"></textarea>
+
+            <div class="mb-2">
+              <select [(ngModel)]="formTask.categoryId" class="w-full p-2 border rounded bg-white">
+                <option [ngValue]="undefined">無分類</option>
+                <option *ngFor="let cat of availableCategories" [value]="cat.id">{{ cat.name }}</option>
+              </select>
+            </div>
+
             <input [(ngModel)]="formTask.date" type="date" placeholder="日期" class="w-full p-2 mb-2 border rounded">
             <div class="flex gap-2 mb-2">
               <input [(ngModel)]="formTask.startTime" type="time" placeholder="開始時間" class="w-1/2 p-2 border rounded">
@@ -543,6 +588,7 @@ export class MainViewComponent implements OnInit, OnDestroy {
 
   private workspaceService = inject(WorkspaceService);
   private taskService = inject(TaskService);
+  private categoryService = inject(CategoryService);
   private userService = inject(UserService);
   private router = inject(Router);
 
@@ -579,9 +625,20 @@ export class MainViewComponent implements OnInit, OnDestroy {
   filterTags: string[] = [];
   filterLogicAnd = false;
   filterCreatedBy: string | null = null;
+  filterCategoryId: string | null = null;
   availableTags: string[] = [];
   availableUsers: User[] = [];
+  availableCategories: Category[] = [];
   filteredTasks: Task[] = [];
+
+  // Tag filter input
+  tagFilterInput = '';
+  showTagAutocomplete = false;
+
+  get autocompleteTags(): string[] {
+      const lowerInput = this.tagFilterInput.toLowerCase();
+      return this.availableTags.filter(t => !this.filterTags.includes(t) && t.toLowerCase().includes(lowerInput));
+  }
 
   // Workspace Edit
   isEditingWorkspace = false;
@@ -650,6 +707,7 @@ export class MainViewComponent implements OnInit, OnDestroy {
       }
       this.currentWorkspace = ws;
       this.loadTasks(ws.id);
+      this.loadCategories(ws.id);
     });
 
     this.userService.currentUser$.pipe(takeUntil(this.destroy$)).subscribe(u => {
@@ -675,6 +733,12 @@ export class MainViewComponent implements OnInit, OnDestroy {
     });
   }
 
+  loadCategories(workspaceId: string) {
+    this.categoryService.getCategories(workspaceId).pipe(takeUntil(this.destroy$)).subscribe((cats: Category[]) => {
+      this.availableCategories = cats;
+    });
+  }
+
   toggleFilterUrgent() {
       this.filterUrgent = !this.filterUrgent;
       // We rely on the template calling applyFilter after this
@@ -697,6 +761,10 @@ export class MainViewComponent implements OnInit, OnDestroy {
 
       if (this.filterCreatedBy) {
           filtered = filtered.filter(t => t.createdBy === this.filterCreatedBy);
+      }
+
+      if (this.filterCategoryId) {
+          filtered = filtered.filter(t => t.categoryId === this.filterCategoryId);
       }
 
       if (this.filterTags.length > 0) {
@@ -736,15 +804,37 @@ export class MainViewComponent implements OnInit, OnDestroy {
       this.filterUrgent = false;
       this.filterTags = [];
       this.filterCreatedBy = null;
+      this.filterCategoryId = null;
       this.applyFilter();
   }
 
-  toggleFilterTag(tag: string) {
-     if (this.filterTags.includes(tag)) {
-         this.filterTags = this.filterTags.filter(t => t !== tag);
-     } else {
+  addTagToFilter() {
+     const tag = this.tagFilterInput.trim();
+     if (tag && !this.filterTags.includes(tag)) {
          this.filterTags.push(tag);
      }
+     this.tagFilterInput = '';
+     this.showTagAutocomplete = false;
+     this.applyFilter();
+  }
+
+  selectAutocompleteTag(tag: string) {
+      if (!this.filterTags.includes(tag)) {
+         this.filterTags.push(tag);
+      }
+      this.tagFilterInput = '';
+      this.showTagAutocomplete = false;
+      this.applyFilter();
+  }
+
+  hideTagAutocomplete() {
+      setTimeout(() => {
+          this.showTagAutocomplete = false;
+      }, 150); // slight delay to allow mousedown to fire on autocomplete item
+  }
+
+  removeTagFromFilter(tag: string) {
+     this.filterTags = this.filterTags.filter(t => t !== tag);
      this.applyFilter();
   }
 
@@ -1201,6 +1291,7 @@ export class MainViewComponent implements OnInit, OnDestroy {
 
     const dataToSave = {
       workspaceId: this.currentWorkspace.id,
+      categoryId: this.formTask.categoryId || null,
       title: this.formTask.title || '新代辦事項',
       description: this.formTask.description || '',
       date: this.formTask.date || null,
@@ -1296,6 +1387,10 @@ export class MainViewComponent implements OnInit, OnDestroy {
        this.workspaceService.updateWorkspace(this.currentWorkspace.id, { name: this.editingWorkspaceName.trim() });
     }
     this.isEditingWorkspace = false;
+  }
+
+  goToSettings() {
+    this.router.navigate(['/settings']);
   }
 
   logout() {
