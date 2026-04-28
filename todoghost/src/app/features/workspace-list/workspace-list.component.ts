@@ -17,11 +17,17 @@ import { UserService, User } from '../../core/services/user.service';
       </div>
 
       <div class="flex-1 overflow-y-auto">
-        <div *ngIf="workspaces.length === 0" class="text-center text-milktea-400 mt-10">
+        <div *ngIf="isLoadingWorkspaces" class="flex flex-col items-center justify-center py-12">
+           <svg class="animate-spin h-8 w-8 text-milktea-600 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+           <span class="text-milktea-600 font-bold">載入中...</span>
+        </div>
+
+        <div *ngIf="!isLoadingWorkspaces && workspaces.length === 0" class="text-center text-milktea-400 mt-10">
           您還沒有任何空間，請建立或加入一個。
         </div>
 
-        <div *ngFor="let ws of workspaces"
+        <div *ngIf="!isLoadingWorkspaces">
+          <div *ngFor="let ws of workspaces"
              class="bg-white p-5 rounded-2xl shadow-sm mb-4 cursor-pointer hover:shadow-md border border-milktea-100 transition-all active:scale-[0.98]"
              (click)="enterWorkspace(ws)">
           <div class="flex justify-between items-center mb-2">
@@ -30,6 +36,7 @@ import { UserService, User } from '../../core/services/user.service';
           </div>
           <div class="text-sm text-milktea-500 font-mono bg-milktea-50 p-2 rounded inline-block" *ngIf="ws.inviteCode">
             邀請碼: <span class="font-bold text-milktea-700">{{ ws.inviteCode }}</span>
+          </div>
           </div>
         </div>
       </div>
@@ -54,7 +61,10 @@ import { UserService, User } from '../../core/services/user.service';
           <input [(ngModel)]="newWorkspaceName" placeholder="輸入空間名稱" class="w-full bg-milktea-50 border border-milktea-200 rounded-xl px-4 py-3 mb-6 focus:outline-none focus:border-milktea-400 transition-colors">
           <div class="flex gap-3">
             <button class="flex-1 py-3 rounded-xl bg-milktea-100 text-milktea-800 font-bold" (click)="showNewWorkspaceForm = false">取消</button>
-            <button class="flex-1 py-3 rounded-xl bg-milktea-600 text-white font-bold disabled:opacity-50" [disabled]="!newWorkspaceName.trim()" (click)="createWorkspace()">確定</button>
+            <button class="flex-1 py-3 rounded-xl bg-milktea-600 text-white font-bold disabled:opacity-50 flex justify-center items-center gap-2" [disabled]="!newWorkspaceName.trim() || isSaving" (click)="createWorkspace()">
+               <svg *ngIf="isSaving" class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+               確定
+            </button>
           </div>
         </div>
       </div>
@@ -71,6 +81,8 @@ export class WorkspaceListComponent implements OnInit {
   inviteCodeInput = '';
   showNewWorkspaceForm = false;
   newWorkspaceName = '';
+  isSaving = false;
+  isLoadingWorkspaces = true;
 
   ngOnInit() {
     this.userService.currentUser$.subscribe(user => {
@@ -92,6 +104,7 @@ export class WorkspaceListComponent implements OnInit {
   loadWorkspaces(userId: string) {
     this.workspaceService.getWorkspacesForUser(userId).subscribe(ws => {
       this.workspaces = ws;
+      this.isLoadingWorkspaces = false;
     });
   }
 
@@ -101,10 +114,15 @@ export class WorkspaceListComponent implements OnInit {
 
   async createWorkspace() {
     if(!this.currentUser || !this.newWorkspaceName.trim()) return;
-    const ws = await this.workspaceService.createWorkspace(this.currentUser.id, this.newWorkspaceName.trim());
-    this.showNewWorkspaceForm = false;
-    this.newWorkspaceName = '';
-    this.enterWorkspace(ws);
+    this.isSaving = true;
+    try {
+        const ws = await this.workspaceService.createWorkspace(this.currentUser.id, this.newWorkspaceName.trim());
+        this.showNewWorkspaceForm = false;
+        this.newWorkspaceName = '';
+        this.enterWorkspace(ws);
+    } finally {
+        this.isSaving = false;
+    }
   }
 
   async joinWorkspace() {
