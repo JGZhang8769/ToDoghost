@@ -520,7 +520,10 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
 
           <div class="flex gap-2 justify-end mt-4 shrink-0 pt-2 border-t border-milktea-100">
              <button class="text-milktea-600 px-4 py-2" (click)="showForm = false">取消</button>
-             <button class="bg-milktea-600 text-white px-4 py-2 rounded" (click)="saveForm()">儲存</button>
+             <button class="bg-milktea-600 text-white px-4 py-2 rounded disabled:opacity-50 flex items-center justify-center gap-2" [disabled]="isSaving" (click)="saveForm()">
+               <svg *ngIf="isSaving" class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+               儲存
+             </button>
           </div>
         </div>
       </div>
@@ -586,6 +589,7 @@ export class MainViewComponent implements OnInit, OnDestroy {
 
   // Form
   showForm = false;
+  isSaving = false;
   editingTask: Task | null = null;
   formTask: any = {};
   formTaskTagInput = '';
@@ -1209,12 +1213,31 @@ export class MainViewComponent implements OnInit, OnDestroy {
       reminderOffset: this.formTask.reminderOffset || null
     };
 
+    this.isSaving = true;
     if (this.editingTask) {
-      this.taskService.updateTask(this.editingTask.id, dataToSave);
+      this.taskService.updateTask(this.editingTask.id, dataToSave).then(() => {
+          this.isSaving = false;
+          this.showForm = false;
+      }).catch(() => { this.isSaving = false; });
     } else {
-      this.taskService.addTask(dataToSave as any);
+      // Calculate top order for new task
+      let newOrder = 0;
+      const dateToMatch = dataToSave.date;
+      const tasksInSameList = dateToMatch
+           ? this.filteredTasks.filter(t => t.date === dateToMatch)
+           : this.unassignedTasks;
+
+      if (tasksInSameList.length > 0) {
+          const minOrder = Math.min(...tasksInSameList.map(t => typeof t.order === 'number' ? t.order : 0));
+          newOrder = minOrder - 1;
+      }
+
+      const taskToCreate = { ...dataToSave, order: newOrder };
+      this.taskService.addTask(taskToCreate as any).then(() => {
+          this.isSaving = false;
+          this.showForm = false;
+      }).catch(() => { this.isSaving = false; });
     }
-    this.showForm = false;
   }
 
   copyTask(task: Task) {

@@ -14,7 +14,12 @@ import { PushNotificationService } from '../../core/services/push-notification.s
     <div class="min-h-screen bg-milktea-50 flex flex-col items-center justify-center p-6">
       <h1 class="text-3xl font-bold text-milktea-900 mb-8">誰正在觀看？</h1>
 
-      <div class="flex flex-wrap gap-6 justify-center max-w-md">
+      <div *ngIf="isLoadingUsers" class="flex flex-col items-center justify-center py-12">
+         <svg class="animate-spin h-8 w-8 text-milktea-600 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+         <span class="text-milktea-600 font-bold">載入中...</span>
+      </div>
+
+      <div *ngIf="!isLoadingUsers" class="flex flex-wrap gap-6 justify-center max-w-md">
         <div *ngFor="let user of users"
              class="flex flex-col items-center gap-3 cursor-pointer group"
              (click)="selectUser(user)">
@@ -48,7 +53,10 @@ import { PushNotificationService } from '../../core/services/push-notification.s
           </div>
           <div class="flex gap-3">
             <button class="flex-1 py-3 rounded-xl bg-milktea-100 text-milktea-800 font-bold" (click)="showNewUserForm = false">取消</button>
-            <button class="flex-1 py-3 rounded-xl bg-milktea-600 text-white font-bold disabled:opacity-50" [disabled]="!newUserName.trim()" (click)="createUser()">確定</button>
+            <button class="flex-1 py-3 rounded-xl bg-milktea-600 text-white font-bold disabled:opacity-50 flex justify-center items-center gap-2" [disabled]="!newUserName.trim() || isSaving" (click)="createUser()">
+              <svg *ngIf="isSaving" class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+              確定
+            </button>
           </div>
         </div>
       </div>
@@ -65,10 +73,13 @@ export class LoginComponent implements OnInit {
   newUserName = '';
   newUserIcon = 'bengal';
   availableIcons = ['bengal', 'golden', 'rabbit', 'tiger'];
+  isSaving = false;
+  isLoadingUsers = true;
 
   ngOnInit() {
     this.userService.getUsers().subscribe(users => {
       this.users = users;
+      this.isLoadingUsers = false;
     });
 
     this.userService.currentUser$.subscribe(user => {
@@ -85,9 +96,14 @@ export class LoginComponent implements OnInit {
 
   async createUser() {
     if (this.newUserName.trim()) {
-      await this.userService.addUser(this.newUserName.trim(), this.newUserIcon);
-      this.showNewUserForm = false;
-      this.newUserName = '';
+      this.isSaving = true;
+      try {
+         await this.userService.addUser(this.newUserName.trim(), this.newUserIcon);
+         this.showNewUserForm = false;
+         this.newUserName = '';
+      } finally {
+         this.isSaving = false;
+      }
     }
   }
 }
