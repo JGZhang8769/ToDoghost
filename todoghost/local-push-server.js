@@ -37,6 +37,9 @@ async function checkTasksAndNotify() {
         const currentHour = now.getHours();
         const currentMinute = now.getMinutes();
 
+        // Use a comparable integer for current absolute minutes (e.g. for simple past-time filtering)
+        const currentTotalMinutes = Math.floor(now.getTime() / 60000);
+
         console.log(`\n[${now.toLocaleString()}] Checking for due tasks...`);
         console.log(`System current time: ${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(currentDay).padStart(2, '0')} ${String(currentHour).padStart(2, '0')}:${String(currentMinute).padStart(2, '0')}`);
 
@@ -57,102 +60,120 @@ async function checkTasksAndNotify() {
 
         console.log(`Found tokens for ${Object.keys(userTokens).length} user(s).`);
 
-        // 2. Get all workspaces and their pending tasks
-        const workspacesSnapshot = await db.collection('workspaces').get();
+        // 2. Get all pending tasks directly from root collection
         let totalTasksChecked = 0;
 
-        for (const workspaceDoc of workspacesSnapshot.docs) {
-            const workspaceId = workspaceDoc.id;
+        // OPTIMIZATION: Only fetch tasks that have a date >= today's date string
+        // Since "date" is "YYYY-MM-DD", string comparison works for filtering past days!
+        const todayStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(currentDay).padStart(2, '0')}`;
 
-            const tasksSnapshot = await db.collection(`workspaces/${workspaceId}/tasks`)
-                                        .where('status', '==', 'pending')
-                                        .get();
+        const tasksSnapshot = await db.collection('tasks')
+                                    .where('status', '==', 'pending')
+                                    .where('date', '>=', todayStr)
+                                    .get();
 
-            for (const taskDoc of tasksSnapshot.docs) {
-                const task = taskDoc.data();
+        for (const taskDoc of tasksSnapshot.docs) {
+            const task = taskDoc.data();
 
-                if (!task.date || !task.startTime || task.reminderOffset == null) continue;
+            if (!task.date || !task.startTime || task.reminderOffset == null) continue;
 
-                const userId = task.createdBy;
-                const token = userTokens[userId];
+            const userId = task.createdBy;
+            const token = userTokens[userId];
 
-                if (!token) {
-                    console.log(`[WARNING] Found pending task "${task.title}" for user "${userId}", but no FCM token exists in user_tokens/${userId}. Skipping.`);
-                    continue; // No token for this user
-                }
+            if (!token) continue; // Skip logging no token for efficiency on bulk processing
 
-                totalTasksChecked++;
+            // We need to calculate target trigger time directly
+            const [year, month, day] = task.date.split('-').map(Number);
+            let [h, m] = task.startTime.split(':').map(Number);
 
-                // We need to calculate target trigger time directly
-                const [year, month, day] = task.date.split('-').map(Number);
-                let [h, m] = task.startTime.split(':').map(Number);
+            // Subtract reminderOffset
+            let targetTotalMinutesInDay = h * 60 + m - task.reminderOffset;
 
-                // Subtract reminderOffset
-                let targetTotalMinutes = h * 60 + m - task.reminderOffset;
+            let targetYear = year;
+            let targetMonth = month;
+            let targetDay = day;
 
-                // Handle negative minutes (rolls back to previous day, simplified handling)
-                let targetYear = year;
-                let targetMonth = month;
-                let targetDay = day;
-                let targetHour = h;
-                let targetMinute = m;
+            if (targetTotalMinutesInDay < 0) {
+                 // VERY rough previous day calculation for edge cases (assuming same month for simplicity in local scripts)
+                 targetTotalMinutesInDay += 24 * 60;
+                 targetDay -= 1;
+            }
 
-                if (targetTotalMinutes < 0) {
-                     // VERY rough previous day calculation for edge cases (assuming same month for simplicity in local scripts)
-                     targetTotalMinutes += 24 * 60;
-                     targetDay -= 1;
-                }
+            let targetHour = Math.floor(targetTotalMinutesInDay / 60);
+            let targetMinute = targetTotalMinutesInDay % 60;
 
-                targetHour = Math.floor(targetTotalMinutes / 60);
-                targetMinute = targetTotalMinutes % 60;
+            const targetDateObj = new Date(targetYear, targetMonth - 1, targetDay, targetHour, targetMinute, 0, 0);
+            const targetAbsoluteMinutes = Math.floor(targetDateObj.getTime() / 60000);
 
-                const targetStr = `${targetYear}-${String(targetMonth).padStart(2, '0')}-${String(targetDay).padStart(2, '0')} ${String(targetHour).padStart(2, '0')}:${String(targetMinute).padStart(2, '0')}`;
+            // OPTIMIZATION: If the target time is strictly in the past (more than 0 minutes ago), just skip entirely!
+            if (targetAbsoluteMinutes < currentTotalMinutes) {
+                continue;
+            }
 
-                // Absolute exact match check (minute precision)
-                const isDateMatch = (year === currentYear && month === currentMonth && day === currentDay);
-                const isTimeMatch = (targetHour === currentHour && targetMinute === currentMinute);
+            totalTasksChecked++;
 
-                if (isDateMatch && isTimeMatch) {
-                    console.log(`[HIT] Task "${task.title}" is due NOW (${targetStr})! Sending push to user ${userId}...`);
+            const targetStr = `${targetYear}-${String(targetMonth).padStart(2, '0')}-${String(targetDay).padStart(2, '0')} ${String(targetHour).padStart(2, '0')}:${String(targetMinute).padStart(2, '0')}`;
 
-                    const payload = {
-                        notification: {
-                            title: '即將到期的代辦事項',
-                            body: `${task.title} 將於 ${task.startTime} 開始`
-                        },
-                        token: token,
-                        apns: {
-                            payload: {
-                                aps: {
-                                    sound: 'default',
-                                    badge: 1
-                                }
+            // Absolute exact match check (minute precision)
+            const isDateMatch = (year === currentYear && month === currentMonth && day === currentDay);
+            const isTimeMatch = (targetHour === currentHour && targetMinute === currentMinute);
+
+            if (isDateMatch && isTimeMatch) {
+                console.log(`[HIT] Task "${task.title}" is due NOW (${targetStr})! Sending push to user ${userId}...`);
+
+                const payload = {
+                    notification: {
+                        title: '即將到期的代辦事項',
+                        body: `${task.title} 將於 ${task.startTime} 開始`
+                    },
+                    token: token,
+                    apns: {
+                        payload: {
+                            aps: {
+                                sound: 'default',
+                                badge: 1
                             }
                         }
-                    };
-
-                    try {
-                        const response = await messaging.send(payload);
-                        console.log('Successfully sent message:', response);
-                    } catch (error) {
-                        console.error('Error sending message:', error);
                     }
-                } else {
-                    // Not time yet, print debug info
-                    console.log(`[DEBUG] Task "${task.title}": Reminder targets ${targetStr} (System is currently ${currentHour}:${currentMinute})`);
+                };
+
+                try {
+                    const response = await messaging.send(payload);
+                    console.log('Successfully sent message:', response);
+                } catch (error) {
+                    console.error('Error sending message:', error);
                 }
+            } else {
+                // Print debug info only for upcoming tasks in the future
+                console.log(`[DEBUG] Task "${task.title}": Reminder targets ${targetStr} (System is currently ${currentHour}:${currentMinute})`);
             }
         }
 
-        console.log(`Checked ${totalTasksChecked} scheduled pending tasks with valid tokens.`);
+        console.log(`Checked ${totalTasksChecked} upcoming pending tasks.`);
 
     } catch (error) {
          console.error('Error in checkTasksAndNotify:', error);
     }
 }
 
-// Run every minute (60000 ms)
-setInterval(checkTasksAndNotify, 60000);
+// ALIGN TO CLOCK (Execute exactly at the 00 second mark of every minute)
+function scheduleNextMinute() {
+    const now = new Date();
+    // Calculate how many milliseconds until the next minute starts
+    const delay = 60000 - (now.getSeconds() * 1000 + now.getMilliseconds());
+
+    console.log(`[INIT] Aligning clock. Waiting ${Math.round(delay/1000)} seconds until the next exact minute...`);
+
+    setTimeout(() => {
+        checkTasksAndNotify(); // Fire precisely at :00
+
+        // Now that we are aligned, trigger every 60s
+        setInterval(checkTasksAndNotify, 60000);
+    }, delay);
+}
 
 // Run once immediately on start
-checkTasksAndNotify();
+checkTasksAndNotify().then(() => {
+    // Schedule loop aligned to the system clock
+    scheduleNextMinute();
+});

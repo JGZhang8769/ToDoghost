@@ -20,11 +20,17 @@ messaging.onBackgroundMessage((payload) => {
     payload
   );
 
-  const notificationTitle = payload.notification?.title || '提醒通知';
-  const notificationOptions = {
-    body: payload.notification?.body,
-    icon: "/icons/icon-192x192.png",
-  };
+  // If the payload already contains a `notification` object, the system/browser
+  // will AUTOMATICALLY show a notification. Calling showNotification here
+  // will result in a duplicate (double) notification on the user's device.
+  // We only need to show a manual notification if it's a "data-only" payload.
 
-  self.registration.showNotification(notificationTitle, notificationOptions);
+  if (!payload.notification) {
+      const notificationTitle = payload.data?.title || '提醒通知';
+      const notificationOptions = {
+        body: payload.data?.body,
+        icon: "/icons/icon-192x192.png",
+      };
+      self.registration.showNotification(notificationTitle, notificationOptions);
+  }
 });

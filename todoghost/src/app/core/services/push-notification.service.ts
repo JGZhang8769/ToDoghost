@@ -34,11 +34,11 @@ export class PushNotificationService {
     if (!this.messaging) return;
 
     onMessage(this.messaging, (payload) => {
-      console.log('Message received. ', payload);
-      new Notification(payload.notification?.title || '提醒通知', {
-        body: payload.notification?.body,
-        icon: '/icons/icon-192x192.png'
-      });
+      console.log('Message received in foreground: ', payload);
+      // Removed new Notification(...) here because if the app is open,
+      // we might want to show an in-app toast instead of a system notification,
+      // or we just let it be. If we manually create a Notification here,
+      // it causes duplicates when the browser/OS also handles it automatically.
     });
   }
 }
