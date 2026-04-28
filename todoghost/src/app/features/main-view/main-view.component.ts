@@ -1025,61 +1025,9 @@ export class MainViewComponent implements OnInit, OnDestroy {
 
   // Calculate local time reminders
   scheduleLocalReminders(tasks: Task[]) {
-    if (!('Notification' in window)) return;
-
-    if (Notification.permission !== 'granted') {
-        Notification.requestPermission();
-    }
-
-    const now = new Date();
-    tasks.forEach(task => {
-        if (task.status === 'completed') return; // Skip completed tasks
-
-        if (task.date && task.startTime && task.reminderOffset) {
-            const [h, m] = task.startTime.split(':').map(Number);
-            const taskDate = new Date(task.date);
-            taskDate.setHours(h, m, 0, 0);
-
-            const reminderTime = new Date(taskDate.getTime() - task.reminderOffset * 60000);
-            const timeDiff = reminderTime.getTime() - now.getTime();
-
-            if (this.reminderTimeouts[task.id] && this.reminderTimeouts[task.id].time === reminderTime.getTime()) {
-                return;
-            }
-
-            if (this.reminderTimeouts[task.id]) {
-                clearTimeout(this.reminderTimeouts[task.id].timeoutId || this.reminderTimeouts[task.id]);
-                delete this.reminderTimeouts[task.id];
-            }
-
-            if (timeDiff > 0 && timeDiff < 86400000) {
-               const timeoutId = setTimeout(() => {
-                  if (Notification.permission === 'granted') {
-                      if ('serviceWorker' in navigator) {
-                          navigator.serviceWorker.ready.then(registration => {
-                              registration.showNotification('即將到期的代辦事項', {
-                                  body: `${task.title} 將於 ${task.startTime} 開始`,
-                                  icon: '/icons/icon-192x192.png',
-                                  tag: task.id
-                              });
-                          });
-                      } else {
-                          new Notification('即將到期的代辦事項', {
-                              body: `${task.title} 將於 ${task.startTime} 開始`,
-                              tag: task.id
-                          });
-                      }
-                  }
-               }, timeDiff);
-               this.reminderTimeouts[task.id] = { timeoutId: timeoutId, time: reminderTime.getTime() };
-            }
-        } else {
-            if (this.reminderTimeouts[task.id]) {
-                clearTimeout(this.reminderTimeouts[task.id].timeoutId || this.reminderTimeouts[task.id]);
-                delete this.reminderTimeouts[task.id];
-            }
-        }
-    });
+    // Intentionally disabled. We now strictly rely on the local-push-server.js
+    // to send background FCM pushes. Local setTimeouts cause duplicate notifications
+    // when the PWA is active in the background.
   }
 
   // --- Swipe Actions Logic ---
