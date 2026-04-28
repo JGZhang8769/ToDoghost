@@ -40,3 +40,18 @@
 - [ ] 月視圖與週視圖任務根據時間自動排序。
 - [ ] 日視圖全天區塊加入左右滑動操作。
 - [ ] 表單防呆：無開始時間不可填寫結束時間與提前提醒。
+
+## 階段五：新功能與體驗升級 (Phase 5: New Features & Experience Upgrade)
+- [x] **PWA 體驗優化**: 全域攔截 iOS 邊緣滑動事件，徹底禁用上一頁/下一頁手勢動畫。
+- [x] **SVG 資源更新**:
+    - [x] 繪製並替換主要 App Icon (幽靈+行事曆+貓咪)，並更新 `public/` 下的 PWA icon。
+    - [x] 繪製備用的 App Icon (幽靈+衝浪板+貓咪)。
+    - [x] 擴充 `app-svg-icon` 支援 `cute_tiger`, `cute_bengal`, `black_cat`, `white_cat`, `leopard`, `boy`, `girl`。
+- [x] **過濾器優化 (標籤與分類)**:
+    - [x] 標籤過濾輸入框：實作 Autocomplete、僅 Enter 確認新增、不阻擋逗號。
+    - [x] 過濾選單新增「分類 (Category)」下拉單選，並與現有條件（AND/OR）連動。
+- [x] **設定與分類管理 (Settings & Categories)**:
+    - [x] 建立新的設定頁面與路由，設計分類設定卡片。
+    - [x] 實作 `CategoryService` (新增、編輯、刪除、拖拉更新 `order`，並記錄 `createdBy` 與 `workspaceId`)。
+    - [x] 實作分類管理的 Bottom Drawer，包含 Material Icon 選擇器。
+- [x] **任務資料結構擴充**: 在 Task 中新增 `categoryId` 欄位，並在新增/編輯任務時可選擇單一分類。
