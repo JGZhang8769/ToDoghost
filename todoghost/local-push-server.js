@@ -30,13 +30,20 @@ console.log('Firebase Admin initialized. Push notification server started.');
 // Function to check and send notifications
 async function checkTasksAndNotify() {
     try {
-        console.log(`[${new Date().toISOString()}] Checking for due tasks...`);
         const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth() + 1; // 1-12
+        const currentDay = now.getDate();
+        const currentHour = now.getHours();
+        const currentMinute = now.getMinutes();
+
+        console.log(`\n[${now.toLocaleString()}] Checking for due tasks...`);
+        console.log(`System current time: ${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(currentDay).padStart(2, '0')} ${String(currentHour).padStart(2, '0')}:${String(currentMinute).padStart(2, '0')}`);
 
         // 1. Get all user tokens
         const tokensSnapshot = await db.collection('user_tokens').get();
         if (tokensSnapshot.empty) {
-            console.log('No user tokens found.');
+            console.log('No user tokens found in Firestore.');
             return;
         }
 
@@ -48,14 +55,15 @@ async function checkTasksAndNotify() {
             }
         });
 
+        console.log(`Found tokens for ${Object.keys(userTokens).length} user(s).`);
+
         // 2. Get all workspaces and their pending tasks
         const workspacesSnapshot = await db.collection('workspaces').get();
+        let totalTasksChecked = 0;
 
         for (const workspaceDoc of workspacesSnapshot.docs) {
             const workspaceId = workspaceDoc.id;
 
-            // Note: Since we are checking periodically, we want to find tasks that are
-            // due within the NEXT minute, or just now.
             const tasksSnapshot = await db.collection(`workspaces/${workspaceId}/tasks`)
                                         .where('status', '==', 'pending')
                                         .get();
@@ -63,27 +71,49 @@ async function checkTasksAndNotify() {
             for (const taskDoc of tasksSnapshot.docs) {
                 const task = taskDoc.data();
 
-                if (!task.date || !task.startTime || !task.reminderOffset) continue;
+                if (!task.date || !task.startTime || task.reminderOffset == null) continue;
 
-                // Determine user ID to send to (use createdBy, assuming it matches the user ID who generated the token)
                 const userId = task.createdBy;
                 const token = userTokens[userId];
 
-                if (!token) continue; // No token for this user
+                if (!token) {
+                    console.log(`[WARNING] Found pending task "${task.title}" for user "${userId}", but no FCM token exists in user_tokens/${userId}. Skipping.`);
+                    continue; // No token for this user
+                }
 
-                // Calculate trigger time
-                const [h, m] = task.startTime.split(':').map(Number);
-                const taskDate = new Date(task.date);
-                taskDate.setHours(h, m, 0, 0);
+                totalTasksChecked++;
 
-                const triggerTimeMs = taskDate.getTime() - task.reminderOffset * 60000;
+                // We need to calculate target trigger time directly
+                const [year, month, day] = task.date.split('-').map(Number);
+                let [h, m] = task.startTime.split(':').map(Number);
 
-                // If trigger time is within the last 1 minute window (prevent duplicate sending)
-                const timeDiff = now.getTime() - triggerTimeMs;
+                // Subtract reminderOffset
+                let targetTotalMinutes = h * 60 + m - task.reminderOffset;
 
-                // Using a 1-minute window: 0 to 60000 ms
-                if (timeDiff >= 0 && timeDiff < 60000) {
-                    console.log(`Task "${task.title}" is due! Sending push to user ${userId}...`);
+                // Handle negative minutes (rolls back to previous day, simplified handling)
+                let targetYear = year;
+                let targetMonth = month;
+                let targetDay = day;
+                let targetHour = h;
+                let targetMinute = m;
+
+                if (targetTotalMinutes < 0) {
+                     // VERY rough previous day calculation for edge cases (assuming same month for simplicity in local scripts)
+                     targetTotalMinutes += 24 * 60;
+                     targetDay -= 1;
+                }
+
+                targetHour = Math.floor(targetTotalMinutes / 60);
+                targetMinute = targetTotalMinutes % 60;
+
+                const targetStr = `${targetYear}-${String(targetMonth).padStart(2, '0')}-${String(targetDay).padStart(2, '0')} ${String(targetHour).padStart(2, '0')}:${String(targetMinute).padStart(2, '0')}`;
+
+                // Absolute exact match check (minute precision)
+                const isDateMatch = (year === currentYear && month === currentMonth && day === currentDay);
+                const isTimeMatch = (targetHour === currentHour && targetMinute === currentMinute);
+
+                if (isDateMatch && isTimeMatch) {
+                    console.log(`[HIT] Task "${task.title}" is due NOW (${targetStr})! Sending push to user ${userId}...`);
 
                     const payload = {
                         notification: {
@@ -91,7 +121,6 @@ async function checkTasksAndNotify() {
                             body: `${task.title} 將於 ${task.startTime} 開始`
                         },
                         token: token,
-                        // Add Apple-specific configurations for iOS background push
                         apns: {
                             payload: {
                                 aps: {
@@ -108,9 +137,15 @@ async function checkTasksAndNotify() {
                     } catch (error) {
                         console.error('Error sending message:', error);
                     }
+                } else {
+                    // Not time yet, print debug info
+                    console.log(`[DEBUG] Task "${task.title}": Reminder targets ${targetStr} (System is currently ${currentHour}:${currentMinute})`);
                 }
             }
         }
+
+        console.log(`Checked ${totalTasksChecked} scheduled pending tasks with valid tokens.`);
+
     } catch (error) {
          console.error('Error in checkTasksAndNotify:', error);
     }
