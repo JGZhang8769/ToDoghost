@@ -23,8 +23,7 @@ export class CategoryService {
     const categoriesRef = collection(this.firestore, this.collectionName);
     const q = query(
       categoriesRef,
-      where('workspaceId', '==', workspaceId),
-      orderBy('order', 'asc')
+      where('workspaceId', '==', workspaceId)
     );
     return collectionData(q, { idField: 'id' }) as Observable<Category[]>;
   }

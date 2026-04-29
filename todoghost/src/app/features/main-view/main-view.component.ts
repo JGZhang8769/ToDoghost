@@ -735,7 +735,7 @@ export class MainViewComponent implements OnInit, OnDestroy {
 
   loadCategories(workspaceId: string) {
     this.categoryService.getCategories(workspaceId).pipe(takeUntil(this.destroy$)).subscribe((cats: Category[]) => {
-      this.availableCategories = cats;
+      this.availableCategories = cats.sort((a, b) => a.order - b.order);
     });
   }
 
