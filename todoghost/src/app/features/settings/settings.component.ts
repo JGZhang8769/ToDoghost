@@ -68,7 +68,7 @@ import { Subject, takeUntil } from 'rxjs';
       </div>
 
       <!-- Edit/Create Category Modal -->
-      <div *ngIf="showEditModal" class="absolute inset-0 z-[60] flex items-center justify-center p-4">
+      <div *ngIf="showEditModal" class="fixed inset-0 z-[70] flex items-center justify-center p-4">
         <div class="absolute inset-0 bg-black/40" (click)="closeEditModal()"></div>
         <div class="bg-white rounded-2xl p-6 shadow-xl w-full max-w-sm relative z-10">
            <h3 class="font-bold text-lg text-milktea-900 mb-4">{{ editingCategory?.id ? '編輯分類' : '新增分類' }}</h3>
@@ -153,7 +153,7 @@ export class SettingsComponent implements OnInit, OnDestroy {
 
   loadCategories(workspaceId: string) {
     this.categoryService.getCategories(workspaceId).pipe(takeUntil(this.destroy$)).subscribe(cats => {
-      this.categories = cats;
+      this.categories = cats.sort((a, b) => a.order - b.order);
     });
   }
 
@@ -208,7 +208,7 @@ export class SettingsComponent implements OnInit, OnDestroy {
 
   async deleteCategory(event: Event, cat: Category) {
     event.stopPropagation();
-    if (confirm(`確定要刪除分類「\${cat.name}」嗎？`)) {
+    if (confirm(`確定要刪除分類「${cat.name}」嗎？`)) {
       await this.categoryService.deleteCategory(cat.id);
     }
   }

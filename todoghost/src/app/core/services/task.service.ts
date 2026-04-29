@@ -53,10 +53,15 @@ export class TaskService {
   }
 
   async updateTask(taskId: string, data: Partial<Task>) {
-    const taskRef = doc(this.firestore, `tasks/\${taskId}`);
+    const taskRef = doc(this.firestore, `tasks/${taskId}`);
     try {
+      // Remove undefined values
+      const cleanData = Object.fromEntries(
+        Object.entries(data).filter(([_, v]) => v !== undefined)
+      );
+
       await updateDoc(taskRef, {
-        ...data,
+        ...cleanData,
         updatedAt: serverTimestamp()
       });
     } catch (e) {
@@ -66,7 +71,7 @@ export class TaskService {
   }
 
   async deleteTask(taskId: string) {
-    const taskRef = doc(this.firestore, `tasks/\${taskId}`);
+    const taskRef = doc(this.firestore, `tasks/${taskId}`);
     try {
       await deleteDoc(taskRef);
     } catch (e) {
