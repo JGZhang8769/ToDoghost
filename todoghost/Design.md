@@ -32,3 +32,11 @@
     *   分類管理採用底部抽屜 (Bottom Drawer) 介面，支援拖曳排序 (Drag & Drop to reorder)，常用分類可置頂。
     *   透過點擊編輯、長按呼叫刪除選項。
     *   支援 Material Icons 作為分類圖示選擇。
+
+## 4. 安全與驗證設計 (Security & Authentication)
+*   **WebAuthn (Face ID) 前端驗證**:
+    *   使用者首次點擊頭像時，觸發 `navigator.credentials.create`，建立本機憑證並綁定 `localStorage`。
+    *   後續點擊頭像登入時，觸發 `navigator.credentials.get` 進行 Face ID 驗證。
+*   **備用 PIN 碼登入 (Fallback)**:
+    *   當裝置不支援 WebAuthn、使用者取消 Face ID 或驗證失敗時，彈出 4 位數 PIN 碼輸入框。
+    *   新使用者預設 PIN 碼為 `0000`。
