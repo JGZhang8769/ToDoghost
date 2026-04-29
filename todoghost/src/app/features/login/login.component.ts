@@ -72,7 +72,7 @@ export class LoginComponent implements OnInit {
   showNewUserForm = false;
   newUserName = '';
   newUserIcon = 'bengal';
-  availableIcons = ['tiger', 'rabbit', 'bengal', 'golden', 'cute_tiger', 'cute_bengal', 'leopard', 'black_cat', 'white_cat', 'boy', 'girl'];
+  availableIcons = ['bengal', 'golden', 'rabbit', 'tiger'];
   isSaving = false;
   isLoadingUsers = true;
 
