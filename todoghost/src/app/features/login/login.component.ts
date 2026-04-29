@@ -42,9 +42,9 @@ import { PushNotificationService } from '../../core/services/push-notification.s
         <div class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-xl">
           <h2 class="text-xl font-bold text-milktea-900 mb-4">新增用戶</h2>
           <input [(ngModel)]="newUserName" placeholder="輸入名稱" class="w-full bg-milktea-50 border border-milktea-200 rounded-xl px-4 py-3 mb-4 focus:outline-none focus:border-milktea-400 transition-colors">
-          <div class="flex gap-2 mb-6 justify-center">
+          <div class="flex flex-wrap gap-2 mb-6 justify-center max-h-48 overflow-y-auto">
             <button *ngFor="let icon of availableIcons"
-                    class="w-12 h-12 rounded-xl border-2 p-1"
+                    class="w-12 h-12 rounded-xl border-2 p-1 shrink-0"
                     [class.border-milktea-400]="newUserIcon === icon"
                     [class.border-transparent]="newUserIcon !== icon"
                     (click)="newUserIcon = icon">
@@ -72,7 +72,11 @@ export class LoginComponent implements OnInit {
   showNewUserForm = false;
   newUserName = '';
   newUserIcon = 'bengal';
-  availableIcons = ['bengal', 'golden', 'rabbit', 'tiger'];
+  availableIcons = [
+    'bengal', 'golden', 'rabbit', 'tiger',
+    'cute_tiger', 'cute_bengal', 'leopard',
+    'black_cat', 'white_cat', 'boy', 'girl'
+  ];
   isSaving = false;
   isLoadingUsers = true;
 

@@ -37,34 +37,33 @@ import { Subject, takeUntil } from 'rxjs';
       </div>
 
       <!-- Category Drawer -->
-      <div *ngIf="showCategoryDrawer" class="absolute inset-0 z-50 flex flex-col justify-end">
-        <div class="absolute inset-0 bg-black/40" (click)="closeCategoryDrawer()"></div>
-        <div class="bg-white w-full rounded-t-2xl shadow-xl flex flex-col max-h-[85vh] transition-transform pb-safe">
-          <div class="p-4 border-b border-milktea-100 flex justify-between items-center shrink-0">
-             <h2 class="font-bold text-milktea-900 text-lg">分類清單管理</h2>
-             <button class="material-icons text-milktea-400" (click)="closeCategoryDrawer()">close</button>
-          </div>
+      <div *ngIf="showCategoryDrawer" class="fixed inset-0 bg-black/20 z-[60] transition-opacity" (click)="closeCategoryDrawer()"></div>
+      <div class="fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-[0_-4px_15px_rgba(0,0,0,0.1)] transition-transform duration-300 z-[65] max-w-3xl mx-auto flex flex-col"
+           [style.transform]="showCategoryDrawer ? 'translateY(0)' : 'translateY(100%)'">
+        <div class="p-4 border-b border-milktea-100 flex justify-between items-center shrink-0">
+           <h2 class="font-bold text-milktea-900 text-lg">分類清單管理</h2>
+           <button class="material-icons text-milktea-400" (click)="closeCategoryDrawer()">close</button>
+        </div>
 
-          <div class="flex-1 overflow-y-auto p-4" cdkDropList (cdkDropListDropped)="onCategoryDrop($event)">
-             <div *ngIf="categories.length === 0" class="text-center text-milktea-400 text-sm py-4">目前沒有分類</div>
-             <div *ngFor="let cat of categories; let i = index" cdkDrag
-                  class="flex items-center justify-between p-3 mb-2 bg-milktea-50 rounded-lg border border-milktea-100 touch-none"
-                  (click)="startEditCategory(cat)">
-                <div *cdkDragPreview class="w-4 h-4 rounded-full bg-red-400 shadow-sm shadow-red-500/50"></div>
-                <div class="flex items-center gap-3">
-                   <div cdkDragHandle class="material-icons text-milktea-400 cursor-grab px-1 touch-none" (click)="$event.stopPropagation()">drag_indicator</div>
-                   <span class="material-icons text-milktea-600">{{ cat.icon }}</span>
-                   <span class="font-bold text-milktea-800">{{ cat.name }}</span>
-                </div>
-                <button class="material-icons text-red-400 text-sm p-2" (click)="deleteCategory($event, cat)">delete</button>
-             </div>
-          </div>
+        <div class="h-[50vh] overflow-y-auto px-4 py-4 overflow-x-hidden flex flex-col" cdkDropList (cdkDropListDropped)="onCategoryDrop($event)">
+           <div *ngIf="categories.length === 0" class="text-center text-milktea-400 text-sm py-4">目前沒有分類</div>
+           <div *ngFor="let cat of categories; let i = index" cdkDrag
+                class="flex items-center justify-between p-3 mb-2 bg-milktea-50 rounded-lg border border-milktea-100 touch-none shrink-0"
+                (click)="startEditCategory(cat)">
+              <div *cdkDragPreview class="w-4 h-4 rounded-full bg-red-400 shadow-sm shadow-red-500/50"></div>
+              <div class="flex items-center gap-3">
+                 <div cdkDragHandle class="material-icons text-milktea-400 cursor-grab px-1 touch-none" (click)="$event.stopPropagation()">drag_indicator</div>
+                 <span class="material-icons text-milktea-600">{{ cat.icon }}</span>
+                 <span class="font-bold text-milktea-800">{{ cat.name }}</span>
+              </div>
+              <button class="material-icons text-red-400 text-sm p-2" (click)="deleteCategory($event, cat); $event.stopPropagation()">delete</button>
+           </div>
+        </div>
 
-          <div class="p-4 border-t border-milktea-100 shrink-0">
-             <button class="w-full bg-milktea-600 text-white font-bold py-3 rounded-full shadow-sm" (click)="startCreateCategory()">
-               ＋ 新增分類
-             </button>
-          </div>
+        <div class="p-4 border-t border-milktea-100 shrink-0 pb-safe z-10 bg-white">
+           <button class="w-full bg-milktea-600 text-white font-bold py-3 rounded-full shadow-sm" (click)="startCreateCategory()">
+             ＋ 新增分類
+           </button>
         </div>
       </div>
 
