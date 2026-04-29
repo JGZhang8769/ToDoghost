@@ -6,6 +6,7 @@ import { UserService, User } from '../../core/services/user.service';
 import { SvgIconComponent } from '../../core/svg-icon/svg-icon.component';
 import { PushNotificationService } from '../../core/services/push-notification.service';
 import { WebAuthnService } from '../../core/services/webauthn.service';
+import { ConfigService } from '../../core/services/config.service';
 
 @Component({
   selector: 'app-login',
@@ -55,16 +56,14 @@ import { WebAuthnService } from '../../core/services/webauthn.service';
               <svg *ngIf="isAuthenticating" class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
               {{ hasCredential ? 'Face ID 登入' : '綁定 Face ID 登入' }}
             </button>
-            <button class="w-full py-4 rounded-xl bg-milktea-100 text-milktea-800 font-bold disabled:opacity-50"
-                    [disabled]="isAuthenticating"
+            <button class="w-full py-4 rounded-xl bg-milktea-100 text-milktea-800 font-bold"
                     (click)="switchToPin()">
               PIN 碼登入
             </button>
           </div>
 
           <div class="w-full mt-4 flex justify-center">
-             <button class="text-milktea-500 font-medium py-2 px-4 hover:text-milktea-700 disabled:opacity-50"
-                     [disabled]="isAuthenticating"
+             <button class="text-milktea-500 font-medium py-2 px-4 hover:text-milktea-700"
                      (click)="closeLoginOptions()">
                 取消
              </button>
@@ -126,6 +125,7 @@ export class LoginComponent implements OnInit {
   private router = inject(Router);
   private pushService = inject(PushNotificationService);
   private webAuthnService = inject(WebAuthnService);
+  private configService = inject(ConfigService);
 
   users: User[] = [];
   showNewUserForm = false;
@@ -148,9 +148,16 @@ export class LoginComponent implements OnInit {
   isWebAuthnSupported = false;
   hasCredential = false;
   isAuthenticating = false;
+  isLoginAuthRequired = false;
 
   ngOnInit() {
     this.isWebAuthnSupported = this.webAuthnService.isWebAuthnSupported();
+
+    // Subscribe to feature flag
+    this.configService.getLoginAuthFeatureFlag().subscribe(valid => {
+      this.isLoginAuthRequired = valid;
+    });
+
     this.userService.getUsers().subscribe(users => {
       this.users = users;
       this.isLoadingUsers = false;
@@ -167,13 +174,21 @@ export class LoginComponent implements OnInit {
   openLoginOptions(user: User) {
     if (this.isAuthenticating) return;
 
+    if (!this.isLoginAuthRequired) {
+      this.userService.login(user);
+      return;
+    }
+
     this.selectedUser = user;
     this.hasCredential = this.webAuthnService.hasCredential(user.id);
     this.showLoginOptionsModal = true;
   }
 
   closeLoginOptions() {
-    if (this.isAuthenticating) return;
+    if (this.isAuthenticating) {
+      this.webAuthnService.cancelRequest();
+      this.isAuthenticating = false;
+    }
     this.showLoginOptionsModal = false;
     this.selectedUser = null;
   }
@@ -202,7 +217,10 @@ export class LoginComponent implements OnInit {
   }
 
   switchToPin() {
-    if (this.isAuthenticating) return;
+    if (this.isAuthenticating) {
+      this.webAuthnService.cancelRequest();
+      this.isAuthenticating = false;
+    }
     this.showLoginOptionsModal = false;
     this.showPinModal = true;
     this.pinInput = '';

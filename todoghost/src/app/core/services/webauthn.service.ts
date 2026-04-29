@@ -3,6 +3,8 @@ import { Injectable } from '@angular/core';
 @Injectable({ providedIn: 'root' })
 export class WebAuthnService {
 
+  private abortController: AbortController | null = null;
+
   // Helper to generate a random challenge
   private generateChallenge(): Uint8Array {
     return window.crypto.getRandomValues(new Uint8Array(32));
@@ -14,8 +16,20 @@ export class WebAuthnService {
   }
 
   // Register a new Face ID / Touch ID credential
+  // Cancel any ongoing WebAuthn request
+  cancelRequest() {
+    if (this.abortController) {
+      this.abortController.abort();
+      this.abortController = null;
+    }
+  }
+
   async registerCredential(userId: string, username: string): Promise<string | null> {
     if (!this.isWebAuthnSupported()) return null;
+
+    // Reset abort controller for new request
+    this.cancelRequest();
+    this.abortController = new AbortController();
 
     try {
       const challenge = this.generateChallenge();
@@ -39,10 +53,13 @@ export class WebAuthnService {
           authenticatorAttachment: 'platform', // Enforce local device (Face ID/Touch ID)
           userVerification: 'required'
         },
-        timeout: 60000,
+        timeout: 30000,
       };
 
-      const credential = await navigator.credentials.create({ publicKey }) as PublicKeyCredential;
+      const credential = await navigator.credentials.create({
+        publicKey,
+        signal: this.abortController.signal
+      }) as PublicKeyCredential;
 
       if (credential) {
         // Save mapping of userId -> credentialId in localStorage
@@ -64,6 +81,10 @@ export class WebAuthnService {
     const savedCredentialIdBase64 = localStorage.getItem(`webauthn_credential_${userId}`);
     if (!savedCredentialIdBase64) return false;
 
+    // Reset abort controller for new request
+    this.cancelRequest();
+    this.abortController = new AbortController();
+
     try {
       const challenge = this.generateChallenge();
       const credentialIdBuffer = this.base64ToArrayBuffer(savedCredentialIdBase64);
@@ -76,10 +97,13 @@ export class WebAuthnService {
           transports: ['internal']
         }],
         userVerification: 'required',
-        timeout: 60000,
+        timeout: 30000,
       };
 
-      const assertion = await navigator.credentials.get({ publicKey }) as PublicKeyCredential;
+      const assertion = await navigator.credentials.get({
+        publicKey,
+        signal: this.abortController.signal
+      }) as PublicKeyCredential;
 
       // For this frontend-only check, if we got a valid assertion, we consider it a success.
       return !!assertion;
