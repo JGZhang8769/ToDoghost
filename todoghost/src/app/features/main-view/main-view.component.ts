@@ -521,7 +521,7 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
 
             <div class="mb-2">
               <select [(ngModel)]="formTask.categoryId" class="w-full p-2 border rounded bg-white">
-                <option [ngValue]="undefined">無分類</option>
+                <option [ngValue]="null">無分類</option>
                 <option *ngFor="let cat of availableCategories" [value]="cat.id">{{ cat.name }}</option>
               </select>
             </div>
@@ -700,6 +700,12 @@ export class MainViewComponent implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
+    if (!this.currentDate || isNaN(this.currentDate.getTime())) {
+      this.currentDate = new Date();
+      this.selectedDateStr = format(this.currentDate, 'yyyy-MM-dd');
+    }
+    this.refreshViews();
+
     this.workspaceService.currentWorkspace$.pipe(takeUntil(this.destroy$)).subscribe(ws => {
       if (!ws) {
         this.router.navigate(['/workspaces']);
@@ -1228,7 +1234,7 @@ export class MainViewComponent implements OnInit, OnDestroy {
     openCreateTask() {
     this.editingTask = null;
     this.formTask = {
-       date: this.selectedDateStr
+       date: this.selectedDateStr || format(new Date(), 'yyyy-MM-dd')
     };
     this.formTaskTags = [];
     this.formTaskTagInput = '';

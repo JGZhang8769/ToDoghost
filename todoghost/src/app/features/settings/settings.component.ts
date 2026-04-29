@@ -39,7 +39,7 @@ import { Subject, takeUntil } from 'rxjs';
       <!-- Category Drawer -->
       <div *ngIf="showCategoryDrawer" class="absolute inset-0 z-50 flex flex-col justify-end">
         <div class="absolute inset-0 bg-black/40" (click)="closeCategoryDrawer()"></div>
-        <div class="bg-white w-full rounded-t-2xl shadow-xl flex flex-col max-h-[85vh] transition-transform pb-safe">
+        <div class="relative z-10 bg-white w-full rounded-t-2xl shadow-xl flex flex-col max-h-[85vh] transition-transform pb-safe">
           <div class="p-4 border-b border-milktea-100 flex justify-between items-center shrink-0">
              <h2 class="font-bold text-milktea-900 text-lg">分類清單管理</h2>
              <button class="material-icons text-milktea-400" (click)="closeCategoryDrawer()">close</button>
