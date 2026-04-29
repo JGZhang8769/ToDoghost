@@ -55,3 +55,8 @@
     - [x] 實作 `CategoryService` (新增、編輯、刪除、拖拉更新 `order`，並記錄 `createdBy` 與 `workspaceId`)。
     - [x] 實作分類管理的 Bottom Drawer，包含 Material Icon 選擇器。
 - [x] **任務資料結構擴充**: 在 Task 中新增 `categoryId` 欄位，並在新增/編輯任務時可選擇單一分類。
+- [ ] **安全驗證 (Face ID & PIN)**:
+    - [ ] `UserService` 與 `User` 型別擴充 `pin` 欄位，預設為 `0000`。
+    - [ ] 實作 WebAuthn 註冊 (`navigator.credentials.create`) 與憑證儲存邏輯。
+    - [ ] 實作 WebAuthn 驗證 (`navigator.credentials.get`)，並根據驗證結果登入。
+    - [ ] 實作 PIN 碼彈出視窗作為備用登入機制。

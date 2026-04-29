@@ -5,6 +5,7 @@ import { Router } from '@angular/router';
 import { UserService, User } from '../../core/services/user.service';
 import { SvgIconComponent } from '../../core/svg-icon/svg-icon.component';
 import { PushNotificationService } from '../../core/services/push-notification.service';
+import { WebAuthnService } from '../../core/services/webauthn.service';
 
 @Component({
   selector: 'app-login',
@@ -34,6 +35,29 @@ import { PushNotificationService } from '../../core/services/push-notification.s
              +
           </div>
           <span class="text-milktea-800 font-medium group-hover:text-milktea-900">新增用戶</span>
+        </div>
+      </div>
+
+      <!-- PIN Code Modal -->
+      <div *ngIf="showPinModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-xl flex flex-col items-center">
+          <div class="w-16 h-16 rounded-2xl bg-milktea-50 overflow-hidden p-2 mb-4">
+            <app-svg-icon [name]="selectedUserForPin?.avatar || ''" width="100%" height="100%"></app-svg-icon>
+          </div>
+          <h2 class="text-xl font-bold text-milktea-900 mb-2">輸入 PIN 碼</h2>
+          <p class="text-milktea-600 text-sm mb-6">歡迎回來，{{ selectedUserForPin?.name }}</p>
+
+          <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4"
+                 [(ngModel)]="pinInput" placeholder="4位數密碼"
+                 class="w-full text-center tracking-[0.5em] text-2xl font-bold bg-milktea-50 border border-milktea-200 rounded-xl px-4 py-4 mb-4 focus:outline-none focus:border-milktea-400 transition-colors"
+                 (keyup.enter)="verifyPin()">
+
+          <div *ngIf="pinError" class="text-red-500 text-sm mb-4">{{ pinError }}</div>
+
+          <div class="flex gap-3 w-full mt-2">
+            <button class="flex-1 py-3 rounded-xl bg-milktea-100 text-milktea-800 font-bold" (click)="cancelPinModal()">取消</button>
+            <button class="flex-1 py-3 rounded-xl bg-milktea-600 text-white font-bold disabled:opacity-50" [disabled]="pinInput.length < 4" (click)="verifyPin()">登入</button>
+          </div>
         </div>
       </div>
 
@@ -67,6 +91,7 @@ export class LoginComponent implements OnInit {
   private userService = inject(UserService);
   private router = inject(Router);
   private pushService = inject(PushNotificationService);
+  private webAuthnService = inject(WebAuthnService);
 
   users: User[] = [];
   showNewUserForm = false;
@@ -79,6 +104,11 @@ export class LoginComponent implements OnInit {
   ];
   isSaving = false;
   isLoadingUsers = true;
+
+  showPinModal = false;
+  selectedUserForPin: User | null = null;
+  pinInput = '';
+  pinError = '';
 
   ngOnInit() {
     this.userService.getUsers().subscribe(users => {
@@ -94,8 +124,58 @@ export class LoginComponent implements OnInit {
     });
   }
 
-  selectUser(user: User) {
-    this.userService.login(user);
+  async selectUser(user: User) {
+    if (!this.webAuthnService.isWebAuthnSupported()) {
+      this.promptPin(user);
+      return;
+    }
+
+    if (this.webAuthnService.hasCredential(user.id)) {
+      // Authenticate
+      const success = await this.webAuthnService.authenticate(user.id);
+      if (success) {
+        this.userService.login(user);
+      } else {
+        this.promptPin(user);
+      }
+    } else {
+      // Register (First time)
+      const credentialId = await this.webAuthnService.registerCredential(user.id, user.name);
+      if (credentialId) {
+        this.userService.login(user);
+      } else {
+        this.promptPin(user);
+      }
+    }
+  }
+
+  promptPin(user: User) {
+    this.selectedUserForPin = user;
+    this.showPinModal = true;
+    this.pinInput = '';
+    this.pinError = '';
+  }
+
+  cancelPinModal() {
+    this.showPinModal = false;
+    this.selectedUserForPin = null;
+    this.pinInput = '';
+    this.pinError = '';
+  }
+
+  verifyPin() {
+    if (!this.selectedUserForPin) return;
+
+    // Default pin is '0000' if not set
+    const userPin = this.selectedUserForPin.pin || '0000';
+
+    if (this.pinInput === userPin) {
+      this.userService.login(this.selectedUserForPin);
+      this.showPinModal = false;
+    } else {
+      this.pinError = 'PIN 碼錯誤';
+      this.pinInput = '';
+    }
   }
 
   async createUser() {
