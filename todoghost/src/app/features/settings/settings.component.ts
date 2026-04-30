@@ -34,6 +34,47 @@ import { Subject, takeUntil } from 'rxjs';
           </div>
           <p class="text-xs text-milktea-500 mt-2 pl-9">設定與排序空間的自訂任務分類清單</p>
         </div>
+
+        <div class="bg-white rounded-xl shadow-sm border border-milktea-100 p-4 mb-4 cursor-pointer hover:bg-milktea-50 transition-colors" (click)="openFeatureDrawer()">
+          <div class="flex justify-between items-center">
+            <div class="flex items-center gap-3">
+              <span class="material-icons text-milktea-500">settings_applications</span>
+              <span class="font-bold text-milktea-900">功能設定</span>
+            </div>
+            <span class="material-icons text-milktea-400">chevron_right</span>
+          </div>
+          <p class="text-xs text-milktea-500 mt-2 pl-9">自訂在此空間顯示的頁籤功能 (月曆、週曆等)</p>
+        </div>
+      </div>
+
+      <!-- Feature Settings Drawer -->
+      <div *ngIf="showFeatureDrawer" class="fixed inset-0 bg-black/20 z-[60] transition-opacity" (click)="closeFeatureDrawer()"></div>
+      <div class="fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-[0_-4px_15px_rgba(0,0,0,0.1)] transition-transform duration-300 z-[65] max-w-3xl mx-auto flex flex-col"
+           [style.transform]="showFeatureDrawer ? 'translateY(0)' : 'translateY(100%)'">
+        <div class="p-4 border-b border-milktea-100 flex justify-between items-center shrink-0">
+           <h2 class="font-bold text-milktea-900 text-lg">頁籤顯示設定</h2>
+           <button class="material-icons text-milktea-400" (click)="closeFeatureDrawer()">close</button>
+        </div>
+        <div class="p-4 flex-1 overflow-y-auto">
+          <div class="flex flex-col gap-3">
+            <label class="flex items-center justify-between p-3 bg-milktea-50 rounded-xl border border-milktea-100">
+              <span class="font-bold text-milktea-900">月曆</span>
+              <input type="checkbox" [checked]="featureTabs.includes('month')" (change)="toggleFeatureTab('month')" class="w-5 h-5 accent-milktea-600">
+            </label>
+            <label class="flex items-center justify-between p-3 bg-milktea-50 rounded-xl border border-milktea-100">
+              <span class="font-bold text-milktea-900">週曆</span>
+              <input type="checkbox" [checked]="featureTabs.includes('week')" (change)="toggleFeatureTab('week')" class="w-5 h-5 accent-milktea-600">
+            </label>
+            <label class="flex items-center justify-between p-3 bg-milktea-50 rounded-xl border border-milktea-100">
+              <span class="font-bold text-milktea-900">日曆</span>
+              <input type="checkbox" [checked]="featureTabs.includes('day')" (change)="toggleFeatureTab('day')" class="w-5 h-5 accent-milktea-600">
+            </label>
+            <label class="flex items-center justify-between p-3 bg-milktea-50 rounded-xl border border-milktea-100">
+              <span class="font-bold text-milktea-900">月曆 (蘋果)</span>
+              <input type="checkbox" [checked]="featureTabs.includes('monthApple')" (change)="toggleFeatureTab('monthApple')" class="w-5 h-5 accent-milktea-600">
+            </label>
+          </div>
+        </div>
       </div>
 
       <!-- Category Drawer -->
@@ -109,9 +150,13 @@ export class SettingsComponent implements OnInit, OnDestroy {
   destroy$ = new Subject<void>();
   currentWorkspace: Workspace | null = null;
   categories: Category[] = [];
+  currentUserId: string = '';
 
   showCategoryDrawer = false;
+  showFeatureDrawer = false;
   showEditModal = false;
+
+  featureTabs: ('month' | 'week' | 'day' | 'monthApple')[] = ['month', 'week', 'day'];
 
   editingCategory: Partial<Category> | null = null;
   editName = '';
@@ -124,10 +169,16 @@ export class SettingsComponent implements OnInit, OnDestroy {
   ];
 
   ngOnInit() {
+    this.currentUserId = localStorage.getItem('currentUserId') || '';
     this.workspaceService.currentWorkspace$.pipe(takeUntil(this.destroy$)).subscribe(ws => {
       this.currentWorkspace = ws;
       if (ws) {
         this.loadCategories(ws.id);
+        if (ws.userPreferences && ws.userPreferences[this.currentUserId]) {
+          this.featureTabs = ws.userPreferences[this.currentUserId].tabs || ['month', 'week', 'day'];
+        } else {
+          this.featureTabs = ['month', 'week', 'day'];
+        }
       } else {
         this.router.navigate(['/workspaces']);
       }
@@ -149,6 +200,31 @@ export class SettingsComponent implements OnInit, OnDestroy {
 
   closeCategoryDrawer() {
     this.showCategoryDrawer = false;
+  }
+
+  openFeatureDrawer() {
+    this.showFeatureDrawer = true;
+  }
+
+  closeFeatureDrawer() {
+    this.showFeatureDrawer = false;
+  }
+
+  async toggleFeatureTab(tab: 'month' | 'week' | 'day' | 'monthApple') {
+    if (this.featureTabs.includes(tab)) {
+      this.featureTabs = this.featureTabs.filter(t => t !== tab);
+    } else {
+      this.featureTabs.push(tab);
+    }
+
+    // Auto save preferences
+    if (this.currentWorkspace && this.currentUserId) {
+      await this.workspaceService.updateUserPreferences(
+        this.currentWorkspace.id,
+        this.currentUserId,
+        { tabs: this.featureTabs }
+      );
+    }
   }
 
   loadCategories(workspaceId: string) {

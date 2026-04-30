@@ -36,18 +36,22 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
 
       <!-- Filters & View Toggle -->
       <div class="px-4 py-3 bg-milktea-50 flex gap-2 overflow-x-auto no-scrollbar shrink-0">
-        <button class="px-4 py-1.5 rounded-full text-sm font-bold whitespace-nowrap"
+        <button *ngIf="featureTabs.includes('month')" class="px-4 py-1.5 rounded-full text-sm font-bold whitespace-nowrap"
                 [class.bg-milktea-600]="viewMode === 'month'" [class.text-white]="viewMode === 'month'"
                 [class.bg-white]="viewMode !== 'month'" [class.text-milktea-600]="viewMode !== 'month'"
                 (click)="viewMode = 'month'">月曆</button>
-        <button class="px-4 py-1.5 rounded-full text-sm font-bold whitespace-nowrap"
+        <button *ngIf="featureTabs.includes('week')" class="px-4 py-1.5 rounded-full text-sm font-bold whitespace-nowrap"
                 [class.bg-milktea-600]="viewMode === 'week'" [class.text-white]="viewMode === 'week'"
                 [class.bg-white]="viewMode !== 'week'" [class.text-milktea-600]="viewMode !== 'week'"
                 (click)="viewMode = 'week'">週曆</button>
-        <button class="px-4 py-1.5 rounded-full text-sm font-bold whitespace-nowrap"
+        <button *ngIf="featureTabs.includes('day')" class="px-4 py-1.5 rounded-full text-sm font-bold whitespace-nowrap"
                 [class.bg-milktea-600]="viewMode === 'day'" [class.text-white]="viewMode === 'day'"
                 [class.bg-white]="viewMode !== 'day'" [class.text-milktea-600]="viewMode !== 'day'"
                 (click)="viewMode = 'day'">日曆</button>
+        <button *ngIf="featureTabs.includes('monthApple')" class="px-4 py-1.5 rounded-full text-sm font-bold whitespace-nowrap"
+                [class.bg-milktea-600]="viewMode === 'monthApple'" [class.text-white]="viewMode === 'monthApple'"
+                [class.bg-white]="viewMode !== 'monthApple'" [class.text-milktea-600]="viewMode !== 'monthApple'"
+                (click)="viewMode = 'monthApple'">月曆(蘋果)</button>
         <div class="flex-1"></div>
         <button class="px-3 py-1.5 rounded-full bg-white text-milktea-600 border border-milktea-200 text-sm flex items-center gap-1 shrink-0"
                 (click)="showFilter = !showFilter">
@@ -136,7 +140,7 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
           </div>
 
           <div class="grid grid-cols-7 gap-1 text-center mb-2 text-sm text-milktea-500 font-bold sticky top-[3.5rem] bg-milktea-50 z-20 pb-2 -mx-4 px-4">
-            <div *ngFor="let day of ['日','一','二','三','四','五','六']">{{ day }}</div>
+            <div *ngFor="let day of ['一','二','三','四','五','六','日']">{{ day }}</div>
           </div>
 
           <div class="grid grid-cols-7 gap-1 flex-1 relative">
@@ -171,6 +175,119 @@ import { addDays, format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSa
         </div>
 
         <!-- Week View -->
+        <div *ngIf="viewMode === 'monthApple'" class="p-4 h-full flex flex-col relative pb-32">
+          <div class="flex justify-between items-center mb-4 sticky top-0 bg-milktea-50 z-20 pb-2 pt-4 -mt-4 -mx-4 px-4">
+            <button (click)="prevMonth()" class="text-milktea-800 font-bold px-2">&lt;</button>
+            <h2 class="text-xl font-bold text-milktea-900">{{ currentMonthStr }}</h2>
+            <button (click)="nextMonth()" class="text-milktea-800 font-bold px-2">&gt;</button>
+          </div>
+
+          <div class="flex justify-center gap-2 mb-4">
+            <button class="px-3 py-1 rounded-full text-xs font-bold border transition-colors"
+                    [class.bg-milktea-600]="appleViewStyle === 'compact'" [class.text-white]="appleViewStyle === 'compact'" [class.border-milktea-600]="appleViewStyle === 'compact'"
+                    [class.bg-white]="appleViewStyle !== 'compact'" [class.text-milktea-600]="appleViewStyle !== 'compact'" [class.border-milktea-200]="appleViewStyle !== 'compact'"
+                    (click)="appleViewStyle = 'compact'">精簡</button>
+            <button class="px-3 py-1 rounded-full text-xs font-bold border transition-colors"
+                    [class.bg-milktea-600]="appleViewStyle === 'stack'" [class.text-white]="appleViewStyle === 'stack'" [class.border-milktea-600]="appleViewStyle === 'stack'"
+                    [class.bg-white]="appleViewStyle !== 'stack'" [class.text-milktea-600]="appleViewStyle !== 'stack'" [class.border-milktea-200]="appleViewStyle !== 'stack'"
+                    (click)="appleViewStyle = 'stack'">堆疊</button>
+            <button class="px-3 py-1 rounded-full text-xs font-bold border transition-colors"
+                    [class.bg-milktea-600]="appleViewStyle === 'detailed'" [class.text-white]="appleViewStyle === 'detailed'" [class.border-milktea-600]="appleViewStyle === 'detailed'"
+                    [class.bg-white]="appleViewStyle !== 'detailed'" [class.text-milktea-600]="appleViewStyle !== 'detailed'" [class.border-milktea-200]="appleViewStyle !== 'detailed'"
+                    (click)="appleViewStyle = 'detailed'">詳細資訊</button>
+            <button class="px-3 py-1 rounded-full text-xs font-bold border transition-colors"
+                    [class.bg-milktea-600]="appleViewStyle === 'list'" [class.text-white]="appleViewStyle === 'list'" [class.border-milktea-600]="appleViewStyle === 'list'"
+                    [class.bg-white]="appleViewStyle !== 'list'" [class.text-milktea-600]="appleViewStyle !== 'list'" [class.border-milktea-200]="appleViewStyle !== 'list'"
+                    (click)="appleViewStyle = 'list'">列表</button>
+          </div>
+
+          <div class="grid grid-cols-7 gap-1 text-center mb-2 text-sm text-milktea-500 font-bold sticky top-[6.5rem] bg-milktea-50 z-20 pb-2 -mx-4 px-4">
+            <div *ngFor="let day of ['一','二','三','四','五','六','日']">{{ day }}</div>
+          </div>
+
+          <div *ngIf="appleViewStyle !== 'list'" class="grid grid-cols-7 gap-1 flex-1 relative">
+            <div *ngFor="let d of calendarDays"
+                 class="bg-white rounded-lg flex flex-col items-center relative overflow-hidden"
+                 [class.p-1]="appleViewStyle !== 'stack'"
+                 [class.p-0]="appleViewStyle === 'stack'"
+                 [class.min-h-[60px]]="appleViewStyle === 'compact' || appleViewStyle === 'stack'"
+                 [class.min-h-[100px]]="appleViewStyle === 'detailed'"
+                 [class.opacity-50]="!d.isCurrentMonth"
+                 [class.border-2]="d.dateStr === selectedDateStr"
+                 [class.border-milktea-400]="d.dateStr === selectedDateStr"
+                 (click)="selectDate(d.dateStr); appleViewStyle !== 'detailed' && openScheduledDrawer(d.dateStr, d.tasks)"
+                 cdkDropList
+                 [cdkDropListData]="d.tasks"
+                 (cdkDropListDropped)="dropToDate($event, d.dateStr)">
+
+              <div class="text-sm w-full text-center" [class.font-bold]="d.isToday" [class.text-milktea-600]="d.isToday" [class.bg-milktea-100]="appleViewStyle === 'stack' && d.isToday" [class.py-1]="appleViewStyle === 'stack'">{{ d.dayNum }}</div>
+
+              <!-- Compact Style (Dots) -->
+              <div *ngIf="appleViewStyle === 'compact'" class="flex gap-0.5 mt-1 flex-wrap justify-center px-1 w-full">
+                 <div *ngIf="hasUrgent(d.tasks)" class="w-1.5 h-1.5 rounded-full bg-red-500 mx-auto my-1"></div>
+                 <div *ngIf="!hasUrgent(d.tasks) && d.tasks.length > 0" class="w-1.5 h-1.5 rounded-full bg-milktea-400 mx-auto my-1"></div>
+              </div>
+
+              <!-- Stack Style (Color Blocks) -->
+              <div *ngIf="appleViewStyle === 'stack'" class="w-full mt-1 flex flex-col gap-0.5 px-0.5">
+                  <ng-container *ngFor="let t of d.tasks; let i = index">
+                     <div *ngIf="i < 3" class="w-full h-3 rounded-sm" [class.bg-red-400]="t.isUrgent" [class.bg-milktea-300]="!t.isUrgent" [class.opacity-50]="t.status === 'completed'"></div>
+                  </ng-container>
+                  <div *ngIf="d.tasks.length > 3" class="text-[8px] text-milktea-500 text-center font-bold">...+{{ d.tasks.length - 3 }}</div>
+              </div>
+
+              <!-- Detailed Style (Text) -->
+              <div *ngIf="appleViewStyle === 'detailed'" class="w-full flex flex-col gap-1 px-1 mt-1 pb-1">
+                  <ng-container *ngFor="let t of d.tasks; let i = index">
+                      <div *ngIf="i < 4" class="text-[9px] truncate leading-tight w-full p-0.5 rounded cursor-pointer" [class.bg-red-100]="t.isUrgent" [class.text-red-700]="t.isUrgent" [class.bg-milktea-100]="!t.isUrgent" [class.text-milktea-800]="!t.isUrgent" [class.opacity-50]="t.status === 'completed'" (click)="editTask(t); $event.stopPropagation()">
+                          <span class="font-bold" *ngIf="t.startTime">{{t.startTime}} </span>{{t.title}}
+                      </div>
+                  </ng-container>
+                  <div *ngIf="d.tasks.length > 4" class="text-[9px] text-milktea-500 text-center cursor-pointer font-bold" (click)="openScheduledDrawer(d.dateStr, d.tasks); $event.stopPropagation()">...+{{ d.tasks.length - 4 }}</div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- List Style (Split View) -->
+          <div *ngIf="appleViewStyle === 'list'" class="flex-1 flex flex-col min-h-0 bg-white rounded-xl shadow-sm border border-milktea-100 overflow-hidden relative">
+             <div class="h-1/2 border-b border-milktea-100 overflow-y-auto p-2 no-scrollbar">
+                <div class="grid grid-cols-7 gap-1">
+                  <div *ngFor="let d of calendarDays"
+                       class="rounded-lg flex flex-col items-center justify-center p-1 cursor-pointer min-h-[40px] relative"
+                       [class.opacity-50]="!d.isCurrentMonth"
+                       [class.bg-milktea-100]="d.dateStr === selectedDateStr"
+                       (click)="selectDate(d.dateStr); openScheduledDrawer(d.dateStr, d.tasks)">
+                    <span class="text-sm z-10" [class.font-bold]="d.isToday" [class.text-milktea-600]="d.isToday">{{ d.dayNum }}</span>
+                    <div *ngIf="d.tasks.length > 0" class="w-1 h-1 rounded-full absolute bottom-1" [class.bg-red-500]="hasUrgent(d.tasks)" [class.bg-milktea-400]="!hasUrgent(d.tasks)"></div>
+                  </div>
+                </div>
+             </div>
+             <div class="h-1/2 overflow-y-auto p-4 bg-milktea-50">
+                <h3 class="font-bold text-milktea-900 mb-3">{{ selectedDateStr }} 代辦事項</h3>
+                <div *ngIf="scheduledDrawerTasks.length === 0" class="text-sm text-milktea-400">無代辦事項</div>
+                <div *ngFor="let t of scheduledDrawerTasks" class="bg-white p-3 rounded-lg shadow-sm border border-milktea-100 mb-2 flex items-start gap-2 relative">
+                   <button class="mt-0.5 shrink-0 flex items-center justify-center w-5 h-5 rounded-full border-2 border-milktea-400 focus:outline-none"
+                           [class.bg-milktea-400]="t.status === 'completed'"
+                           (click)="toggleCompletion(t); $event.stopPropagation()">
+                       <span *ngIf="t.status === 'completed'" class="material-icons text-white text-[12px] font-bold">check</span>
+                   </button>
+                   <div class="flex-1 min-w-0" (click)="editTask(t)">
+                       <div class="flex items-center gap-1 w-full pr-4">
+                           <ng-container *ngIf="getCategoryForForm(t.categoryId) as cat">
+                               <span *ngIf="cat.icon && !isEmoji(cat.icon)" class="material-icons text-[14px] text-milktea-500">{{ cat.icon }}</span>
+                               <span *ngIf="cat.icon && isEmoji(cat.icon)" class="text-[14px]">{{ cat.icon }}</span>
+                           </ng-container>
+                           <span class="font-bold truncate" [class.text-milktea-400]="t.status === 'completed'" [class.line-through]="t.status === 'completed'" [class.text-milktea-900]="t.status !== 'completed'">{{ t.title }}</span>
+                       </div>
+                       <span *ngIf="t.isUrgent" class="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0 absolute right-3 top-4"></span>
+                       <div class="text-xs text-milktea-500 mt-1" *ngIf="t.startTime">{{ t.startTime }} <ng-container *ngIf="t.endTime">- {{ t.endTime }}</ng-container></div>
+                   </div>
+                </div>
+             </div>
+          </div>
+        </div>
+
         <div *ngIf="viewMode === 'week'" class="p-4 h-full flex flex-col relative pb-32">
           <div class="flex justify-between items-center mb-4 sticky top-0 bg-milktea-50 z-20 pb-2 pt-4 -mt-4 -mx-4 px-4">
             <button (click)="prevWeek()" class="text-milktea-800 font-bold px-2">&lt;</button>
@@ -597,9 +714,11 @@ export class MainViewComponent implements OnInit, OnDestroy {
   currentWorkspace: Workspace | null = null;
   currentUser: User | null = null;
 
-  viewMode: 'month' | 'week' | 'day' = 'month';
+  viewMode: 'month' | 'week' | 'day' | 'monthApple' = 'month';
+  appleViewStyle: 'compact' | 'stack' | 'detailed' | 'list' = 'compact';
   drawerOpen = false;
 
+  featureTabs: ('month' | 'week' | 'day' | 'monthApple')[] = ['month', 'week', 'day'];
   tasks: Task[] = [];
   unassignedTasks: Task[] = [];
 
@@ -651,6 +770,8 @@ export class MainViewComponent implements OnInit, OnDestroy {
   formTask: any = {};
   formTaskTagInput = '';
   formTaskTags: string[] = [];
+  showCategorySelect = false;
+  showAdvancedSettings = false;
 
   // Interactions
   monthExpandDate: string | null = null;
@@ -692,13 +813,6 @@ export class MainViewComponent implements OnInit, OnDestroy {
       };
   }
 
-  toggleCompletion(task: Task) {
-      const newStatus = task.status === 'completed' ? 'pending' : 'completed';
-      this.taskService.updateTask(task.id, { status: newStatus }).then(() => {
-         // Auto updates via loadTasks observable
-      });
-  }
-
   ngOnInit() {
     this.workspaceService.currentWorkspace$.pipe(takeUntil(this.destroy$)).subscribe(ws => {
       if (!ws) {
@@ -706,6 +820,19 @@ export class MainViewComponent implements OnInit, OnDestroy {
         return;
       }
       this.currentWorkspace = ws;
+
+      const userId = localStorage.getItem('currentUserId');
+      if (userId && ws.userPreferences && ws.userPreferences[userId]) {
+         this.featureTabs = ws.userPreferences[userId].tabs || ['month', 'week', 'day'];
+      } else {
+         this.featureTabs = ['month', 'week', 'day'];
+      }
+
+      // Auto switch viewMode if current is not in featureTabs
+      if (!this.featureTabs.includes(this.viewMode as any) && this.featureTabs.length > 0) {
+         this.viewMode = this.featureTabs[0];
+      }
+
       this.loadTasks(ws.id);
       this.loadCategories(ws.id);
     });
@@ -901,8 +1028,8 @@ export class MainViewComponent implements OnInit, OnDestroy {
     this.currentMonthStr = format(this.currentDate, 'yyyy年 MM月');
     const monthStart = startOfMonth(this.currentDate);
     const monthEnd = endOfMonth(monthStart);
-    const startDate = startOfWeek(monthStart);
-    const endDate = endOfWeek(monthEnd);
+    const startDate = startOfWeek(monthStart, { weekStartsOn: 1 });
+    const endDate = endOfWeek(monthEnd, { weekStartsOn: 1 });
 
     const days = [];
     let day = startDate;
@@ -922,11 +1049,11 @@ export class MainViewComponent implements OnInit, OnDestroy {
   }
 
   generateWeekView() {
-    const weekStart = startOfWeek(this.currentDate);
+    const weekStart = startOfWeek(this.currentDate, { weekStartsOn: 1 });
     this.currentWeekStr = format(weekStart, 'yyyy年 MM月 dd日') + ' ~';
     const days = [];
     let day = weekStart;
-    const dayNames = ['日', '一', '二', '三', '四', '五', '六'];
+    const dayNames = ['一', '二', '三', '四', '五', '六', '日'];
     for(let i=0; i<7; i++) {
       const dateStr = format(day, 'yyyy-MM-dd');
       days.push({
@@ -941,8 +1068,29 @@ export class MainViewComponent implements OnInit, OnDestroy {
     this.weekDays = days;
   }
 
+  toggleCompletion(task: Task) {
+      if (!task) return;
+      const newStatus = task.status === 'completed' ? 'pending' : 'completed';
+      this.taskService.updateTask(task.id, { status: newStatus });
+  }
+
   hasUrgent(tasks: Task[]): boolean {
     return tasks.some(t => t.isUrgent);
+  }
+
+  isEmoji(str: string): boolean {
+    if (!str) return false;
+    const regex = /[\p{Emoji_Presentation}\p{Extended_Pictographic}]/u;
+    return regex.test(str);
+  }
+
+  getCategoryForForm(id: string | undefined): Category | undefined {
+    return this.availableCategories.find(c => c.id === id);
+  }
+
+  selectFormCategory(id: string | undefined) {
+    this.formTask.categoryId = id;
+    this.showCategorySelect = false;
   }
 
   generateDayView() {
