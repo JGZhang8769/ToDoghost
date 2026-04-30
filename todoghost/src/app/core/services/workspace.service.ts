@@ -8,6 +8,11 @@ export interface Workspace {
   createdAt: number;
   users: string[];
   inviteCode: string | null;
+  userPreferences?: Record<string, WorkspaceUserPreferences>;
+}
+
+export interface WorkspaceUserPreferences {
+  tabs: ('month' | 'week' | 'day' | 'monthApple')[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -74,6 +79,26 @@ export class WorkspaceService {
     const current = this.currentWorkspaceSubject.value;
     if (current && current.id === workspaceId) {
       this.currentWorkspaceSubject.next({ ...current, ...data });
+    }
+  }
+
+  async updateUserPreferences(workspaceId: string, userId: string, preferences: WorkspaceUserPreferences) {
+    const wsRef = doc(this.firestore, `workspaces/${workspaceId}`);
+    const updateKey = `userPreferences.${userId}`;
+    await updateDoc(wsRef, {
+      [updateKey]: preferences
+    });
+
+    const current = this.currentWorkspaceSubject.value;
+    if (current && current.id === workspaceId) {
+      const prefs = current.userPreferences || {};
+      this.currentWorkspaceSubject.next({
+        ...current,
+        userPreferences: {
+          ...prefs,
+          [userId]: preferences
+        }
+      });
     }
   }
 
