@@ -108,6 +108,8 @@ export class MainViewComponent implements OnInit, OnDestroy {
       return this.filteredTasks.filter(t => t.date === this.scheduledDrawerDate);
   }
 
+isDropdownOpen = false;
+
 
   contextMenuState = { show: false, x: 0, y: 0, task: null as any };
   isDragging = false;
@@ -117,6 +119,14 @@ export class MainViewComponent implements OnInit, OnDestroy {
   longPressTimer: any;
   longPressTriggered = false;
 
+selectCategory(catId: string | undefined) {
+  this.formTask.categoryId = catId;
+  this.isDropdownOpen = false; // 選完後自動關閉
+}
+@HostListener('document:click', ['$event'])
+onDocumentClick(event: MouseEvent) {
+  // 如果你有用 ElementRef 可以做更精確的判定
+}
 
   openScheduledDrawer(dateStr: string, tasks: any[]) {
       this.scheduledDrawerDate = dateStr;

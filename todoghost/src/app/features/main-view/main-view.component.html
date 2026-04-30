@@ -679,10 +679,56 @@
             <input [(ngModel)]="formTask.title" placeholder="標題" class="w-full p-2 mb-2 border rounded">
 
             <div class="mb-2">
-              <select [(ngModel)]="formTask.categoryId" class="w-full p-2 border rounded bg-white">
-                <option [ngValue]="undefined">無分類</option>
-                <option *ngFor="let cat of availableCategories" [value]="cat.id">{{ cat.name }}</option>
-              </select>
+              <div class="relative w-full mb-2">
+  <!-- 選單標題 (顯示目前選中的項目) -->
+  <div 
+    (click)="isDropdownOpen = !isDropdownOpen" 
+    class="w-full p-2 border rounded bg-white cursor-pointer flex items-center gap-2 min-h-[42px]"
+  >
+    <!-- 顯示選中的圖示 -->
+    <ng-container *ngIf="formTask.categoryId && getCategoryForForm(formTask.categoryId) as selectedCat">
+      <span *ngIf="selectedCat.icon && !isEmoji(selectedCat.icon)" class="material-icons text-[18px] text-milktea-500">{{ selectedCat.icon }}</span>
+      <span *ngIf="selectedCat.icon && isEmoji(selectedCat.icon)" class="text-[18px]">{{ selectedCat.icon }}</span>
+      <span class="flex-grow">{{ selectedCat.name }}</span>
+    </ng-container>
+    
+    <!-- 未選中時顯示 -->
+    <span *ngIf="!formTask.categoryId" class="text-gray-500 flex-grow">無分類</span>
+    
+    <!-- 下拉箭頭 -->
+    <span class="material-icons text-gray-400">arrow_drop_down</span>
+  </div>
+
+  <!-- 彈出的選項清單 -->
+  <div 
+    *ngIf="isDropdownOpen" 
+    class="absolute z-50 w-full mt-1 bg-white border rounded shadow-xl max-h-60 overflow-y-auto"
+  >
+    <!-- 無分類選項 -->
+    <div 
+      (click)="selectCategory(undefined)" 
+      class="p-2 hover:bg-milktea-50 cursor-pointer text-gray-500"
+    >
+      無分類
+    </div>
+
+    <!-- 類別選項 -->
+    <div 
+      *ngFor="let cat of availableCategories" 
+      (click)="selectCategory(cat.id)"
+      class="p-2 hover:bg-milktea-50 cursor-pointer flex items-center gap-2"
+    >
+      <ng-container *ngIf="getCategoryForForm(cat.id) as c">
+        <span *ngIf="c.icon && !isEmoji(c.icon)" class="material-icons text-[18px] text-milktea-500">{{ c.icon }}</span>
+        <span *ngIf="c.icon && isEmoji(c.icon)" class="text-[18px]">{{ c.icon }}</span>
+        <span>{{ cat.name }}</span>
+      </ng-container>
+    </div>
+  </div>
+</div>
+
+<!-- 點擊外面自動關閉選單的透明遮罩 (選配) -->
+<div *ngIf="isDropdownOpen" (click)="isDropdownOpen = false" class="fixed inset-0 z-40"></div>
             </div>
 
             <input [(ngModel)]="formTask.date" type="date" placeholder="日期" class="w-full p-2 mb-2 border rounded">
