@@ -131,7 +131,7 @@
                  [class.opacity-50]="!d.isCurrentMonth"
                  [class.border-2]="d.dateStr === selectedDateStr"
                  [class.border-milktea-400]="d.dateStr === selectedDateStr"
-                 (click)="selectDate(d.dateStr); openScheduledDrawer(d.dateStr, d.tasks)"
+                 (click)="selectDate(d.dateStr)"
                  cdkDropList
                  [cdkDropListData]="d.tasks"
                  (cdkDropListDropped)="dropToDate($event, d.dateStr)">
@@ -143,7 +143,7 @@
               <!-- Desktop Task Previews (RWD) -->
               <div class="hidden lg:flex flex-col w-full px-1 overflow-hidden mt-1 gap-1 max-h-[120px] text-left">
                  <ng-container *ngFor="let t of d.tasks; let i = index">
-                    <div *ngIf="i < 5" class="text-[10px] truncate leading-tight w-full" [class.text-red-500]="t.isUrgent && t.status !== 'completed'" [class.text-milktea-700]="!t.isUrgent && t.status !== 'completed'" [class.text-milktea-400]="t.status === 'completed'" [class.line-through]="t.status === 'completed'">
+                    <div *ngIf="i < 5" class="text-[10px] truncate cursor-pointer leading-tight w-full" [class.text-red-500]="t.isUrgent && t.status !== 'completed'" [class.text-milktea-700]="!t.isUrgent && t.status !== 'completed'" [class.text-milktea-400]="t.status === 'completed'" [class.line-through]="t.status === 'completed'" (click)="editTask(t); $event.stopPropagation()">
 <ng-container *ngIf="getCategoryForForm(t.categoryId) as cat">
                                      <span *ngIf="cat.icon && !isEmoji(cat.icon)" class="material-icons text-[14px] text-milktea-500 shrink-0">{{ cat.icon }}</span>
                                      <span *ngIf="cat.icon && isEmoji(cat.icon)" class="text-[14px] shrink-0">{{ cat.icon }}</span>
@@ -151,7 +151,7 @@
                         <span class="font-bold" *ngIf="t.startTime">{{t.startTime}} </span> <span class="font-bold" *ngIf="t.endTime"> - {{t.endTime}} </span>{{t.title}}
                     </div>
                  </ng-container>
-                 <div *ngIf="d.tasks.length > 5" class="text-[10px] text-milktea-400 cursor-pointer text-center mt-1">...+{{ d.tasks.length - 5 }}</div>
+                 <div *ngIf="d.tasks.length > 5" class="text-[10px] text-milktea-400 cursor-pointer text-center mt-1" (click)="openScheduledDrawer(d.dateStr, d.tasks)">...+{{ d.tasks.length - 5 }}</div>
               </div>
               </div>
 
@@ -497,7 +497,13 @@
                       </div>
                       <span *ngIf="t.isUrgent" class="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0 absolute right-8 top-3"></span>
 
-                      <div class="font-bold truncate pr-6" [class.text-milktea-400]="t.status === 'completed'" [class.line-through]="t.status === 'completed'" [class.text-milktea-900]="t.status !== 'completed'"><ng-container *ngIf="getCategoryForForm(t.categoryId) as cat">
+                      <div class="font-bold truncate pr-6" [class.text-milktea-400]="t.status === 'completed'" [class.line-through]="t.status === 'completed'" [class.text-milktea-900]="t.status !== 'completed'">
+<button class="shrink-0 flex items-center justify-center w-5 h-5 rounded-full border-2 border-milktea-400 focus:outline-none"
+                                 [class.bg-milktea-400]="t.status === 'completed'"
+                                 (click)="toggleCompletion(t); $event.stopPropagation()">
+                             <span *ngIf="t.status === 'completed'" class="material-icons text-white text-[12px] font-bold">check</span>
+                         </button>
+<ng-container *ngIf="getCategoryForForm(t.categoryId) as cat">
                                      <span *ngIf="cat.icon && !isEmoji(cat.icon)" class="material-icons text-[14px] text-milktea-500 shrink-0">{{ cat.icon }}</span>
                                      <span *ngIf="cat.icon && isEmoji(cat.icon)" class="text-[14px] shrink-0">{{ cat.icon }}</span>
                                  </ng-container>{{ t.title }}</div>
