@@ -1,0 +1,751 @@
+    <div class="flex flex-col h-full bg-milktea-50 relative" cdkDropListGroup>
+      <!-- Header -->
+      <div class="bg-white px-4 py-3 shadow-sm border-b border-milktea-100 flex items-center justify-between z-10 ">
+        <button (click)="goBack()" class="text-milktea-400 p-2 -ml-2 whitespace-nowrap">
+          ← 返回
+        </button>
+        <div class="flex items-center justify-center flex-1 mx-2 min-w-0" (click)="editWorkspaceName()">
+          <app-svg-icon name="logo_main" width="28px" height="28px" class="mr-2 flex-shrink-0"></app-svg-icon>
+          <span *ngIf="!isEditingWorkspace" class="font-bold text-milktea-900 truncate w-full max-w-[200px] text-center">{{ currentWorkspace?.name || '未命名空間' }}</span>
+          <input *ngIf="isEditingWorkspace" [(ngModel)]="editingWorkspaceName" (blur)="saveWorkspaceName()" (keyup.enter)="saveWorkspaceName()" class="w-full max-w-[200px] text-center bg-milktea-50 border-b border-milktea-400 focus:outline-none text-milktea-900 font-bold" autofocus>
+        </div>
+        <div class="flex items-center gap-2">
+            <span class="text-sm font-bold text-milktea-800 hidden sm:inline" *ngIf="currentUser">Hi, {{ currentUser.name }}</span>
+            <span class="text-sm font-bold text-milktea-800 sm:hidden" *ngIf="currentUser">Hi, {{ currentUser.name }}</span>
+            <button (click)="logout()" class="text-milktea-600 text-sm font-bold whitespace-nowrap">登出</button>
+        </div>
+      </div>
+
+      <!-- Filters & View Toggle -->
+      <div class="px-4 py-3 bg-milktea-50 flex gap-2 overflow-x-auto no-scrollbar shrink-0">
+        <button *ngIf="featureTabs.includes('month')" class="px-4 py-1.5 rounded-full text-sm font-bold whitespace-nowrap"
+                [class.bg-milktea-600]="viewMode === 'month'" [class.text-white]="viewMode === 'month'"
+                [class.bg-white]="viewMode !== 'month'" [class.text-milktea-600]="viewMode !== 'month'"
+                (click)="viewMode = 'month'">月曆</button>
+        <button *ngIf="featureTabs.includes('week')" class="px-4 py-1.5 rounded-full text-sm font-bold whitespace-nowrap"
+                [class.bg-milktea-600]="viewMode === 'week'" [class.text-white]="viewMode === 'week'"
+                [class.bg-white]="viewMode !== 'week'" [class.text-milktea-600]="viewMode !== 'week'"
+                (click)="viewMode = 'week'">週曆</button>
+        <button *ngIf="featureTabs.includes('day')" class="px-4 py-1.5 rounded-full text-sm font-bold whitespace-nowrap"
+                [class.bg-milktea-600]="viewMode === 'day'" [class.text-white]="viewMode === 'day'"
+                [class.bg-white]="viewMode !== 'day'" [class.text-milktea-600]="viewMode !== 'day'"
+                (click)="viewMode = 'day'">日曆</button>
+        <button *ngIf="featureTabs.includes('monthApple')" class="px-4 py-1.5 rounded-full text-sm font-bold whitespace-nowrap"
+                [class.bg-milktea-600]="viewMode === 'monthApple'" [class.text-white]="viewMode === 'monthApple'"
+                [class.bg-white]="viewMode !== 'monthApple'" [class.text-milktea-600]="viewMode !== 'monthApple'"
+                (click)="viewMode = 'monthApple'">月曆(蘋果)</button>
+        <div class="flex-1"></div>
+        <button class="px-3 py-1.5 rounded-full bg-white text-milktea-600 border border-milktea-200 text-sm flex items-center gap-1 shrink-0"
+                (click)="showFilter = !showFilter">
+          篩選
+        </button>
+        <button class="px-2 py-1.5 rounded-full bg-white text-milktea-600 border border-milktea-200 flex items-center justify-center shrink-0"
+                (click)="goToSettings()">
+          <span class="material-icons text-sm">settings</span>
+        </button>
+      </div>
+
+      <!-- Filter Panel -->
+      <div *ngIf="showFilter" class="px-4 py-2 bg-white border-b border-milktea-100 flex gap-2 flex-wrap items-center z-20 shadow-sm relative">
+         <div class="flex items-center justify-between w-full mb-1">
+             <span class="text-xs text-milktea-500">標籤與屬性過濾：</span>
+             <button class="text-xs px-2 py-0.5 rounded-full border border-milktea-300 text-milktea-600" (click)="toggleFilterLogic()">
+                 邏輯: <span class="font-bold">{{ filterLogicAnd ? 'AND (皆須符合)' : 'OR (符合其一)' }}</span>
+             </button>
+         </div>
+         <button class="text-xs px-3 py-1.5 rounded-full border transition-colors"
+                 [class.border-red-400]="filterUrgent" [class.bg-red-50]="filterUrgent" [class.text-red-600]="filterUrgent"
+                 [class.border-milktea-200]="!filterUrgent" [class.text-milktea-500]="!filterUrgent"
+                 (click)="toggleFilterUrgent(); applyFilter()">緊急</button>
+
+         <!-- Created By Filters -->
+         <ng-container *ngFor="let u of availableUsers">
+           <button class="text-xs px-3 py-1.5 rounded-full border transition-colors flex items-center gap-1"
+                   [class.border-blue-400]="filterCreatedBy === u.id" [class.bg-blue-50]="filterCreatedBy === u.id" [class.text-blue-600]="filterCreatedBy === u.id"
+                   [class.border-milktea-200]="filterCreatedBy !== u.id" [class.text-milktea-500]="filterCreatedBy !== u.id"
+                   (click)="toggleFilterCreatedBy(u.id); applyFilter()">
+               <span class="w-2 h-2 rounded-full" [class.bg-blue-500]="filterCreatedBy === u.id" [class.bg-milktea-300]="filterCreatedBy !== u.id"></span>
+               {{ u.name }}
+           </button>
+         </ng-container>
+
+         <div class="w-[1px] h-4 bg-milktea-200 mx-1"></div>
+
+         <!-- Category Filter (Dropdown) -->
+         <div class="relative flex items-center shrink-0">
+           <select [(ngModel)]="filterCategoryId" (change)="applyFilter()" class="text-xs bg-white border border-milktea-200 text-milktea-800 rounded-full px-3 py-1.5 focus:outline-none focus:border-milktea-500 appearance-none pr-8">
+             <option [ngValue]="null">所有分類</option>
+             <option *ngFor="let cat of availableCategories" [value]="cat.id">
+               {{ cat.name }}
+             </option>
+           </select>
+           <span class="material-icons absolute right-2 text-milktea-400 pointer-events-none" style="font-size: 14px;">arrow_drop_down</span>
+         </div>
+
+         <!-- Tag Input -->
+         <div class="relative flex items-center shrink-0 min-w-[120px]">
+           <span class="absolute left-2 text-milktea-400">#</span>
+           <input type="text"
+                  [(ngModel)]="tagFilterInput"
+                  (keyup.enter)="addTagToFilter()"
+                  (focus)="showTagAutocomplete = true"
+                  (blur)="hideTagAutocomplete()"
+                  placeholder="輸入標籤..."
+                  class="pl-6 pr-2 py-1 text-xs border border-milktea-200 rounded-full bg-white focus:outline-none focus:border-milktea-400 text-milktea-800 w-full" />
+           <div *ngIf="showTagAutocomplete && autocompleteTags.length > 0" class="absolute top-full left-0 mt-1 w-full max-h-40 bg-white shadow-lg rounded-lg border border-milktea-100 overflow-y-auto z-50">
+             <div *ngFor="let t of autocompleteTags" (mousedown)="selectAutocompleteTag(t)" class="px-3 py-2 text-xs text-milktea-700 hover:bg-milktea-50 cursor-pointer">
+               {{ t }}
+             </div>
+           </div>
+         </div>
+
+         <!-- Selected Tags -->
+         <div class="flex items-center space-x-1 shrink-0">
+            <span *ngFor="let t of filterTags" class="text-xs bg-milktea-100 text-milktea-800 px-2 py-1 rounded-full flex items-center border border-milktea-200">
+               {{ t }}
+               <span class="material-icons text-[10px] ml-1 cursor-pointer" (click)="removeTagFromFilter(t)">close</span>
+            </span>
+         </div>
+
+         <button class="text-xs text-milktea-400 ml-auto flex-shrink-0" (click)="clearFilter()">清除</button>
+      </div>
+
+      <!-- Main Content Area -->
+      <div class="flex-1 overflow-y-auto relative pb-20" id="main-group">
+
+        <!-- Month View -->
+        <div *ngIf="viewMode === 'month'" class="p-4 h-full flex flex-col relative pb-32">
+          <div class="flex justify-between items-center mb-4 sticky top-0 bg-milktea-50 z-20 pb-2 pt-4 -mt-4 -mx-4 px-4">
+            <button (click)="prevMonth()" class="text-milktea-800 font-bold px-2">&lt;</button>
+            <h2 class="text-xl font-bold text-milktea-900">{{ currentMonthStr }}</h2>
+            <button (click)="nextMonth()" class="text-milktea-800 font-bold px-2">&gt;</button>
+          </div>
+
+          <div class="grid grid-cols-7 gap-1 text-center mb-2 text-sm text-milktea-500 font-bold sticky top-[3.5rem] bg-milktea-50 z-20 pb-2 -mx-4 px-4">
+            <div *ngFor="let day of ['一','二','三','四','五','六','日']">{{ day }}</div>
+          </div>
+
+          <div class="grid grid-cols-7 gap-1 flex-1 relative">
+            <div *ngFor="let d of calendarDays"
+                 class="bg-white rounded-lg p-1 flex flex-col items-center relative"
+                 [class.opacity-50]="!d.isCurrentMonth"
+                 [class.border-2]="d.dateStr === selectedDateStr"
+                 [class.border-milktea-400]="d.dateStr === selectedDateStr"
+                 (click)="selectDate(d.dateStr); openScheduledDrawer(d.dateStr, d.tasks)"
+                 cdkDropList
+                 [cdkDropListData]="d.tasks"
+                 (cdkDropListDropped)="dropToDate($event, d.dateStr)">
+              <span class="text-sm mt-1" [class.font-bold]="d.isToday" [class.text-milktea-600]="d.isToday">{{ d.dayNum }}</span>
+              <div class="flex gap-0.5 mt-1 flex-wrap justify-center flex-1 w-full min-h-[20px]">
+                 <!-- Red dot indicator if there are tasks -->
+                 <div *ngIf="hasUrgent(d.tasks)" class="w-1.5 h-1.5 rounded-full bg-red-500 mx-auto my-1 lg:hidden"></div>
+                 <div *ngIf="!hasUrgent(d.tasks) && d.tasks.length > 0" class="w-1.5 h-1.5 rounded-full bg-milktea-400 mx-auto my-1 lg:hidden"></div>
+              <!-- Desktop Task Previews (RWD) -->
+              <div class="hidden lg:flex flex-col w-full px-1 overflow-hidden mt-1 gap-1 max-h-[120px] text-left">
+                 <ng-container *ngFor="let t of d.tasks; let i = index">
+                    <div *ngIf="i < 5" class="text-[10px] truncate leading-tight w-full" [class.text-red-500]="t.isUrgent && t.status !== 'completed'" [class.text-milktea-700]="!t.isUrgent && t.status !== 'completed'" [class.text-milktea-400]="t.status === 'completed'" [class.line-through]="t.status === 'completed'">
+                        <span class="font-bold" *ngIf="t.startTime">{{t.startTime}} </span>{{t.title}}
+                    </div>
+                 </ng-container>
+                 <div *ngIf="d.tasks.length > 5" class="text-[10px] text-milktea-400 cursor-pointer text-center mt-1">...+{{ d.tasks.length - 5 }}</div>
+              </div>
+              </div>
+
+<!-- Expanded List replaced by new drawer -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Week View -->
+        <div *ngIf="viewMode === 'monthApple'" class="p-4 h-full flex flex-col relative pb-32">
+          <div class="flex justify-between items-center mb-4 sticky top-0 bg-milktea-50 z-20 pb-2 pt-4 -mt-4 -mx-4 px-4">
+            <button (click)="prevMonth()" class="text-milktea-800 font-bold px-2">&lt;</button>
+            <h2 class="text-xl font-bold text-milktea-900">{{ currentMonthStr }}</h2>
+            <button (click)="nextMonth()" class="text-milktea-800 font-bold px-2">&gt;</button>
+          </div>
+
+          <div class="flex justify-center gap-2 mb-4">
+            <button class="px-3 py-1 rounded-full text-xs font-bold border transition-colors"
+                    [class.bg-milktea-600]="appleViewStyle === 'compact'" [class.text-white]="appleViewStyle === 'compact'" [class.border-milktea-600]="appleViewStyle === 'compact'"
+                    [class.bg-white]="appleViewStyle !== 'compact'" [class.text-milktea-600]="appleViewStyle !== 'compact'" [class.border-milktea-200]="appleViewStyle !== 'compact'"
+                    (click)="appleViewStyle = 'compact'">精簡</button>
+            <button class="px-3 py-1 rounded-full text-xs font-bold border transition-colors"
+                    [class.bg-milktea-600]="appleViewStyle === 'stack'" [class.text-white]="appleViewStyle === 'stack'" [class.border-milktea-600]="appleViewStyle === 'stack'"
+                    [class.bg-white]="appleViewStyle !== 'stack'" [class.text-milktea-600]="appleViewStyle !== 'stack'" [class.border-milktea-200]="appleViewStyle !== 'stack'"
+                    (click)="appleViewStyle = 'stack'">堆疊</button>
+            <button class="px-3 py-1 rounded-full text-xs font-bold border transition-colors"
+                    [class.bg-milktea-600]="appleViewStyle === 'detailed'" [class.text-white]="appleViewStyle === 'detailed'" [class.border-milktea-600]="appleViewStyle === 'detailed'"
+                    [class.bg-white]="appleViewStyle !== 'detailed'" [class.text-milktea-600]="appleViewStyle !== 'detailed'" [class.border-milktea-200]="appleViewStyle !== 'detailed'"
+                    (click)="appleViewStyle = 'detailed'">詳細資訊</button>
+            <button class="px-3 py-1 rounded-full text-xs font-bold border transition-colors"
+                    [class.bg-milktea-600]="appleViewStyle === 'list'" [class.text-white]="appleViewStyle === 'list'" [class.border-milktea-600]="appleViewStyle === 'list'"
+                    [class.bg-white]="appleViewStyle !== 'list'" [class.text-milktea-600]="appleViewStyle !== 'list'" [class.border-milktea-200]="appleViewStyle !== 'list'"
+                    (click)="appleViewStyle = 'list'">列表</button>
+          </div>
+
+          <div class="grid grid-cols-7 gap-1 text-center mb-2 text-sm text-milktea-500 font-bold sticky top-[6.5rem] bg-milktea-50 z-20 pb-2 -mx-4 px-4">
+            <div *ngFor="let day of ['一','二','三','四','五','六','日']">{{ day }}</div>
+          </div>
+
+          <div *ngIf="appleViewStyle !== 'list'" class="grid grid-cols-7 gap-1 flex-1 relative">
+            <div *ngFor="let d of calendarDays"
+                 class="bg-white rounded-lg flex flex-col items-center relative overflow-hidden"
+                 [class.p-1]="appleViewStyle !== 'stack'"
+                 [class.p-0]="appleViewStyle === 'stack'"
+                 [class.min-h-[60px]]="appleViewStyle === 'compact' || appleViewStyle === 'stack'"
+                 [class.min-h-[100px]]="appleViewStyle === 'detailed'"
+                 [class.opacity-50]="!d.isCurrentMonth"
+                 [class.border-2]="d.dateStr === selectedDateStr"
+                 [class.border-milktea-400]="d.dateStr === selectedDateStr"
+                 (click)="selectDate(d.dateStr); appleViewStyle !== 'detailed' && openScheduledDrawer(d.dateStr, d.tasks)"
+                 cdkDropList
+                 [cdkDropListData]="d.tasks"
+                 (cdkDropListDropped)="dropToDate($event, d.dateStr)">
+
+              <div class="text-sm w-full text-center" [class.font-bold]="d.isToday" [class.text-milktea-600]="d.isToday" [class.bg-milktea-100]="appleViewStyle === 'stack' && d.isToday" [class.py-1]="appleViewStyle === 'stack'">{{ d.dayNum }}</div>
+
+              <!-- Compact Style (Dots) -->
+              <div *ngIf="appleViewStyle === 'compact'" class="flex gap-0.5 mt-1 flex-wrap justify-center px-1 w-full">
+                 <div *ngIf="hasUrgent(d.tasks)" class="w-1.5 h-1.5 rounded-full bg-red-500 mx-auto my-1"></div>
+                 <div *ngIf="!hasUrgent(d.tasks) && d.tasks.length > 0" class="w-1.5 h-1.5 rounded-full bg-milktea-400 mx-auto my-1"></div>
+              </div>
+
+              <!-- Stack Style (Color Blocks) -->
+              <div *ngIf="appleViewStyle === 'stack'" class="w-full mt-1 flex flex-col gap-0.5 px-0.5">
+                  <ng-container *ngFor="let t of d.tasks; let i = index">
+                     <div *ngIf="i < 3" class="w-full h-3 rounded-sm" [class.bg-red-400]="t.isUrgent" [class.bg-milktea-300]="!t.isUrgent" [class.opacity-50]="t.status === 'completed'"></div>
+                  </ng-container>
+                  <div *ngIf="d.tasks.length > 3" class="text-[8px] text-milktea-500 text-center font-bold">...+{{ d.tasks.length - 3 }}</div>
+              </div>
+
+              <!-- Detailed Style (Text) -->
+              <div *ngIf="appleViewStyle === 'detailed'" class="w-full flex flex-col gap-1 px-1 mt-1 pb-1">
+                  <ng-container *ngFor="let t of d.tasks; let i = index">
+                      <div *ngIf="i < 4" class="text-[9px] truncate leading-tight w-full p-0.5 rounded cursor-pointer" [class.bg-red-100]="t.isUrgent" [class.text-red-700]="t.isUrgent" [class.bg-milktea-100]="!t.isUrgent" [class.text-milktea-800]="!t.isUrgent" [class.opacity-50]="t.status === 'completed'" (click)="editTask(t); $event.stopPropagation()">
+                          <span class="font-bold" *ngIf="t.startTime">{{t.startTime}} </span>{{t.title}}
+                      </div>
+                  </ng-container>
+                  <div *ngIf="d.tasks.length > 4" class="text-[9px] text-milktea-500 text-center cursor-pointer font-bold" (click)="openScheduledDrawer(d.dateStr, d.tasks); $event.stopPropagation()">...+{{ d.tasks.length - 4 }}</div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- List Style (Split View) -->
+          <div *ngIf="appleViewStyle === 'list'" class="flex-1 flex flex-col min-h-0 bg-white rounded-xl shadow-sm border border-milktea-100 overflow-hidden relative">
+             <div class="h-1/2 border-b border-milktea-100 overflow-y-auto p-2 no-scrollbar">
+                <div class="grid grid-cols-7 gap-1">
+                  <div *ngFor="let d of calendarDays"
+                       class="rounded-lg flex flex-col items-center justify-center p-1 cursor-pointer min-h-[40px] relative"
+                       [class.opacity-50]="!d.isCurrentMonth"
+                       [class.bg-milktea-100]="d.dateStr === selectedDateStr"
+                       (click)="selectDate(d.dateStr); openScheduledDrawer(d.dateStr, d.tasks)">
+                    <span class="text-sm z-10" [class.font-bold]="d.isToday" [class.text-milktea-600]="d.isToday">{{ d.dayNum }}</span>
+                    <div *ngIf="d.tasks.length > 0" class="w-1 h-1 rounded-full absolute bottom-1" [class.bg-red-500]="hasUrgent(d.tasks)" [class.bg-milktea-400]="!hasUrgent(d.tasks)"></div>
+                  </div>
+                </div>
+             </div>
+             <div class="h-1/2 overflow-y-auto p-4 bg-milktea-50">
+                <h3 class="font-bold text-milktea-900 mb-3">{{ selectedDateStr }} 代辦事項</h3>
+                <div *ngIf="scheduledDrawerTasks.length === 0" class="text-sm text-milktea-400">無代辦事項</div>
+                <div *ngFor="let t of scheduledDrawerTasks" class="bg-white p-3 rounded-lg shadow-sm border border-milktea-100 mb-2 flex items-start gap-2 relative">
+                   <button class="shrink-0 flex items-center justify-center w-5 h-5 rounded-full border-2 border-milktea-400 focus:outline-none"
+                           [class.bg-milktea-400]="t.status === 'completed'"
+                           (click)="toggleCompletion(t); $event.stopPropagation()">
+                       <span *ngIf="t.status === 'completed'" class="material-icons text-white text-[12px] font-bold">check</span>
+                   </button>
+                   <div class="flex-1 min-w-0 flex flex-col justify-center cursor-pointer" (click)="editTask(t)">
+                       <div class="flex items-center gap-1 w-full relative">
+                           <ng-container *ngIf="getCategoryForForm(t.categoryId) as cat">
+                               <span *ngIf="cat.icon && !isEmoji(cat.icon)" class="material-icons text-[14px] text-milktea-500 shrink-0">{{ cat.icon }}</span>
+                               <span *ngIf="cat.icon && isEmoji(cat.icon)" class="text-[14px] shrink-0">{{ cat.icon }}</span>
+                           </ng-container>
+                           <span class="font-bold truncate text-sm" [class.text-milktea-400]="t.status === 'completed'" [class.line-through]="t.status === 'completed'" [class.text-milktea-900]="t.status !== 'completed'">{{ t.title }}</span>
+                           <span *ngIf="t.isUrgent" class="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0 ml-1"></span>
+                       </div>
+                       <div class="text-[10px] text-milktea-500 mt-0.5" *ngIf="t.startTime || t.endTime">{{ t.startTime || '' }} <ng-container *ngIf="t.endTime">- {{ t.endTime }}</ng-container></div>
+                   </div>
+                </div>
+             </div>
+          </div>
+        </div>
+
+        <div *ngIf="viewMode === 'week'" class="p-4 h-full flex flex-col relative pb-32">
+          <div class="flex justify-between items-center mb-4 sticky top-0 bg-milktea-50 z-20 pb-2 pt-4 -mt-4 -mx-4 px-4">
+            <button (click)="prevWeek()" class="text-milktea-800 font-bold px-2">&lt;</button>
+            <h2 class="text-xl font-bold text-milktea-900">{{ currentWeekStr }}</h2>
+            <button (click)="nextWeek()" class="text-milktea-800 font-bold px-2">&gt;</button>
+          </div>
+
+          <div class="flex-1 flex flex-col gap-3 pb-32 overflow-y-auto">
+             <div *ngFor="let d of weekDays"
+                  class="bg-white rounded-xl p-3 flex border border-milktea-100 shadow-sm"
+                  [class.bg-milktea-100]="d.isToday"
+                  [class.border-2]="d.dateStr === selectedDateStr"
+                  [class.border-milktea-400]="d.dateStr === selectedDateStr"
+                  (click)="selectDate(d.dateStr); openScheduledDrawer(d.dateStr, d.tasks)"
+                  cdkDropList
+                  [cdkDropListData]="d.tasks"
+                  (cdkDropListDropped)="dropToDate($event, d.dateStr)">
+
+               <div class="flex flex-col items-center justify-center border-r border-milktea-100 pr-3 mr-3 min-w-[50px] shrink-0">
+                 <div class="text-xs text-milktea-500">{{ d.dayName }}</div>
+                 <div class="text-2xl font-bold text-milktea-900">{{ d.dayNum }}</div>
+               </div>
+
+               <div class="flex-1 flex flex-col gap-2 justify-center">
+                 <ng-container *ngFor="let t of d.tasks; let i = index">
+                   <div *ngIf="i < 3" cdkDrag [cdkDragData]="t" (cdkDragStarted)="dragStarted(t.id)" (cdkDragEnded)="dragEnded()" class="relative overflow-hidden rounded bg-milktea-50 border border-milktea-200 shadow-sm group" [class.opacity-0]="draggingId === t.id">
+
+                     <!-- Left Swipe Background (Copy) -->
+                     <div class="absolute inset-y-0 right-0 w-16 bg-blue-500 text-white flex items-center justify-center font-bold z-0 text-[10px]"
+                          [style.opacity]="getSwipeState(t.id) === 'left' ? 1 : 0"
+                          (click)="copyTask(t); $event.stopPropagation()">
+                       複製
+                     </div>
+
+                     <!-- Right Swipe Background (Unschedule) -->
+                     <div class="absolute inset-y-0 left-0 w-16 bg-red-500 text-white flex items-center justify-center font-bold z-0 text-[10px]"
+                          [style.opacity]="getSwipeState(t.id) === 'right' ? 1 : 0"
+                          (click)="unscheduleTask(t); $event.stopPropagation()">
+                       取消
+                     </div>
+
+                     <div class="p-2 text-sm relative z-10 bg-milktea-50 transition-transform duration-200 flex justify-between items-center cursor-pointer"
+                          [style.transform]="'translateX(' + getSwipeOffset(t.id) + 'px)'"
+                          (mousedown)="onTouchStart($event, t.id)"
+                          (touchstart)="onTouchStart($event, t.id)"
+                          (mousemove)="onTouchMove($event, t.id)"
+                          (touchmove)="onTouchMove($event, t.id)"
+                          (mouseup)="onTouchEnd($event, t.id)"
+                          (touchend)="onTouchEnd($event, t.id)"
+                          (touchcancel)="onTouchCancel($event)"
+                          (contextmenu)="onContextMenu($event, t)"
+                          (click)="editTask(t); $event.stopPropagation()">
+                     <div class="p-1 flex items-center gap-2 w-full pr-6 relative">
+                         <button class="shrink-0 flex items-center justify-center w-5 h-5 rounded-full border-2 border-milktea-400 focus:outline-none"
+                                 [class.bg-milktea-400]="t.status === 'completed'"
+                                 (click)="toggleCompletion(t); $event.stopPropagation()">
+                             <span *ngIf="t.status === 'completed'" class="material-icons text-white text-[12px] font-bold">check</span>
+                         </button>
+                         <div class="flex-1 min-w-0 flex flex-col justify-center">
+                             <div class="flex items-center gap-1 w-full relative">
+                                 <ng-container *ngIf="getCategoryForForm(t.categoryId) as cat">
+                                     <span *ngIf="cat.icon && !isEmoji(cat.icon)" class="material-icons text-[14px] text-milktea-500 shrink-0">{{ cat.icon }}</span>
+                                     <span *ngIf="cat.icon && isEmoji(cat.icon)" class="text-[14px] shrink-0">{{ cat.icon }}</span>
+                                 </ng-container>
+                                 <span class="font-bold truncate text-sm" [class.text-milktea-400]="t.status === 'completed'" [class.line-through]="t.status === 'completed'" [class.text-milktea-900]="t.status !== 'completed'">{{ t.title }}</span>
+                                 <span *ngIf="t.isUrgent" class="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0 ml-1"></span>
+                             </div>
+                             <div class="text-[10px] text-milktea-500 mt-0.5" *ngIf="t.startTime || t.endTime">{{ t.startTime || '' }} <ng-container *ngIf="t.endTime">- {{ t.endTime }}</ng-container></div>
+                         </div>
+                         <div cdkDragHandle class="absolute top-1/2 -translate-y-1/2 right-0 w-8 h-8 flex items-center justify-center cursor-move z-20 text-milktea-400 hover:bg-milktea-200 rounded" (click)="$event.stopPropagation()">
+                             <span class="material-icons text-lg">drag_indicator</span>
+                         </div>
+                     </div>
+                     </div>
+                     <div *cdkDragPreview class="w-4 h-4 bg-red-500 rounded-full shadow-xl z-[9999]"></div>
+                   </div>
+                 </ng-container>
+
+                 <div *ngIf="d.tasks.length > 3" class="text-xs text-milktea-500 text-center font-bold py-1 cursor-pointer" (click)="openScheduledDrawer(d.dateStr, d.tasks); $event.stopPropagation()">
+                   ...more ({{ d.tasks.length - 3 }})
+                 </div>
+
+                 <div *ngIf="d.tasks.length === 0" class="text-sm text-milktea-400 italic py-2">
+                    無代辦事項
+                 </div>
+               </div>
+             </div>
+          </div>
+        </div>
+
+        <!-- Day View (Time Axis) -->
+        <div *ngIf="viewMode === 'day'" class="p-4 h-full flex flex-col relative overflow-x-hidden pb-32">
+          <!-- Solid backdrop for the header area to prevent timeline bleeding -->
+          <div class="sticky top-0 z-30 bg-milktea-50 -mx-4 px-4 pt-4 pb-2 -mt-4 mb-4 shadow-[0_4px_6px_-6px_rgba(0,0,0,0.1)]">
+            <div class="flex justify-between items-center">
+            <button (click)="prevDay()" class="text-milktea-800 font-bold px-2">&lt;</button>
+            <h2 class="text-xl font-bold text-milktea-900">{{ selectedDateStr }}</h2>
+            <button (click)="nextDay()" class="text-milktea-800 font-bold px-2">&gt;</button>
+            </div>
+          </div>
+
+          <!-- All Day / No Time Section -->
+          <div class="mb-4 bg-white border border-milktea-200 rounded-xl p-2 shadow-sm shrink-0"
+               cdkDropList
+               [cdkDropListData]="allDayTasks"
+               (cdkDropListDropped)="dropToAllDay($event)">
+             <div class="text-xs font-bold text-milktea-500 mb-2 border-b border-milktea-100 pb-1">全天 / 未指定時間</div>
+             <div class="flex flex-col gap-1 min-h-[30px]">
+                <div *ngFor="let t of allDayTasks" cdkDrag [cdkDragData]="t" (cdkDragStarted)="dragStarted(t.id)" (cdkDragEnded)="dragEnded()" class="relative overflow-hidden rounded bg-milktea-100 border border-milktea-300 group" [class.opacity-0]="draggingId === t.id">
+                   <!-- Left Swipe Background (Copy) -->
+                   <div class="absolute inset-y-0 right-0 w-16 bg-blue-500 text-white flex items-center justify-center font-bold z-0 text-[10px]"
+                        [style.opacity]="getSwipeState(t.id) === 'left' ? 1 : 0"
+                        (click)="copyTask(t); $event.stopPropagation()">
+                     複製
+                   </div>
+
+                   <!-- Right Swipe Background (Unschedule) -->
+                   <div class="absolute inset-y-0 left-0 w-16 bg-red-500 text-white flex items-center justify-center font-bold z-0 text-[10px]"
+                        [style.opacity]="getSwipeState(t.id) === 'right' ? 1 : 0"
+                        (click)="unscheduleTask(t); $event.stopPropagation()">
+                     取消
+                   </div>
+
+                   <div class="p-2 text-sm text-milktea-900 touch-none flex justify-between items-center cursor-pointer relative z-10 transition-transform duration-200 bg-milktea-100"
+                        [style.transform]="'translateX(' + getSwipeOffset(t.id) + 'px)'"
+                        (mousedown)="onTouchStart($event, t.id)"
+                        (touchstart)="onTouchStart($event, t.id)"
+                        (mousemove)="onTouchMove($event, t.id)"
+                        (touchmove)="onTouchMove($event, t.id)"
+                        (mouseup)="onTouchEnd($event, t.id)"
+                        (touchend)="onTouchEnd($event, t.id)"
+                        (touchcancel)="onTouchCancel($event)"
+                        (contextmenu)="onContextMenu($event, t)"
+                        (click)="editTask(t)">
+                     <div class="flex items-center gap-2 w-full pr-6 relative">
+                         <button class="shrink-0 flex items-center justify-center w-5 h-5 rounded-full border-2 border-milktea-400 focus:outline-none"
+                                 [class.bg-milktea-400]="t.status === 'completed'"
+                                 (click)="toggleCompletion(t); $event.stopPropagation()">
+                             <span *ngIf="t.status === 'completed'" class="material-icons text-white text-[12px] font-bold">check</span>
+                         </button>
+                         <div class="flex-1 min-w-0 flex flex-col justify-center">
+                             <div class="flex items-center gap-1 w-full relative">
+                                 <ng-container *ngIf="getCategoryForForm(t.categoryId) as cat">
+                                     <span *ngIf="cat.icon && !isEmoji(cat.icon)" class="material-icons text-[14px] text-milktea-500 shrink-0">{{ cat.icon }}</span>
+                                     <span *ngIf="cat.icon && isEmoji(cat.icon)" class="text-[14px] shrink-0">{{ cat.icon }}</span>
+                                 </ng-container>
+                                 <span class="font-bold truncate text-sm" [class.text-milktea-400]="t.status === 'completed'" [class.line-through]="t.status === 'completed'" [class.text-milktea-900]="t.status !== 'completed'">{{ t.title }}</span>
+                                 <span *ngIf="t.isUrgent" class="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0 ml-1"></span>
+                             </div>
+                         </div>
+                         <div cdkDragHandle class="absolute top-1/2 -translate-y-1/2 right-0 w-8 h-8 flex items-center justify-center cursor-move z-20 text-milktea-400 hover:bg-milktea-200 rounded" (click)="$event.stopPropagation()">
+                             <span class="material-icons text-lg">drag_indicator</span>
+                         </div>
+                     </div>
+                   </div>
+                   <div *cdkDragPreview class="w-4 h-4 bg-red-500 rounded-full shadow-xl z-[9999]"></div>
+                </div>
+                <div *ngIf="allDayTasks.length === 0" class="text-xs text-milktea-400 text-center py-1">無</div>
+             </div>
+          </div>
+
+          <!-- Time Grid -->
+          <div class="relative flex-1 min-h-[1440px] mt-2"> <!-- 24 hours * 60px -->
+             <!-- Background hours -->
+             <div *ngFor="let hour of dayHours" class="absolute w-full h-[60px] border-b border-milktea-200 flex" [style.top.px]="hour * 60">
+                <div class="w-12 text-xs text-milktea-400 text-right pr-2 -mt-2">{{ hour }}:00</div>
+                <div class="flex-1 h-full"
+                     cdkDropList
+                     [cdkDropListData]="timeTasks"
+                     (cdkDropListDropped)="dropToTime($event, hour, 0)">
+                </div>
+             </div>
+
+             <!-- Render Tasks -->
+             <div cdkDropList id="day-task-wrapper" [cdkDropListData]="timeTasks" class="absolute inset-0 z-10 pointer-events-none">
+                 <div *ngFor="let t of timeTasks"
+                      cdkDrag [cdkDragData]="t"
+                      (cdkDragStarted)="dragStarted(t.id)" (cdkDragEnded)="dragEnded()"
+                      class="absolute rounded border border-milktea-500 shadow-sm overflow-hidden text-xs touch-none hover:z-30 pointer-events-auto flex items-stretch" [class.opacity-0]="draggingId === t.id"
+                      [class.bg-milktea-300]="t.endTime"
+                      [class.bg-milktea-100]="!t.endTime"
+                      [class.border-dashed]="!t.endTime"
+                      [style.top.px]="t._top"
+                      [style.height.px]="t._height"
+                      [style.left]="t._left"
+                      [style.width]="t._width">
+
+                    <!-- Left Swipe Background (Copy) -->
+                    <div class="absolute inset-y-0 right-0 w-16 bg-blue-500 text-white flex items-center justify-center font-bold z-0 text-[10px]"
+                         [style.opacity]="getSwipeState(t.id) === 'left' ? 1 : 0"
+                         (click)="copyTask(t); $event.stopPropagation()">
+                      複製
+                    </div>
+
+                    <!-- Right Swipe Background (Unschedule) -->
+                    <div class="absolute inset-y-0 left-0 w-16 bg-red-500 text-white flex items-center justify-center font-bold z-0 text-[10px]"
+                         [style.opacity]="getSwipeState(t.id) === 'right' ? 1 : 0"
+                         (click)="unscheduleTask(t); $event.stopPropagation()">
+                      取消
+                    </div>
+
+                    <div class="w-full h-full p-1 relative z-10 transition-transform duration-200 cursor-pointer"
+                         [class.bg-milktea-300]="t.endTime"
+                         [class.bg-milktea-100]="!t.endTime"
+                         [style.transform]="'translateX(' + getSwipeOffset(t.id) + 'px)'"
+                         (mousedown)="onTouchStart($event, t.id)"
+                         (touchstart)="onTouchStart($event, t.id)"
+                         (mousemove)="onTouchMove($event, t.id)"
+                         (touchmove)="onTouchMove($event, t.id)"
+                         (mouseup)="onTouchEnd($event, t.id)"
+                         (touchend)="onTouchEnd($event, t.id)"
+                         (touchcancel)="onTouchCancel($event)"
+                         (contextmenu)="onContextMenu($event, t)"
+                         (click)="editTask(t)">
+                      <div cdkDragHandle class="absolute top-1 right-1 w-8 h-8 flex items-center justify-center cursor-move z-20 text-milktea-500 bg-white/50 rounded" (click)="$event.stopPropagation()">
+                          <span class="material-icons text-lg">drag_indicator</span>
+                      </div>
+                      <span *ngIf="t.isUrgent" class="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0 absolute right-8 top-3"></span>
+                      <div class="font-bold truncate pr-6" [class.text-milktea-400]="t.status === 'completed'" [class.line-through]="t.status === 'completed'" [class.text-milktea-900]="t.status !== 'completed'">{{ t.title }}</div>
+                      <div class="text-[10px] truncate font-mono" [class.text-milktea-400]="t.status === 'completed'" [class.line-through]="t.status === 'completed'" [class.text-milktea-800]="t.status !== 'completed'" *ngIf="t.startTime">{{ t.startTime }} <ng-container *ngIf="t.endTime">- {{ t.endTime }}</ng-container><ng-container *ngIf="!t.endTime">- ?</ng-container></div>
+                    </div>
+                    <div *cdkDragPreview class="w-4 h-4 bg-red-500 rounded-full shadow-xl z-[9999]"></div>
+                 </div>
+             </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Floating Trash Can (Visible only during drag via CSS logic, but placed at root level) -->
+      <div cdkDropList id="trash-list" [cdkDropListData]="[]" (cdkDropListDropped)="dropToTrash($event)"
+           class="fixed top-20 right-4 w-14 h-14 bg-red-500 rounded-full flex items-center justify-center shadow-2xl z-50 border-4 border-dashed border-red-200 transition-all duration-200"
+           [class.opacity-0]="!isDragging"
+           [class.pointer-events-none]="!isDragging"
+           [class.opacity-100]="isDragging"
+           title="拖曳至此取消排程">
+        <span class="text-2xl text-white">🗑️</span>
+      </div>
+
+      <!-- Bottom Drawer handle & Backdrop -->
+      <div *ngIf="drawerOpen" class="fixed inset-0 bg-black/20 z-30 transition-opacity" (click)="drawerOpen = false"></div>
+      <div class="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md rounded-t-3xl shadow-[0_-4px_15px_rgba(0,0,0,0.1)] border border-milktea-200/50 transition-transform duration-300 z-40 max-w-3xl mx-auto flex flex-col max-h-[85vh]"
+           [style.transform]="drawerOpen ? 'translateY(0)' : 'translateY(calc(100% - 60px))'">
+        <div class="h-[60px] shrink-0 flex items-center justify-center cursor-pointer relative" (click)="drawerOpen = !drawerOpen">
+          <div class="w-12 h-1.5 bg-milktea-200 rounded-full mb-1"></div>
+          <span class="absolute right-6 bg-milktea-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">未排程 ({{ unassignedTasks.length }})</span>
+        </div>
+
+        <div class="flex-1 overflow-y-auto px-4 pb-8 overflow-x-hidden" [class.invisible]="!drawerOpen" [class.hidden]="!drawerOpen"
+             cdkDropList
+             id="unassigned-list"
+             [cdkDropListData]="unassignedTasks"
+             (cdkDropListDropped)="dropToUnassigned($event)">
+          <div *ngFor="let task of unassignedTasks"
+               cdkDrag [cdkDragData]="task"
+               (cdkDragStarted)="dragStarted(task.id)" (cdkDragEnded)="dragEnded()"
+               class="relative bg-milktea-50 p-3 rounded-xl mb-2 shadow-sm cursor-move active:shadow-md touch-none flex items-center justify-between group overflow-hidden"
+               [class.opacity-0]="draggingId === task.id">
+            <div *cdkDragPreview class="w-4 h-4 bg-red-500 rounded-full shadow-xl z-[9999]"></div>
+            <!-- Main Content Container -->
+            <div class="relative z-10 w-full flex items-center justify-between transition-transform duration-200 bg-milktea-50 rounded-xl cursor-pointer" (click)="editTask(task)">
+              <div class="flex items-center gap-2 flex-1 min-w-0 pr-6 relative">
+                 <button class="shrink-0 flex items-center justify-center w-5 h-5 rounded-full border-2 border-milktea-400 focus:outline-none"
+                         [class.bg-milktea-400]="task.status === 'completed'"
+                         (click)="toggleCompletion(task); $event.stopPropagation()">
+                     <span *ngIf="task.status === 'completed'" class="material-icons text-white text-[12px] font-bold">check</span>
+                 </button>
+                 <div class="flex-1 flex flex-col justify-center min-w-0">
+                    <div class="flex items-center gap-1 w-full relative">
+                        <ng-container *ngIf="getCategoryForForm(task.categoryId) as cat">
+                            <span *ngIf="cat.icon && !isEmoji(cat.icon)" class="material-icons text-[14px] text-milktea-500 shrink-0">{{ cat.icon }}</span>
+                            <span *ngIf="cat.icon && isEmoji(cat.icon)" class="text-[14px] shrink-0">{{ cat.icon }}</span>
+                        </ng-container>
+                        <span class="font-bold text-sm truncate" [class.text-milktea-400]="task.status === 'completed'" [class.line-through]="task.status === 'completed'" [class.text-milktea-900]="task.status !== 'completed'">{{ task.title }}</span>
+                        <span *ngIf="task.isUrgent" class="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0 ml-1"></span>
+                    </div>
+                    <div class="text-[10px] text-milktea-500 mt-0.5" *ngIf="task.startTime || task.endTime">{{ task.startTime || '' }} <ng-container *ngIf="task.endTime">- {{ task.endTime }}</ng-container></div>
+                 </div>
+                 <div cdkDragHandle class="absolute top-1/2 -translate-y-1/2 right-0 w-8 h-8 flex items-center justify-center cursor-move z-20 text-milktea-400 hover:bg-milktea-200 rounded" (click)="$event.stopPropagation()">
+                     <span class="material-icons text-lg">drag_indicator</span>
+                 </div>
+              </div>
+            </div>
+
+            <div *cdkDragPreview class="w-4 h-4 bg-red-500 rounded-full shadow-xl z-[9999]"></div>
+          </div>
+          <div *ngIf="unassignedTasks.length === 0" class="text-center text-milktea-400 mt-8 text-sm">
+            沒有未排程代辦
+          </div>
+        </div>
+      </div>
+
+      <!-- FAB -->
+      <button class="absolute right-6 bottom-24 w-14 h-14 bg-milktea-600 text-white rounded-full shadow-lg flex items-center justify-center text-3xl font-light hover:bg-milktea-700 active:scale-95 transition-all z-20"
+              (click)="openCreateTask()">
+        +
+      </button>
+
+      <!-- Overlay form for demo -->
+
+      <!-- Scheduled Task Drawer -->
+      <div *ngIf="scheduledDrawerOpen" class="fixed inset-0 bg-black/20 z-[60] transition-opacity" (click)="scheduledDrawerOpen = false"></div>
+      <div class="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md rounded-t-3xl shadow-[0_-4px_15px_rgba(0,0,0,0.1)] border border-milktea-200/50 transition-transform duration-300 z-[65] max-w-3xl mx-auto flex flex-col max-h-[85vh]"
+           [style.transform]="scheduledDrawerOpen ? 'translateY(0)' : 'translateY(100%)'">
+        <div class="h-[60px] shrink-0 flex items-center justify-between px-6 cursor-pointer relative border-b border-milktea-100" (click)="scheduledDrawerOpen = !scheduledDrawerOpen">
+          <span class="font-bold text-milktea-900">{{ scheduledDrawerDate }} 排程</span>
+          <div class="w-12 h-1.5 bg-milktea-200 rounded-full absolute left-1/2 -translate-x-1/2 top-2"></div>
+          <span class="bg-milktea-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">{{ scheduledDrawerTasks.length }}</span>
+        </div>
+
+        <div class="flex-1 overflow-y-auto px-4 py-4 overflow-x-hidden"
+             cdkDropList
+             id="scheduled-list"
+             [cdkDropListConnectedTo]="['trash-list', 'unassigned-list']"
+             [cdkDropListData]="scheduledDrawerTasks"
+             (cdkDropListDropped)="dropToDate($event, scheduledDrawerDate!)">
+          <div *ngFor="let task of scheduledDrawerTasks"
+               cdkDrag [cdkDragData]="task"
+               (cdkDragStarted)="dragStarted(task.id)" (cdkDragEnded)="dragEnded()"
+               class="relative bg-milktea-50 p-3 rounded-xl mb-2 shadow-sm touch-none flex items-center justify-between group overflow-hidden"
+               [class.opacity-50]="task.status === 'completed'"
+               [class.opacity-0]="draggingId === task.id"
+               (contextmenu)="onContextMenu($event, task)">
+
+            <!-- Mobile Swipe Actions -->
+            <div class="absolute inset-y-0 right-0 w-16 bg-blue-500 text-white flex items-center justify-center font-bold z-0 text-[10px]"
+                 [style.opacity]="getSwipeState(task.id) === 'left' ? 1 : 0"
+                 (click)="copyTask(task); scheduledDrawerOpen = false">複製</div>
+            <div class="absolute inset-y-0 left-0 w-16 bg-red-500 text-white flex items-center justify-center font-bold z-0 text-[10px]"
+                 [style.opacity]="getSwipeState(task.id) === 'right' ? 1 : 0"
+                 (click)="unscheduleTask(task); scheduledDrawerOpen = false">取消</div>
+
+            <!-- Main Content Container -->
+            <div class="relative z-10 w-full flex items-center justify-between transition-transform duration-200 bg-milktea-50 rounded-xl cursor-pointer"
+                 [style.transform]="'translateX(' + getSwipeOffset(task.id) + 'px)'"
+                 (mousedown)="onTouchStart($event, task.id)" (touchstart)="onTouchStart($event, task.id)"
+                 (mousemove)="onTouchMove($event, task.id)" (touchmove)="onTouchMove($event, task.id)"
+                 (mouseup)="onTouchEnd($event, task.id)" (touchend)="onTouchEnd($event, task.id)"
+                 (touchcancel)="onTouchCancel($event)"
+                 (contextmenu)="onContextMenu($event, task)"
+                 (click)="editTask(task)">
+
+              <div class="flex items-center gap-2 flex-1 min-w-0 pr-2">
+                 <button class="shrink-0 flex items-center justify-center w-5 h-5 rounded-full border-2 border-milktea-400 focus:outline-none"
+                         [class.bg-milktea-400]="task.status === 'completed'"
+                         (click)="toggleCompletion(task); $event.stopPropagation()">
+                     <span *ngIf="task.status === 'completed'" class="material-icons text-white text-[12px] font-bold">check</span>
+                 </button>
+                 <div class="flex-1 flex flex-col justify-center min-w-0">
+                    <div class="flex items-center gap-1 w-full relative">
+                        <ng-container *ngIf="getCategoryForForm(task.categoryId) as cat">
+                            <span *ngIf="cat.icon && !isEmoji(cat.icon)" class="material-icons text-[14px] text-milktea-500 shrink-0">{{ cat.icon }}</span>
+                            <span *ngIf="cat.icon && isEmoji(cat.icon)" class="text-[14px] shrink-0">{{ cat.icon }}</span>
+                        </ng-container>
+                        <span class="font-bold text-sm truncate" [class.text-milktea-400]="task.status === 'completed'" [class.line-through]="task.status === 'completed'" [class.text-milktea-900]="task.status !== 'completed'">{{ task.title }}</span>
+                        <span *ngIf="task.isUrgent" class="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0 ml-1"></span>
+                    </div>
+                    <div class="text-[10px] text-milktea-500 mt-0.5" *ngIf="task.startTime || task.endTime">{{ task.startTime || '' }} <ng-container *ngIf="task.endTime">- {{ task.endTime }}</ng-container></div>
+                 </div>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                  <div class="flex flex-col gap-1 items-center justify-center z-20">
+                     <button class="w-6 h-6 flex items-center justify-center text-milktea-400 hover:bg-milktea-200 rounded active:bg-milktea-300" (click)="moveTaskUp(task); $event.stopPropagation()">
+                        <span class="material-icons text-sm">keyboard_arrow_up</span>
+                     </button>
+                     <button class="w-6 h-6 flex items-center justify-center text-milktea-400 hover:bg-milktea-200 rounded active:bg-milktea-300" (click)="moveTaskDown(task); $event.stopPropagation()">
+                        <span class="material-icons text-sm">keyboard_arrow_down</span>
+                     </button>
+                  </div>
+                  <div cdkDragHandle class="w-8 h-8 flex items-center justify-center cursor-move z-20 text-milktea-400 hover:bg-milktea-200 rounded" (click)="$event.stopPropagation()">
+                    <span class="material-icons">drag_indicator</span>
+                  </div>
+              </div>
+            </div>
+            <div *cdkDragPreview class="w-4 h-4 bg-red-500 rounded-full shadow-xl z-[9999]"></div>
+          </div>
+          <div *ngIf="scheduledDrawerTasks.length === 0" class="text-center text-milktea-400 mt-8 text-sm">
+            無代辦事項
+          </div>
+        </div>
+      </div>
+
+      <!-- Context Menu Desktop -->
+      <div *ngIf="contextMenuState.show" class="fixed bg-white border border-milktea-200 shadow-xl rounded-lg z-[80] py-1 w-32"
+           [style.left.px]="contextMenuState.x" [style.top.px]="contextMenuState.y">
+         <button class="w-full text-left px-4 py-2 hover:bg-milktea-50 text-sm" (click)="copyTask(contextMenuState.task); contextMenuState.show = false; $event.stopPropagation()">複製</button>
+         <button class="w-full text-left px-4 py-2 hover:bg-milktea-50 text-sm" (click)="toggleCompletion(contextMenuState.task); contextMenuState.show = false; $event.stopPropagation()">{{ contextMenuState.task?.status === 'completed' ? '標為未完成' : '標為已完成' }}</button>
+         <button class="w-full text-left px-4 py-2 hover:bg-red-50 text-red-600 text-sm" (click)="unscheduleTask(contextMenuState.task); contextMenuState.show = false; $event.stopPropagation()">取消排程</button>
+      </div>
+
+      <div *ngIf="showForm" class="fixed inset-0 bg-black/30 z-[70] flex items-center justify-center p-4">
+        <div class="bg-white p-6 rounded-2xl w-full max-w-sm shadow-xl relative max-h-screen flex flex-col">
+          <h2 class="font-bold mb-4 shrink-0">{{ editingTask?.id ? '編輯代辦' : '新增代辦' }}</h2>
+          <div class="overflow-y-auto flex-1 pb-4">
+            <input [(ngModel)]="formTask.title" placeholder="標題" class="w-full p-2 mb-2 border rounded">
+
+            <div class="mb-2">
+              <select [(ngModel)]="formTask.categoryId" class="w-full p-2 border rounded bg-white">
+                <option [ngValue]="undefined">無分類</option>
+                <option *ngFor="let cat of availableCategories" [value]="cat.id">{{ cat.name }}</option>
+              </select>
+            </div>
+
+            <input [(ngModel)]="formTask.date" type="date" placeholder="日期" class="w-full p-2 mb-2 border rounded">
+
+            <!-- Time and Reminder Block toggle -->
+            <div class="mb-2 flex items-center gap-2 cursor-pointer text-milktea-600" (click)="showTimeReminder = !showTimeReminder">
+              <span class="material-icons text-sm">{{ showTimeReminder ? 'expand_less' : 'expand_more' }}</span>
+              <span class="text-sm font-bold">{{ showTimeReminder ? '隱藏進階設定 (時間與提醒)' : '進階設定 (時間與提醒)' }}</span>
+            </div>
+
+            <div *ngIf="showTimeReminder" class="bg-milktea-50 p-3 rounded-xl border border-milktea-100 mb-2">
+              <div class="flex gap-2 mb-2">
+                <div class="w-1/2 flex flex-col">
+                  <label class="text-xs text-milktea-500 mb-1 font-bold">開始時間</label>
+                  <input [(ngModel)]="formTask.startTime" type="time" class="w-full p-2 border rounded">
+                </div>
+                <div class="w-1/2 flex flex-col">
+                  <label class="text-xs text-milktea-500 mb-1 font-bold">結束時間</label>
+                  <input [(ngModel)]="formTask.endTime" type="time" class="w-full p-2 border rounded" [disabled]="!formTask.startTime">
+                </div>
+              </div>
+
+              <div class="flex items-center gap-2 mb-2">
+                 <span class="text-sm text-milktea-600 font-bold">提醒:</span>
+                 <select [(ngModel)]="formTask.reminderOffset" class="flex-1 p-2 border rounded bg-white text-milktea-900" [disabled]="!formTask.startTime">
+                    <option [ngValue]="null">不提醒</option>
+                    <option [ngValue]="15">提前 15 分鐘</option>
+                    <option [ngValue]="30">提前 30 分鐘</option>
+                    <option [ngValue]="60">提前 1 小時</option>
+                    <option [ngValue]="1440">提前 1 天</option>
+                 </select>
+              </div>
+
+              <label class="flex items-center gap-2 mt-2 mb-2 p-2 bg-white rounded-lg border border-milktea-100" *ngIf="formTask.reminderOffset !== null">
+                 <input type="checkbox" [checked]="$any(formTask).enablePush" (change)="$any(formTask).enablePush = !$any(formTask).enablePush" class="rounded w-4 h-4 text-milktea-600 border-milktea-300">
+                 <span class="text-sm font-bold text-milktea-900">開啟推播通知</span>
+                 <span class="material-icons text-milktea-500 text-sm ml-auto">notifications_active</span>
+              </label>
+              <div *ngIf="$any(formTask).enablePush && formTask.reminderOffset !== null" class="text-xs text-milktea-500 px-2">
+                將會在設定時間推播通知至您的裝置
+              </div>
+            </div>
+
+            <div class="flex flex-col gap-2 mb-2 border rounded p-2 bg-white">
+               <label class="flex items-center gap-2 mb-2" *ngIf="editingTask?.id">
+                   <input type="checkbox" [checked]="formTask.status === 'completed'" (change)="formTask.status = formTask.status === 'completed' ? 'pending' : 'completed'" class="rounded w-4 h-4 text-milktea-600 border-milktea-300">
+                   <span class="text-sm font-bold text-milktea-900">標記為已完成</span>
+               </label>
+               <div class="flex gap-2 items-center mb-1">
+                   <span class="text-sm text-milktea-600 font-bold">標籤</span>
+                   <label class="flex items-center gap-1 text-sm text-red-500 font-bold whitespace-nowrap ml-auto">
+                       <input type="checkbox" [(ngModel)]="formTask.isUrgent" class="rounded text-red-500"> 緊急
+                   </label>
+               </div>
+               <div class="flex flex-wrap gap-1 mb-1" *ngIf="formTaskTags.length > 0">
+                   <span *ngFor="let tag of formTaskTags" class="text-xs bg-milktea-100 text-milktea-800 px-2 py-1 rounded-full flex items-center gap-1">
+                       {{ tag }}
+                       <button class="text-milktea-400 hover:text-red-500 font-bold" (click)="removeFormTag(tag)">&times;</button>
+                   </span>
+               </div>
+               <input [(ngModel)]="formTaskTagInput" (keydown.enter)="addFormTag()" placeholder="輸入標籤後按 Enter" class="w-full p-2 border rounded text-sm bg-gray-50 focus:bg-white outline-none">
+            </div>
+
+            <!-- Notes at the bottom -->
+            <label class="text-xs text-milktea-500 mb-1 font-bold block mt-4">詳細內容 (備註)</label>
+            <textarea [(ngModel)]="formTask.description" placeholder="輸入詳細內容..." class="w-full p-2 mb-2 border rounded" rows="3"></textarea>
+          </div>
+
+          <div class="flex gap-2 justify-end mt-4 shrink-0 pt-2 border-t border-milktea-100">
+             <button class="text-milktea-600 px-4 py-2" (click)="showForm = false">取消</button>
+             <button class="bg-milktea-600 text-white px-4 py-2 rounded disabled:opacity-50 flex items-center justify-center gap-2" [disabled]="isSaving" (click)="saveForm()">
+               <svg *ngIf="isSaving" class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+               儲存
+             </button>
+          </div>
+        </div>
+      </div>
+    </div>
