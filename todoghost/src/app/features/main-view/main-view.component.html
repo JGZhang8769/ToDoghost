@@ -496,20 +496,30 @@
                       <div cdkDragHandle class="absolute top-1 right-1 w-12 h-12 flex items-center justify-center cursor-move z-20 text-milktea-500 bg-white/50 rounded" (click)="$event.stopPropagation()">
                           <span class="material-icons text-lg">drag_indicator</span>
                       </div>
-                      <span *ngIf="t.isUrgent" class="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0 absolute right-8 top-3"></span>
 
-                      <div class="font-bold truncate pr-6" [class.text-milktea-400]="t.status === 'completed'" [class.line-through]="t.status === 'completed'" [class.text-milktea-900]="t.status !== 'completed'">
-<button class="shrink-0 flex items-center justify-center w-5 h-5 rounded-full border-2 border-milktea-400 focus:outline-none"
-                                 [class.bg-milktea-400]="t.status === 'completed'"
-                                 (click)="toggleCompletion(t); $event.stopPropagation()">
-                             <span *ngIf="t.status === 'completed'" class="material-icons text-white text-[12px] font-bold">check</span>
-                         </button>
-<ng-container *ngIf="getCategoryForForm(t.categoryId) as cat">
-                                     <span *ngIf="cat.icon && !isEmoji(cat.icon)" class="material-icons text-[14px] text-milktea-500 shrink-0">{{ cat.icon }}</span>
-                                     <span *ngIf="cat.icon && isEmoji(cat.icon)" class="text-[14px] shrink-0">{{ cat.icon }}</span>
-                                 </ng-container>{{ t.title }}</div>
-                      <div class="text-[10px] truncate font-mono" [class.text-milktea-400]="t.status === 'completed'" [class.line-through]="t.status === 'completed'" [class.text-milktea-800]="t.status !== 'completed'" *ngIf="t.startTime">{{ t.startTime }} <ng-container *ngIf="t.endTime">- {{ t.endTime }}</ng-container><ng-container *ngIf="!t.endTime">- ?</ng-container></div>
+                      <div class="font-bold truncate pr-6 flex items-center gap-1" 
+     [class.text-milktea-400]="t.status === 'completed'" 
+     [class.line-through]="t.status === 'completed'" 
+     [class.text-milktea-900]="t.status !== 'completed'">
+  <button class="shrink-0 flex items-center justify-center w-5 h-5 rounded-full border-2 border-milktea-400 focus:outline-none"
+                           [class.bg-milktea-400]="t.status === 'completed'"
+                           (click)="toggleCompletion(t); $event.stopPropagation()">
+                       <span *ngIf="t.status === 'completed'" class="material-icons text-white text-[12px] font-bold">check</span>
+                   </button>
+                   <div class="flex-1 min-w-0 flex flex-col justify-center cursor-pointer" (click)="editTask(t)">
+                       <div class="flex items-center gap-1 w-full relative">
+                           <ng-container *ngIf="getCategoryForForm(t.categoryId) as cat">
+                               <span *ngIf="cat.icon && !isEmoji(cat.icon)" class="material-icons text-[14px] text-milktea-500 shrink-0">{{ cat.icon }}</span>
+                               <span *ngIf="cat.icon && isEmoji(cat.icon)" class="text-[14px] shrink-0">{{ cat.icon }}</span>
+                           </ng-container>
+                           <span class="font-bold truncate text-sm" [class.text-milktea-400]="t.status === 'completed'" [class.line-through]="t.status === 'completed'" [class.text-milktea-900]="t.status !== 'completed'">{{ t.title }}</span>
+                           <span *ngIf="t.isUrgent" class="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0 ml-1"></span>
+                       </div>
+                       <div class="text-[10px] text-milktea-500 mt-0.5" *ngIf="t.startTime || t.endTime">{{ t.startTime || '' }} <ng-container *ngIf="t.endTime">- {{ t.endTime }}</ng-container></div>
+
+
                     </div>
+
                     <div *cdkDragPreview class="w-8 h-8 bg-red-500 rounded-full shadow-xl z-[9999]"></div>
                  </div>
              </div>
