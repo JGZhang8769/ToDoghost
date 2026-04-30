@@ -2,7 +2,6 @@ import { Injectable } from '@angular/core';
 
 @Injectable({ providedIn: 'root' })
 export class WebAuthnService {
-
   private abortController: AbortController | null = null;
 
   // Helper to generate a random challenge
@@ -24,7 +23,10 @@ export class WebAuthnService {
     }
   }
 
-  async registerCredential(userId: string, username: string): Promise<string | null> {
+  async registerCredential(
+    userId: string,
+    username: string,
+  ): Promise<string | null> {
     if (!this.isWebAuthnSupported()) return null;
 
     // Reset abort controller for new request
@@ -43,28 +45,31 @@ export class WebAuthnService {
         user: {
           id: userIdBuffer,
           name: username,
-          displayName: username
+          displayName: username,
         },
         pubKeyCredParams: [
-          { type: 'public-key', alg: -7 },  // ES256
-          { type: 'public-key', alg: -257 } // RS256
+          { type: 'public-key', alg: -7 }, // ES256
+          { type: 'public-key', alg: -257 }, // RS256
         ],
         authenticatorSelection: {
           authenticatorAttachment: 'platform', // Enforce local device (Face ID/Touch ID)
-          userVerification: 'required'
+          userVerification: 'required',
         },
         timeout: 30000,
       };
 
-      const credential = await navigator.credentials.create({
+      const credential = (await navigator.credentials.create({
         publicKey,
-        signal: this.abortController.signal
-      }) as PublicKeyCredential;
+        signal: this.abortController.signal,
+      })) as PublicKeyCredential;
 
       if (credential) {
         // Save mapping of userId -> credentialId in localStorage
         const credentialIdBase64 = this.arrayBufferToBase64(credential.rawId);
-        localStorage.setItem(`webauthn_credential_${userId}`, credentialIdBase64);
+        localStorage.setItem(
+          `webauthn_credential_${userId}`,
+          credentialIdBase64,
+        );
         return credentialIdBase64;
       }
       return null;
@@ -78,7 +83,9 @@ export class WebAuthnService {
   async authenticate(userId: string): Promise<boolean> {
     if (!this.isWebAuthnSupported()) return false;
 
-    const savedCredentialIdBase64 = localStorage.getItem(`webauthn_credential_${userId}`);
+    const savedCredentialIdBase64 = localStorage.getItem(
+      `webauthn_credential_${userId}`,
+    );
     if (!savedCredentialIdBase64) return false;
 
     // Reset abort controller for new request
@@ -87,23 +94,27 @@ export class WebAuthnService {
 
     try {
       const challenge = this.generateChallenge();
-      const credentialIdBuffer = this.base64ToArrayBuffer(savedCredentialIdBase64);
+      const credentialIdBuffer = this.base64ToArrayBuffer(
+        savedCredentialIdBase64,
+      );
 
       const publicKey: PublicKeyCredentialRequestOptions = {
         challenge,
-        allowCredentials: [{
-          type: 'public-key',
-          id: credentialIdBuffer,
-          transports: ['internal']
-        }],
+        allowCredentials: [
+          {
+            type: 'public-key',
+            id: credentialIdBuffer,
+            transports: ['internal'],
+          },
+        ],
         userVerification: 'required',
         timeout: 30000,
       };
 
-      const assertion = await navigator.credentials.get({
+      const assertion = (await navigator.credentials.get({
         publicKey,
-        signal: this.abortController.signal
-      }) as PublicKeyCredential;
+        signal: this.abortController.signal,
+      })) as PublicKeyCredential;
 
       // For this frontend-only check, if we got a valid assertion, we consider it a success.
       return !!assertion;

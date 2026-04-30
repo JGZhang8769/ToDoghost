@@ -1,5 +1,15 @@
 import { Injectable, inject } from '@angular/core';
-import { Firestore, collection, collectionData, doc, setDoc, getDoc, getDocs, query, limit } from '@angular/fire/firestore';
+import {
+  Firestore,
+  collection,
+  collectionData,
+  doc,
+  setDoc,
+  getDoc,
+  getDocs,
+  query,
+  limit,
+} from '@angular/fire/firestore';
 import { BehaviorSubject, Observable } from 'rxjs';
 
 export interface User {
@@ -24,17 +34,19 @@ export class UserService {
     const savedUserId = localStorage.getItem('currentUserId');
     if (savedUserId) {
       try {
-        const userDoc = await getDoc(doc(this.firestore, `users/${savedUserId}`));
+        const userDoc = await getDoc(
+          doc(this.firestore, `users/${savedUserId}`),
+        );
         if (userDoc.exists()) {
           const data = userDoc.data();
           this.currentUserSubject.next({
             id: savedUserId,
             name: data['name'],
             avatar: data['avatar'],
-            pin: data['pin'] || '0000'
+            pin: data['pin'] || '0000',
           });
         } else {
-           localStorage.removeItem('currentUserId');
+          localStorage.removeItem('currentUserId');
         }
       } catch (e) {
         console.error('Error hydrating user:', e);
@@ -43,17 +55,25 @@ export class UserService {
   }
 
   private async seedDefaultUsers() {
-      try {
-          const usersRef = collection(this.firestore, 'users');
-          const q = query(usersRef, limit(1));
-          const snap = await getDocs(q);
-          if (snap.empty) {
-              await setDoc(doc(this.firestore, 'users/user1'), { name: 'R張', avatar: 'tiger', pin: '0000' });
-              await setDoc(doc(this.firestore, 'users/user2'), { name: '小芷', avatar: 'rabbit', pin: '0000' });
-          }
-      } catch (e) {
-          console.error('Failed to seed users', e);
+    try {
+      const usersRef = collection(this.firestore, 'users');
+      const q = query(usersRef, limit(1));
+      const snap = await getDocs(q);
+      if (snap.empty) {
+        await setDoc(doc(this.firestore, 'users/user1'), {
+          name: 'R張',
+          avatar: 'tiger',
+          pin: '0000',
+        });
+        await setDoc(doc(this.firestore, 'users/user2'), {
+          name: '小芷',
+          avatar: 'rabbit',
+          pin: '0000',
+        });
       }
+    } catch (e) {
+      console.error('Failed to seed users', e);
+    }
   }
 
   getUsers(): Observable<User[]> {

@@ -12,23 +12,31 @@ export class AppComponent implements OnInit {
   private pushService = inject(PushNotificationService);
 
   ngOnInit() {
-     this.pushService.listen();
-     this.preventIOSSwipeNavigation();
+    this.pushService.listen();
+    this.preventIOSSwipeNavigation();
   }
 
   private preventIOSSwipeNavigation() {
     let touchStartX = 0;
 
-    document.addEventListener('touchstart', (e: TouchEvent) => {
-      touchStartX = e.touches[0].clientX;
-    }, { passive: false });
+    document.addEventListener(
+      'touchstart',
+      (e: TouchEvent) => {
+        touchStartX = e.touches[0].clientX;
+      },
+      { passive: false },
+    );
 
-    document.addEventListener('touchmove', (e: TouchEvent) => {
-      const touchCurrentX = e.touches[0].clientX;
-      const windowWidth = window.innerWidth;
-      if (touchStartX < 20 || touchStartX > windowWidth - 20) {
-        e.preventDefault();
-      }
-    }, { passive: false });
+    document.addEventListener(
+      'touchmove',
+      (e: TouchEvent) => {
+        const touchCurrentX = e.touches[0].clientX;
+        const windowWidth = window.innerWidth;
+        if (touchStartX < 20 || touchStartX > windowWidth - 20) {
+          e.preventDefault();
+        }
+      },
+      { passive: false },
+    );
   }
 }

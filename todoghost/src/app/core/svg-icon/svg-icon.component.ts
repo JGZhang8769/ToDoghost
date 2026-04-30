@@ -23,11 +23,25 @@ const ICONS: Record<string, string> = {
   standalone: true,
   imports: [CommonModule],
   template: `<div class="svg-container" [innerHTML]="safeIcon"></div>`,
-  styles: [`
-    :host { display: inline-block; }
-    .svg-container { width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
-    ::ng-deep .svg-container svg { width: 100%; height: 100%; object-fit: contain; }
-  `]
+  styles: [
+    `
+      :host {
+        display: inline-block;
+      }
+      .svg-container {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      ::ng-deep .svg-container svg {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+      }
+    `,
+  ],
 })
 export class SvgIconComponent {
   @Input() name: string = '';

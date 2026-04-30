@@ -1,19 +1,30 @@
 import { Injectable, inject } from '@angular/core';
-import { Firestore, collection, collectionData, doc, addDoc, updateDoc, deleteDoc, query, where, serverTimestamp } from '@angular/fire/firestore';
+import {
+  Firestore,
+  collection,
+  collectionData,
+  doc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+  serverTimestamp,
+} from '@angular/fire/firestore';
 import { Observable } from 'rxjs';
 
 export interface Task {
   id: string;
   workspaceId: string;
-  categoryId?: string;     // Category ID
+  categoryId?: string; // Category ID
   title: string;
   description?: string;
-  date: string | null;     // 'yyyy-MM-dd' or null if unscheduled
+  date: string | null; // 'yyyy-MM-dd' or null if unscheduled
   startTime: string | null; // 'HH:mm' or null
-  endTime: string | null;   // 'HH:mm' or null
+  endTime: string | null; // 'HH:mm' or null
   tags: string[];
   isUrgent: boolean;
-  createdBy: string;       // User ID
+  createdBy: string; // User ID
   status: 'pending' | 'completed';
   reminderOffset: number | null; // minutes before start time to notify
   order: number;
@@ -22,17 +33,14 @@ export interface Task {
 }
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class TaskService {
   private firestore = inject(Firestore);
 
   getTasks(workspaceId: string): Observable<Task[]> {
     const tasksRef = collection(this.firestore, 'tasks');
-    const q = query(
-      tasksRef,
-      where('workspaceId', '==', workspaceId)
-    );
+    const q = query(tasksRef, where('workspaceId', '==', workspaceId));
     return collectionData(q, { idField: 'id' }) as Observable<Task[]>;
   }
 
@@ -41,13 +49,13 @@ export class TaskService {
     const enrichedData = {
       ...taskData,
       createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
+      updatedAt: serverTimestamp(),
     };
     try {
       const docRef = await addDoc(tasksRef, enrichedData);
       return docRef.id;
     } catch (e) {
-      console.error("Error adding document: ", e);
+      console.error('Error adding document: ', e);
       throw e;
     }
   }
@@ -57,15 +65,15 @@ export class TaskService {
     try {
       // Remove undefined values
       const cleanData = Object.fromEntries(
-        Object.entries(data).filter(([_, v]) => v !== undefined)
+        Object.entries(data).filter(([_, v]) => v !== undefined),
       );
 
       await updateDoc(taskRef, {
         ...cleanData,
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
       });
     } catch (e) {
-      console.error("Error updating document: ", e);
+      console.error('Error updating document: ', e);
       throw e;
     }
   }
@@ -75,7 +83,7 @@ export class TaskService {
     try {
       await deleteDoc(taskRef);
     } catch (e) {
-      console.error("Error deleting document: ", e);
+      console.error('Error deleting document: ', e);
       throw e;
     }
   }
