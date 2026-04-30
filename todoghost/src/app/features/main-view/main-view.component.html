@@ -645,10 +645,10 @@
             <!-- Mobile Swipe Actions -->
             <div class="absolute inset-y-0 right-0 w-16 bg-blue-500 text-white flex items-center justify-center font-bold z-0 text-[10px]"
                  [style.opacity]="getSwipeState(task.id) === 'left' ? 1 : 0"
-                 (click)="copyTask(task); scheduledDrawerOpen = false">複製</div>
+                 (click)="copyTask(task); scheduledDrawerOpen = false; $event.stopPropagation()">複製</div>
             <div class="absolute inset-y-0 left-0 w-16 bg-red-500 text-white flex items-center justify-center font-bold z-0 text-[10px]"
                  [style.opacity]="getSwipeState(task.id) === 'right' ? 1 : 0"
-                 (click)="unscheduleTask(task); scheduledDrawerOpen = false">取消</div>
+                 (click)="unscheduleTask(task); scheduledDrawerOpen = false; $event.stopPropagation()">取消</div>
 
             <!-- Main Content Container -->
             <div class="relative z-10 w-full flex items-center justify-between transition-transform duration-200 bg-milktea-50 rounded-xl cursor-pointer"

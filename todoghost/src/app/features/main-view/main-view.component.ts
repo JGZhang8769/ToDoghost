@@ -180,6 +180,7 @@ onDocumentClick(event: MouseEvent) {
     this.userService.getUsers().pipe(takeUntil(this.destroy$)).subscribe(users => {
       this.availableUsers = users;
     });
+this.scheduledDrawerDate = this.selectedDateStr;
   }
 
   ngOnDestroy() {
@@ -616,10 +617,21 @@ onDocumentClick(event: MouseEvent) {
     return e.touches ? e.touches[0].clientY : e.clientY;
   }
 
-  onTouchStart(e: any, taskId: string) {
-    if (e.type.startsWith('mouse')) return; // Disable desktop swipe
+onTouchStart(e: any, taskId: string) {
+    if (e.type.startsWith('mouse')) return; 
     if (this.isDragging) return;
 
+    // --- 新增：清理邏輯 ---
+    // 遍歷所有正在滑動的狀態，如果不是當前這個，就直接歸零
+    Object.keys(this.swipeState).forEach(id => {
+        if (id !== taskId && this.swipeState[id].offset !== 0) {
+            this.swipeState[id].offset = 0;
+            this.swipeState[id].state = '';
+            this.swipeState[id].active = false;
+        }
+    });
+
+    // 初始化當前任務狀態
     this.swipeState[taskId] = {
       offset: 0,
       startX: this.getClientX(e),
@@ -674,17 +686,14 @@ onDocumentClick(event: MouseEvent) {
     clearTimeout(this.longPressTimer);
   }
 
-  onTouchEnd(e: any, taskId: string) {
+onTouchEnd(e: any, taskId: string) {
     clearTimeout(this.longPressTimer);
     const s = this.swipeState[taskId];
     if (!s) return;
 
     if (s.state === 'right') {
-        // Trigger right action (Cancel schedule)
-        // Usually right swipe reveals button, we snap it open
-        s.offset = 80;
+        s.offset = 80; // 展開寬度
     } else if (s.state === 'left') {
-        // Trigger left action (Copy)
         s.offset = -80;
     } else {
         s.offset = 0;
@@ -692,13 +701,17 @@ onDocumentClick(event: MouseEvent) {
 
     s.active = false;
 
-    // Auto close after 3 sec if opened
-    if(s.offset !== 0) {
-      setTimeout(() => {
-        if(this.swipeState[taskId]) this.swipeState[taskId].offset = 0;
-      }, 3000);
-    }
-  }
+    // 改進：使用一個閉包來檢查在 3 秒後，用戶是否「又開始動它了」
+    // 如果用戶 3 秒內沒去動這個特定的 task，才把它縮回去
+    setTimeout(() => {
+        const currentStatus = this.swipeState[taskId];
+        // 如果該物件現在不是在 active 狀態，且 offset 還是當初設定的值，才彈回
+        if (currentStatus && !currentStatus.active && Math.abs(currentStatus.offset) === 80) {
+            currentStatus.offset = 0;
+            currentStatus.state = '';
+        }
+    }, 3000);
+}
 
   getSwipeOffset(taskId: string) {
     return this.swipeState[taskId]?.offset || 0;
