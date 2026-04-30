@@ -131,7 +131,7 @@
                  [class.opacity-50]="!d.isCurrentMonth"
                  [class.border-2]="d.dateStr === selectedDateStr"
                  [class.border-milktea-400]="d.dateStr === selectedDateStr"
-                 (click)="selectDate(d.dateStr)"
+                 (click)="selectDate(d.dateStr); openScheduledDrawer(d.dateStr, d.tasks)"
                  cdkDropList
                  [cdkDropListData]="d.tasks"
                  (cdkDropListDropped)="dropToDate($event, d.dateStr)">
@@ -139,7 +139,8 @@
               <div class="flex gap-0.5 mt-1 flex-wrap justify-center flex-1 w-full min-h-[20px]">
                  <!-- Red dot indicator if there are tasks -->
                  <div *ngIf="hasUrgent(d.tasks)" class="w-1.5 h-1.5 rounded-full bg-red-500 mx-auto my-1 lg:hidden"></div>
-                 <div *ngIf="!hasUrgent(d.tasks) && d.tasks.length > 0" class="w-1.5 h-1.5 rounded-full bg-milktea-400 mx-auto my-1 lg:hidden"></div>
+                 <div *ngIf="!hasUrgent(d.tasks) && d.tasks.length > 0" class="w-1.5 h-1.5 rounded-full bg-milktea-400 mx-auto my-1 lg:hidden"
+></div>
               <!-- Desktop Task Previews (RWD) -->
               <div class="hidden lg:flex flex-col w-full px-1 overflow-hidden mt-1 gap-1 max-h-[120px] text-left">
                  <ng-container *ngFor="let t of d.tasks; let i = index">
