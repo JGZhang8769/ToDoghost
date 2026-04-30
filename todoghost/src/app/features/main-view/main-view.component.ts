@@ -720,6 +720,7 @@ export class MainViewComponent implements OnInit, OnDestroy {
     this.formTask = { ...task };
     this.formTaskTags = task.tags ? [...task.tags] : [];
     this.formTaskTagInput = '';
+    this.showTimeReminder = !!(task.startTime || task.endTime || (task as any).enablePush);
     this.showForm = true;
   }
 
