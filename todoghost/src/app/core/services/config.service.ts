@@ -15,10 +15,10 @@ export class ConfigService {
   getLoginAuthFeatureFlag(): Observable<boolean> {
     const configDocRef = doc(this.firestore, 'system_configs/loginAuth');
     return docData(configDocRef).pipe(
-      map(data => {
+      map((data) => {
         if (!data) return false;
         return data['valid'] === true;
-      })
+      }),
     );
   }
 }

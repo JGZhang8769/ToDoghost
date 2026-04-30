@@ -7,8 +7,8 @@ describe('AppComponent', () => {
     await TestBed.configureTestingModule({
       imports: [AppComponent],
       providers: [
-         { provide: PushNotificationService, useValue: { listen: () => {} } }
-      ]
+        { provide: PushNotificationService, useValue: { listen: () => {} } },
+      ],
     }).compileComponents();
   });
 

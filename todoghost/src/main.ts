@@ -5,7 +5,7 @@ import { appConfig } from './app/app.config';
 import { AppComponent } from './app/app.component';
 
 bootstrapApplication(AppComponent, appConfig)
-  .then(appRef => {
+  .then((appRef) => {
     const pushService = appRef.injector.get(PushNotificationService);
     pushService.requestPermission();
     pushService.listen();

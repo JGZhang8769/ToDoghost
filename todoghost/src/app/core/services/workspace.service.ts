@@ -1,5 +1,17 @@
 import { Injectable, inject } from '@angular/core';
-import { Firestore, collection, collectionData, doc, setDoc, query, where, updateDoc, arrayUnion, getDocs, getDoc } from '@angular/fire/firestore';
+import {
+  Firestore,
+  collection,
+  collectionData,
+  doc,
+  setDoc,
+  query,
+  where,
+  updateDoc,
+  arrayUnion,
+  getDocs,
+  getDoc,
+} from '@angular/fire/firestore';
 import { BehaviorSubject, Observable } from 'rxjs';
 
 export interface Workspace {
@@ -30,20 +42,25 @@ export class WorkspaceService {
     const savedWsId = localStorage.getItem('currentWorkspaceId');
     if (savedWsId) {
       try {
-        const wsDoc = await getDoc(doc(this.firestore, `workspaces/${savedWsId}`));
+        const wsDoc = await getDoc(
+          doc(this.firestore, `workspaces/${savedWsId}`),
+        );
         if (wsDoc.exists()) {
-          this.currentWorkspaceSubject.next({ id: savedWsId, ...(wsDoc.data() as Omit<Workspace, 'id'>) });
+          this.currentWorkspaceSubject.next({
+            id: savedWsId,
+            ...(wsDoc.data() as Omit<Workspace, 'id'>),
+          });
         } else {
           localStorage.removeItem('currentWorkspaceId');
         }
-      } catch(e) {
+      } catch (e) {
         console.error('Error hydrating workspace:', e);
       }
     }
   }
 
   setCurrentWorkspace(ws: Workspace | null): void {
-    if(ws) localStorage.setItem('currentWorkspaceId', ws.id);
+    if (ws) localStorage.setItem('currentWorkspaceId', ws.id);
     else localStorage.removeItem('currentWorkspaceId');
     this.currentWorkspaceSubject.next(ws);
   }
@@ -65,7 +82,7 @@ export class WorkspaceService {
       name,
       createdAt: Date.now(),
       users: [userId],
-      inviteCode: this.generateInviteCode()
+      inviteCode: this.generateInviteCode(),
     };
     await setDoc(doc(this.firestore, `workspaces/${id}`), ws);
     return ws;
@@ -82,11 +99,15 @@ export class WorkspaceService {
     }
   }
 
-  async updateUserPreferences(workspaceId: string, userId: string, preferences: WorkspaceUserPreferences) {
+  async updateUserPreferences(
+    workspaceId: string,
+    userId: string,
+    preferences: WorkspaceUserPreferences,
+  ) {
     const wsRef = doc(this.firestore, `workspaces/${workspaceId}`);
     const updateKey = `userPreferences.${userId}`;
     await updateDoc(wsRef, {
-      [updateKey]: preferences
+      [updateKey]: preferences,
     });
 
     const current = this.currentWorkspaceSubject.value;
@@ -96,8 +117,8 @@ export class WorkspaceService {
         ...current,
         userPreferences: {
           ...prefs,
-          [userId]: preferences
-        }
+          [userId]: preferences,
+        },
       });
     }
   }
@@ -116,7 +137,7 @@ export class WorkspaceService {
     if (wsData.users.includes(userId)) return true; // Already in
 
     const updates: any = {
-      users: arrayUnion(userId)
+      users: arrayUnion(userId),
     };
 
     if (wsData.users.length === 1) {

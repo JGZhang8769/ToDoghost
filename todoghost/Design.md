@@ -1,42 +1,46 @@
 # 設計規範 (Design Guidelines)
 
 ## 1. 視覺主題 (Visual Theme)
+
 整體應用程式採用「奶茶色系 (Milktea Palette)」為主軸，強調簡單、乾淨、溫暖的視覺體驗。
 
 ## 2. 響應式與 PWA 設計 (Responsive & PWA Design)
-*   以 iOS Mobile (iPhone 15 Pro / iPad) 為優先考量。
-*   禁用原生網頁的反彈效果與捲動條 (`no-scrollbar`)。
-*   全域 CSS 設置 `user-select: none` 與 `-webkit-touch-callout: none`，並在 `meta viewport` 加入 `user-scalable=no` 避免被縮放跟反白。
-*   底部抽屜 (Bottom Drawer) 使用絕對定位遮罩 (Overlay) 方式實作，避免撐開原有頁面長度。
-*   高度計算須包含 `env(safe-area-inset-bottom)` 確保 iOS 底部橫條不會遮擋內容。
+
+- 以 iOS Mobile (iPhone 15 Pro / iPad) 為優先考量。
+- 禁用原生網頁的反彈效果與捲動條 (`no-scrollbar`)。
+- 全域 CSS 設置 `user-select: none` 與 `-webkit-touch-callout: none`，並在 `meta viewport` 加入 `user-scalable=no` 避免被縮放跟反白。
+- 底部抽屜 (Bottom Drawer) 使用絕對定位遮罩 (Overlay) 方式實作，避免撐開原有頁面長度。
+- 高度計算須包含 `env(safe-area-inset-bottom)` 確保 iOS 底部橫條不會遮擋內容。
 
 ## 3. 互動設計 (Interaction Design)
-*   **拖拉 (Drag and Drop)**:
-    *   使用者可將未排程抽屜中的事項拖曳至月、週、日視圖。
-    *   日視圖有「全天/未指定時間」專屬拖曳區，以及「時間網格」。若拖到時間網格且未指定結束時間，預設佔用一小時並有獨特的視覺區隔 (漸層或虛線底色)。
-    *   拖拉啟動時，畫面才浮現右上角垃圾桶供取消排程。
-    *   **拖曳預覽 (Drag Preview)**: 為了避免視線遮蔽，所有拖曳動作發生時，預覽圖樣僅顯示為一顆紅色圓點。
-*   **滑動 (Swipe)**:
-    *   自訂水平滑動事件，確保使用者滑出「複製」或「取消」按鈕時手感順暢，並設定閥值以防在電腦版或拖拉時誤觸。
-*   **標籤 (Tags)**:
-    *   輸入時採晶片 (Chip) 樣式，輸入逗號或 Enter 即可產生新標籤。
-    *   過濾器採多選，支援 AND/OR 切換。
 
-*   **PWA 防呆與體驗**: 完全禁用 iOS 邊緣左滑/右滑（Swipe to go back/forward）導覽手勢，透過攔截 `touchstart` / `touchmove` 的邊緣事件並 `preventDefault()` 來實現，避免操作被中斷重置。
-*   **圖示擴充**: 在使用者的頭像選擇上，提供原有的 `tiger`, `bengal` 以及多種可愛手繪風格 SVG 插圖（包含：白貓、黑貓、小豹、虎、男生、女生）。
-*   **應用程式標誌 (App Logo)**: 採用全新的「韓國幽靈拿著行事曆與貓咪」的 SVG 插畫作為主要的 APP Icon，並保留原始拿衝浪板的版本作為備選，展現活潑可愛的視覺風格。
-*   **標籤 (Tags) 體驗**: 標籤篩選器採用輸入與自動補齊 (Autocomplete) 方式，**僅在按下 Enter 時才建立新標籤**，允許標籤內包含逗號等特殊字元。
-*   **分類系統與設定頁**:
-    *   新增「設定頁面 (Settings)」，入口為齒輪圖標。
-    *   設定頁內包含「分類清單 (Category List)」卡片。
-    *   分類管理採用底部抽屜 (Bottom Drawer) 介面，支援拖曳排序 (Drag & Drop to reorder)，常用分類可置頂。
-    *   透過點擊編輯、長按呼叫刪除選項。
-    *   支援 Material Icons 作為分類圖示選擇。
+- **拖拉 (Drag and Drop)**:
+  - 使用者可將未排程抽屜中的事項拖曳至月、週、日視圖。
+  - 日視圖有「全天/未指定時間」專屬拖曳區，以及「時間網格」。若拖到時間網格且未指定結束時間，預設佔用一小時並有獨特的視覺區隔 (漸層或虛線底色)。
+  - 拖拉啟動時，畫面才浮現右上角垃圾桶供取消排程。
+  - **拖曳預覽 (Drag Preview)**: 為了避免視線遮蔽，所有拖曳動作發生時，預覽圖樣僅顯示為一顆紅色圓點。
+- **滑動 (Swipe)**:
+  - 自訂水平滑動事件，確保使用者滑出「複製」或「取消」按鈕時手感順暢，並設定閥值以防在電腦版或拖拉時誤觸。
+- **標籤 (Tags)**:
+  - 輸入時採晶片 (Chip) 樣式，輸入逗號或 Enter 即可產生新標籤。
+  - 過濾器採多選，支援 AND/OR 切換。
+
+- **PWA 防呆與體驗**: 完全禁用 iOS 邊緣左滑/右滑（Swipe to go back/forward）導覽手勢，透過攔截 `touchstart` / `touchmove` 的邊緣事件並 `preventDefault()` 來實現，避免操作被中斷重置。
+- **圖示擴充**: 在使用者的頭像選擇上，提供原有的 `tiger`, `bengal` 以及多種可愛手繪風格 SVG 插圖（包含：白貓、黑貓、小豹、虎、男生、女生）。
+- **應用程式標誌 (App Logo)**: 採用全新的「韓國幽靈拿著行事曆與貓咪」的 SVG 插畫作為主要的 APP Icon，並保留原始拿衝浪板的版本作為備選，展現活潑可愛的視覺風格。
+- **標籤 (Tags) 體驗**: 標籤篩選器採用輸入與自動補齊 (Autocomplete) 方式，**僅在按下 Enter 時才建立新標籤**，允許標籤內包含逗號等特殊字元。
+- **分類系統與設定頁**:
+  - 新增「設定頁面 (Settings)」，入口為齒輪圖標。
+  - 設定頁內包含「分類清單 (Category List)」卡片。
+  - 分類管理採用底部抽屜 (Bottom Drawer) 介面，支援拖曳排序 (Drag & Drop to reorder)，常用分類可置頂。
+  - 透過點擊編輯、長按呼叫刪除選項。
+  - 支援 Material Icons 作為分類圖示選擇。
 
 ## 4. 安全與驗證設計 (Security & Authentication)
-*   **WebAuthn (Face ID) 前端驗證**:
-    *   使用者首次點擊頭像時，觸發 `navigator.credentials.create`，建立本機憑證並綁定 `localStorage`。
-    *   後續點擊頭像登入時，觸發 `navigator.credentials.get` 進行 Face ID 驗證。
-*   **備用 PIN 碼登入 (Fallback)**:
-    *   當裝置不支援 WebAuthn、使用者取消 Face ID 或驗證失敗時，彈出 4 位數 PIN 碼輸入框。
-    *   新使用者預設 PIN 碼為 `0000`。
+
+- **WebAuthn (Face ID) 前端驗證**:
+  - 使用者首次點擊頭像時，觸發 `navigator.credentials.create`，建立本機憑證並綁定 `localStorage`。
+  - 後續點擊頭像登入時，觸發 `navigator.credentials.get` 進行 Face ID 驗證。
+- **備用 PIN 碼登入 (Fallback)**:
+  - 當裝置不支援 WebAuthn、使用者取消 Face ID 或驗證失敗時，彈出 4 位數 PIN 碼輸入框。
+  - 新使用者預設 PIN 碼為 `0000`。

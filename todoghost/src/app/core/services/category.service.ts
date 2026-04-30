@@ -1,5 +1,17 @@
 import { Injectable, inject } from '@angular/core';
-import { Firestore, collection, doc, setDoc, deleteDoc, collectionData, query, where, orderBy, getDocs, writeBatch } from '@angular/fire/firestore';
+import {
+  Firestore,
+  collection,
+  doc,
+  setDoc,
+  deleteDoc,
+  collectionData,
+  query,
+  where,
+  orderBy,
+  getDocs,
+  writeBatch,
+} from '@angular/fire/firestore';
 import { Observable } from 'rxjs';
 
 export interface Category {
@@ -13,7 +25,7 @@ export interface Category {
 }
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class CategoryService {
   private firestore = inject(Firestore);
@@ -21,10 +33,7 @@ export class CategoryService {
 
   getCategories(workspaceId: string): Observable<Category[]> {
     const categoriesRef = collection(this.firestore, this.collectionName);
-    const q = query(
-      categoriesRef,
-      where('workspaceId', '==', workspaceId)
-    );
+    const q = query(categoriesRef, where('workspaceId', '==', workspaceId));
     return collectionData(q, { idField: 'id' }) as Observable<Category[]>;
   }
 
