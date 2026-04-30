@@ -57,21 +57,21 @@ import { Subject, takeUntil } from 'rxjs';
         </div>
         <div class="p-4 flex-1 overflow-y-auto">
           <div class="flex flex-col gap-3">
-            <label class="flex items-center justify-between p-3 bg-milktea-50 rounded-xl border border-milktea-100">
+            <label class="flex items-center justify-between p-3 bg-milktea-50 rounded-xl border border-milktea-100" (click)="$event.stopPropagation()">
               <span class="font-bold text-milktea-900">月曆</span>
-              <input type="checkbox" [checked]="featureTabs.includes('month')" (change)="toggleFeatureTab('month')" class="w-5 h-5 accent-milktea-600">
+              <input type="checkbox" [checked]="featureTabs.includes('month')" (change)="toggleFeatureTab('month')" (click)="$event.stopPropagation()" class="w-5 h-5 accent-milktea-600">
             </label>
-            <label class="flex items-center justify-between p-3 bg-milktea-50 rounded-xl border border-milktea-100">
+            <label class="flex items-center justify-between p-3 bg-milktea-50 rounded-xl border border-milktea-100" (click)="$event.stopPropagation()">
               <span class="font-bold text-milktea-900">週曆</span>
-              <input type="checkbox" [checked]="featureTabs.includes('week')" (change)="toggleFeatureTab('week')" class="w-5 h-5 accent-milktea-600">
+              <input type="checkbox" [checked]="featureTabs.includes('week')" (change)="toggleFeatureTab('week')" (click)="$event.stopPropagation()" class="w-5 h-5 accent-milktea-600">
             </label>
-            <label class="flex items-center justify-between p-3 bg-milktea-50 rounded-xl border border-milktea-100">
+            <label class="flex items-center justify-between p-3 bg-milktea-50 rounded-xl border border-milktea-100" (click)="$event.stopPropagation()">
               <span class="font-bold text-milktea-900">日曆</span>
-              <input type="checkbox" [checked]="featureTabs.includes('day')" (change)="toggleFeatureTab('day')" class="w-5 h-5 accent-milktea-600">
+              <input type="checkbox" [checked]="featureTabs.includes('day')" (change)="toggleFeatureTab('day')" (click)="$event.stopPropagation()" class="w-5 h-5 accent-milktea-600">
             </label>
-            <label class="flex items-center justify-between p-3 bg-milktea-50 rounded-xl border border-milktea-100">
+            <label class="flex items-center justify-between p-3 bg-milktea-50 rounded-xl border border-milktea-100" (click)="$event.stopPropagation()">
               <span class="font-bold text-milktea-900">月曆 (蘋果)</span>
-              <input type="checkbox" [checked]="featureTabs.includes('monthApple')" (change)="toggleFeatureTab('monthApple')" class="w-5 h-5 accent-milktea-600">
+              <input type="checkbox" [checked]="featureTabs.includes('monthApple')" (change)="toggleFeatureTab('monthApple')" (click)="$event.stopPropagation()" class="w-5 h-5 accent-milktea-600">
             </label>
           </div>
         </div>
@@ -80,6 +80,7 @@ import { Subject, takeUntil } from 'rxjs';
       <!-- Category Drawer -->
       <div *ngIf="showCategoryDrawer" class="fixed inset-0 bg-black/20 z-[60] transition-opacity" (click)="closeCategoryDrawer()"></div>
       <div class="fixed bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-[0_-4px_15px_rgba(0,0,0,0.1)] transition-transform duration-300 z-[65] max-w-3xl mx-auto flex flex-col"
+           (click)="$event.stopPropagation()"
            [style.transform]="showCategoryDrawer ? 'translateY(0)' : 'translateY(100%)'">
         <div class="p-4 border-b border-milktea-100 flex justify-between items-center shrink-0">
            <h2 class="font-bold text-milktea-900 text-lg">分類清單管理</h2>
