@@ -195,7 +195,8 @@
           <div *ngIf="appleViewStyle !== 'list'" class="grid grid-cols-7 gap-1 flex-1 relative">
             <div *ngFor="let d of calendarDays"
                  class="bg-white rounded-lg flex flex-col items-center relative overflow-hidden"
-                 [class.p-1]="appleViewStyle !== 'stack'"
+                 [class.p-1]="appleViewStyle !== 'stack' && appleViewStyle !== 'detailed'"
+                 [class.p-0.5]="appleViewStyle === 'detailed'"
                  [class.p-0]="appleViewStyle === 'stack'"
                  [class.min-h-[60px]]="appleViewStyle === 'compact' || appleViewStyle === 'stack'"
                  [class.min-h-[100px]]="appleViewStyle === 'detailed'"
@@ -224,17 +225,17 @@
               </div>
 
               <!-- Detailed Style (Text) -->
-              <div *ngIf="appleViewStyle === 'detailed'" class="w-full flex flex-col gap-1 px-1 mt-1 pb-1">
+              <div *ngIf="appleViewStyle === 'detailed'" class="w-full flex flex-col gap-1 px-0.5 mt-0.5 pb-0.5">
                   <ng-container *ngFor="let t of d.tasks; let i = index">
-                      <div *ngIf="i < 4" class="text-[9px] truncate leading-tight w-full p-0.5 rounded cursor-pointer" [class.bg-red-100]="t.isUrgent" [class.text-red-700]="t.isUrgent" [class.bg-milktea-100]="!t.isUrgent" [class.text-milktea-800]="!t.isUrgent" [class.opacity-50]="t.status === 'completed'" (click)="editTask(t); $event.stopPropagation()">
+                      <div *ngIf="i < 4" class="text-[10px] line-clamp-2 break-words leading-tight w-full p-0.5 rounded cursor-pointer" [class.bg-red-100]="t.isUrgent" [class.text-red-700]="t.isUrgent" [class.bg-milktea-100]="!t.isUrgent" [class.text-milktea-800]="!t.isUrgent" [class.opacity-50]="t.status === 'completed'" (click)="editTask(t); $event.stopPropagation()">
 <ng-container *ngIf="getCategoryForForm(t.categoryId) as cat">
-                                     <span *ngIf="cat.icon && !isEmoji(cat.icon)" class="material-icons text-[14px] text-milktea-500 shrink-0">{{ cat.icon }}</span>
-                                     <span *ngIf="cat.icon && isEmoji(cat.icon)" class="text-[14px] shrink-0">{{ cat.icon }}</span>
+                                     <span *ngIf="cat.icon && !isEmoji(cat.icon)" class="material-icons text-[12px] text-milktea-500 shrink-0 align-middle">{{ cat.icon }}</span>
+                                     <span *ngIf="cat.icon && isEmoji(cat.icon)" class="text-[12px] shrink-0 align-middle">{{ cat.icon }}</span>
                                  </ng-container>
-                          <span class="font-bold" *ngIf="t.startTime">{{t.startTime}} </span><span class="font-bold" *ngIf="t.endTime"> - {{t.endTime}} </span>{{t.title}}
+                          <span class="font-bold" *ngIf="t.startTime">{{t.startTime}} </span>{{t.title}}
                       </div>
                   </ng-container>
-                  <div *ngIf="d.tasks.length > 4" class="text-[9px] text-milktea-500 text-center cursor-pointer font-bold" (click)="openScheduledDrawer(d.dateStr, d.tasks); $event.stopPropagation()">...+{{ d.tasks.length - 4 }}</div>
+                  <div *ngIf="d.tasks.length > 4" class="text-[10px] text-milktea-500 text-center cursor-pointer font-bold" (click)="openScheduledDrawer(d.dateStr, d.tasks); $event.stopPropagation()">...+{{ d.tasks.length - 4 }}</div>
               </div>
 
             </div>
