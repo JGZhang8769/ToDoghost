@@ -224,7 +224,7 @@
               </div>
 
               <!-- Detailed Style (Text) -->
-              <div *ngIf="appleViewStyle === 'detailed'" class="w-full flex flex-col  px-1 mt-1 pb-1">
+              <div *ngIf="appleViewStyle === 'detailed'" class="w-full flex flex-col gap-1 px-1 mt-1 pb-1">
                   <ng-container *ngFor="let t of d.tasks; let i = index">
                       <div *ngIf="i < 4" class="text-[9px] truncate leading-tight w-full p-0.5 rounded cursor-pointer" [class.bg-red-100]="t.isUrgent" [class.text-red-700]="t.isUrgent" [class.bg-milktea-100]="!t.isUrgent" [class.text-milktea-800]="!t.isUrgent" [class.opacity-50]="t.status === 'completed'" (click)="editTask(t); $event.stopPropagation()">
 <ng-container *ngIf="getCategoryForForm(t.categoryId) as cat">
