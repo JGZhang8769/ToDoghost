@@ -617,7 +617,13 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     if (this.splitter === 'left') {
       this.leftWidth = Math.min(this.LEFT_MAX, Math.max(this.LEFT_MIN, this.splitterStartWidth + delta));
     } else {
-      this.rightWidth = Math.min(this.RIGHT_MAX, Math.max(this.RIGHT_MIN, this.splitterStartWidth - delta));
+      // The inspector-side splitter direction depends on which side the
+      // inspector sits on. In 'right' layout it lives on the right edge
+      // (drag-right shrinks inspector → subtract delta). In 'middle' layout
+      // the inspector sits to the *left* of the splitter (drag-right grows
+      // inspector → add delta).
+      const direction = this.inspectorPosition === 'middle' ? +1 : -1;
+      this.rightWidth = Math.min(this.RIGHT_MAX, Math.max(this.RIGHT_MIN, this.splitterStartWidth + direction * delta));
     }
   }
 

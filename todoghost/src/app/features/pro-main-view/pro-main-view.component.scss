@@ -244,60 +244,8 @@
     min-height: 0;
     position: relative;
 }
-/* Collapse button: bottom-right of the sidebar. Putting it at the bottom
-   avoids overlap with the floating expand button (which sits at top-left
-   of the same area when the sidebar is hidden), so users don't accidentally
-   re-expand right after collapsing. */
-.pro-sidebar__collapse {
-    position: absolute;
-    bottom: 12px;
-    right: 12px;
-    width: 28px;
-    height: 28px;
-    border: 0;
-    border-radius: 8px;
-    background: rgba(120, 100, 80, 0.1);
-    color: #7a6850;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.15s ease, color 0.15s ease;
-    z-index: 2;
-}
-.pro-sidebar__collapse:hover {
-    background: rgba(120, 100, 80, 0.18);
-    color: #2a1f10;
-}
-
-/* Floating expand button shown when the sidebar is fully collapsed.
-   Pinned to the top-left of the main grid area in a position that no
-   sidebar-internal control occupies, so the user knows where to find it. */
-.pro-sidebar__expand {
-    position: absolute;
-    top: 20px;
-    left: 16px;
-    width: 36px;
-    height: 36px;
-    border: 1px solid rgba(255, 255, 255, 0.7);
-    border-radius: 10px;
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(20px) saturate(150%);
-    -webkit-backdrop-filter: blur(20px) saturate(150%);
-    color: #4a3a22;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 50;
-    box-shadow: 0 4px 12px rgba(60, 40, 20, 0.12);
-    transition: all 0.15s ease;
-}
-.pro-sidebar__expand:hover {
-    background: #fff;
-    transform: translateY(-1px);
-    box-shadow: 0 6px 16px rgba(60, 40, 20, 0.18);
-}
+/* Sidebar toggle now lives in the topbar (.pro-iconbtn) next to 返回經典版.
+   No internal collapse/expand button styles needed here anymore. */
 .pro-sidebar__section {
     margin-bottom: 16px;
 }
