@@ -217,6 +217,10 @@
                        [style.--user-bar]="userColor(t.createdBy)?.bar"
                        (click)="selectTask(t.id); $event.stopPropagation()">
                     <span *ngIf="t.startTime" class="pro-day__time tabular-nums">{{ t.startTime }}</span>
+                    <ng-container *ngIf="categoryFor(t.categoryId) as cat">
+                      <span *ngIf="cat.icon && !isEmoji(cat.icon)" class="material-icons pro-day__catico">{{ cat.icon }}</span>
+                      <span *ngIf="cat.icon && isEmoji(cat.icon)" class="pro-day__catico">{{ cat.icon }}</span>
+                    </ng-container>
                     <span class="pro-day__title">{{ t.title }}</span>
                   </div>
                 </ng-container>
@@ -256,6 +260,10 @@
                    [class.is-selected]="selectedTaskId === t.id"
                    [style.--user-bar]="userColor(t.createdBy)?.bar"
                    (click)="selectTask(t.id); $event.stopPropagation()">
+                <ng-container *ngIf="categoryFor(t.categoryId) as cat">
+                  <span *ngIf="cat.icon && !isEmoji(cat.icon)" class="material-icons pro-week__chip-ico">{{ cat.icon }}</span>
+                  <span *ngIf="cat.icon && isEmoji(cat.icon)" class="pro-week__chip-ico">{{ cat.icon }}</span>
+                </ng-container>
                 {{ t.title }}
               </div>
             </div>
@@ -284,7 +292,13 @@
                    [style.width]="'calc(' + (100 / block.totalCols) + '% - 4px)'"
                    [style.--user-bar]="userColor(block.task.createdBy)?.bar"
                    (click)="selectTask(block.task.id); $event.stopPropagation()">
-                <div class="pro-week__event-title">{{ block.task.title }}</div>
+                <div class="pro-week__event-title">
+                  <ng-container *ngIf="categoryFor(block.task.categoryId) as cat">
+                    <span *ngIf="cat.icon && !isEmoji(cat.icon)" class="material-icons pro-week__event-ico">{{ cat.icon }}</span>
+                    <span *ngIf="cat.icon && isEmoji(cat.icon)" class="pro-week__event-ico">{{ cat.icon }}</span>
+                  </ng-container>
+                  {{ block.task.title }}
+                </div>
                 <div class="pro-week__event-time tabular-nums" *ngIf="block.task.startTime">
                   {{ block.task.startTime }}<span *ngIf="block.task.endTime"> - {{ block.task.endTime }}</span>
                 </div>
