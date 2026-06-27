@@ -3,27 +3,15 @@
   <!-- Background tint -->
   <div class="pmob-home__bg" aria-hidden="true"></div>
 
-  <!-- Sticky topbar: logo + workspace name + user chip + back button.
-       Lives outside the scroll surface so it stays pinned while the rest
-       of the page scrolls. -->
-  <header class="pmob-topbar">
-    <app-svg-icon name="logo_main" width="26px" height="26px" class="pmob-topbar__logo"></app-svg-icon>
-    <div class="pmob-topbar__ws">
-      <span class="pmob-topbar__wsname">{{ currentWorkspace?.name || 'ToDoghost' }}</span>
-      <span class="pmob-topbar__user" *ngIf="currentUser">
-        <span class="pmob-topbar__avatar">{{ (currentUser.name || '?')[0] }}</span>
-        {{ currentUser.name }}
-      </span>
-    </div>
-    <button class="pmob-topbar__exit" (click)="backToWorkspaces()" title="返回選擇空間" aria-label="返回選擇空間">
-      <span class="material-icons" style="font-size: 20px;">logout</span>
-    </button>
-  </header>
-
   <!-- ============ Scrollable content ============ -->
   <main class="pmob-home__scroll ios-scroll">
 
-    <!-- Headline: date + lunar (back button moved up to the topbar) -->
+    <!-- Headline row:
+         - Left: selected date + 週X + 農曆/節氣 + (今天 chip)
+         - Right: workspace name + signed-in user chip + logout icon
+         Workspace / user / logout used to live in a sticky topbar; user
+         preferred the info to sit alongside the date instead of taking a
+         full row up top. -->
     <header class="pmob-home__head">
       <div class="pmob-home__date">
         <div class="pmob-home__date-main">{{ selectedDateStr() }}</div>
@@ -36,6 +24,22 @@
           </span>
           <span *ngIf="isHeadlineToday" class="pmob-home__today-chip">今天</span>
         </div>
+      </div>
+
+      <div class="pmob-home__who">
+        <div class="pmob-home__whotext">
+          <span class="pmob-home__wsname">{{ currentWorkspace?.name || 'ToDoghost' }}</span>
+          <span class="pmob-home__user" *ngIf="currentUser">
+            <span class="pmob-home__avatar">{{ (currentUser.name || '?')[0] }}</span>
+            {{ currentUser.name }}
+          </span>
+        </div>
+        <button class="pmob-home__exit"
+                (click)="backToWorkspaces()"
+                title="返回選擇空間"
+                aria-label="返回選擇空間">
+          <span class="material-icons" style="font-size: 18px;">logout</span>
+        </button>
       </div>
     </header>
 
