@@ -1,0 +1,377 @@
+<div class="pro-shell" [class.pro-splitting]="!!splitter">
+
+  <!-- Animated gradient background (liquid glass base) -->
+  <div class="pro-bg" aria-hidden="true">
+    <div class="pro-bg__blob pro-bg__blob--a"></div>
+    <div class="pro-bg__blob pro-bg__blob--b"></div>
+    <div class="pro-bg__blob pro-bg__blob--c"></div>
+  </div>
+
+  <!-- Top bar -->
+  <header class="pro-topbar">
+    <button class="pro-iconbtn" title="返回經典版" (click)="backToClassic()">
+      <span class="material-icons" style="font-size: 20px;">arrow_back</span>
+    </button>
+    <div class="pro-topbar__brand">
+      <app-svg-icon name="logo_main" width="22px" height="22px"></app-svg-icon>
+      <span class="pro-topbar__title">{{ currentWorkspace?.name || 'ToDoghost Pro' }}</span>
+    </div>
+
+    <div class="pro-topbar__search">
+      <span class="material-icons" style="font-size: 18px;">search</span>
+      <input type="text" [(ngModel)]="searchQuery" placeholder="搜尋代辦事項、標籤、描述…">
+      <kbd>⌘K</kbd>
+    </div>
+
+    <div class="pro-topbar__actions">
+      <button class="pro-segment">
+        <span class="pro-segment__btn"
+              [class.is-active]="layoutMode === 'calendar-first'"
+              (click)="layoutMode !== 'calendar-first' && toggleLayout()">
+          <span class="material-icons" style="font-size: 16px;">calendar_view_month</span>
+          月曆為主
+        </span>
+        <span class="pro-segment__btn"
+              [class.is-active]="layoutMode === 'list-first'"
+              (click)="layoutMode !== 'list-first' && toggleLayout()">
+          <span class="material-icons" style="font-size: 16px;">list_alt</span>
+          清單為主
+        </span>
+      </button>
+      <button class="pro-iconbtn" title="切換右側 Inspector" (click)="toggleInspector()">
+        <span class="material-icons" style="font-size: 20px;">{{ showInspector ? 'right_panel_close' : 'right_panel_open' }}</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Three-column shell -->
+  <main class="pro-grid" [style.grid-template-columns]="(leftWidth + 'px 6px 1fr ') + (showInspector ? '6px ' + rightWidth + 'px' : '')">
+
+    <!-- Left: Sidebar -->
+    <aside class="pro-sidebar pro-glass">
+      <section class="pro-sidebar__section">
+        <h4 class="pro-sidebar__heading">清單</h4>
+        <button class="pro-nav" [class.is-active]="isSelectedList('inbox')" (click)="selectSmartList('inbox')">
+          <span class="pro-nav__icon" style="background: linear-gradient(135deg, #94a3b8, #64748b);">
+            <span class="material-icons" style="font-size: 14px;">inbox</span>
+          </span>
+          <span class="pro-nav__label">收件匣</span>
+          <span class="pro-nav__count">{{ smartListCount('inbox') }}</span>
+        </button>
+        <button class="pro-nav" [class.is-active]="isSelectedList('today')" (click)="selectSmartList('today')">
+          <span class="pro-nav__icon" style="background: linear-gradient(135deg, #fbbf24, #f59e0b);">
+            <span class="material-icons" style="font-size: 14px;">wb_sunny</span>
+          </span>
+          <span class="pro-nav__label">今日</span>
+          <span class="pro-nav__count">{{ smartListCount('today') }}</span>
+        </button>
+        <button class="pro-nav" [class.is-active]="isSelectedList('week')" (click)="selectSmartList('week')">
+          <span class="pro-nav__icon" style="background: linear-gradient(135deg, #60a5fa, #3b82f6);">
+            <span class="material-icons" style="font-size: 14px;">date_range</span>
+          </span>
+          <span class="pro-nav__label">本週</span>
+          <span class="pro-nav__count">{{ smartListCount('week') }}</span>
+        </button>
+        <button class="pro-nav" [class.is-active]="isSelectedList('urgent')" (click)="selectSmartList('urgent')">
+          <span class="pro-nav__icon" style="background: linear-gradient(135deg, #f87171, #ef4444);">
+            <span class="material-icons" style="font-size: 14px;">priority_high</span>
+          </span>
+          <span class="pro-nav__label">緊急</span>
+          <span class="pro-nav__count">{{ smartListCount('urgent') }}</span>
+        </button>
+        <button class="pro-nav" [class.is-active]="isSelectedList('unscheduled')" (click)="selectSmartList('unscheduled')">
+          <span class="pro-nav__icon" style="background: linear-gradient(135deg, #c4b5fd, #8b5cf6);">
+            <span class="material-icons" style="font-size: 14px;">event_busy</span>
+          </span>
+          <span class="pro-nav__label">未排程</span>
+          <span class="pro-nav__count">{{ smartListCount('unscheduled') }}</span>
+        </button>
+        <button class="pro-nav" [class.is-active]="isSelectedList('completed')" (click)="selectSmartList('completed')">
+          <span class="pro-nav__icon" style="background: linear-gradient(135deg, #86efac, #22c55e);">
+            <span class="material-icons" style="font-size: 14px;">done_all</span>
+          </span>
+          <span class="pro-nav__label">已完成</span>
+          <span class="pro-nav__count">{{ smartListCount('completed') }}</span>
+        </button>
+      </section>
+
+      <section class="pro-sidebar__section" *ngIf="categories.length > 0">
+        <h4 class="pro-sidebar__heading">分類</h4>
+        <button *ngFor="let cat of categories" class="pro-nav" [class.is-active]="isSelectedCategory(cat.id)" (click)="selectCategoryList(cat)">
+          <span class="pro-nav__icon" style="background: linear-gradient(135deg, #d6cab7, #b5a78a);">
+            <span *ngIf="cat.icon && !isEmoji(cat.icon)" class="material-icons" style="font-size: 14px;">{{ cat.icon }}</span>
+            <span *ngIf="cat.icon && isEmoji(cat.icon)" style="font-size: 14px;">{{ cat.icon }}</span>
+          </span>
+          <span class="pro-nav__label">{{ cat.name }}</span>
+          <span class="pro-nav__count">{{ categoryCount(cat.id) }}</span>
+        </button>
+      </section>
+
+      <div class="pro-sidebar__footer">
+        <div class="pro-user" *ngIf="currentUser">
+          <span class="pro-user__avatar">{{ (currentUser.name || '?')[0] }}</span>
+          <span class="pro-user__name">{{ currentUser.name }}</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Left splitter -->
+    <div class="pro-splitter" (mousedown)="startSplitter('left', $event)" title="拖曳調整側邊欄寬度"></div>
+
+    <!-- Center: main view (calendar-first OR list-first) -->
+    <section class="pro-center">
+      <!-- Layout: Calendar primary, list secondary -->
+      <div *ngIf="layoutMode === 'calendar-first'" class="pro-center__split">
+        <div class="pro-calendar pro-glass">
+          <header class="pro-calendar__header">
+            <button class="pro-iconbtn" (click)="prevMonth()" title="上個月">
+              <span class="material-icons" style="font-size: 18px;">chevron_left</span>
+            </button>
+            <h2>{{ currentMonthStr }}</h2>
+            <button class="pro-iconbtn" (click)="nextMonth()" title="下個月">
+              <span class="material-icons" style="font-size: 18px;">chevron_right</span>
+            </button>
+            <button class="pro-pill" (click)="goToToday()">今天</button>
+          </header>
+          <div class="pro-calendar__weekheader">
+            <span *ngFor="let day of ['一','二','三','四','五','六','日']">{{ day }}</span>
+          </div>
+          <div class="pro-calendar__grid" cdkDropListGroup>
+            <div *ngFor="let d of calendarDays"
+                 class="pro-day"
+                 [class.is-other-month]="!d.isCurrentMonth"
+                 [class.is-today]="d.isToday"
+                 [class.is-selected]="d.dateStr === selectedDateStr"
+                 (click)="selectDate(d.dateStr)"
+                 cdkDropList
+                 [cdkDropListData]="d.tasks"
+                 (cdkDropListDropped)="dropOnDate($event, d.dateStr)">
+              <div class="pro-day__head">
+                <span class="pro-day__num">{{ d.dayNum }}</span>
+                <span *ngIf="d.tasks.length > 0" class="pro-day__badge">{{ d.tasks.length }}</span>
+              </div>
+              <div class="pro-day__tasks">
+                <ng-container *ngFor="let t of d.tasks; let i = index">
+                <div *ngIf="i < 4"
+                     cdkDrag [cdkDragData]="t"
+                     class="pro-day__task"
+                     [class.is-urgent]="t.isUrgent && t.status !== 'completed'"
+                     [class.is-done]="t.status === 'completed'"
+                     [class.is-selected]="selectedTaskId === t.id"
+                     (click)="selectTask(t.id); $event.stopPropagation()">
+                  <span *ngIf="t.startTime" class="pro-day__time tabular-nums">{{ t.startTime }}</span>
+                  <span class="pro-day__title">{{ t.title }}</span>
+                </div>
+                </ng-container>
+                <div *ngIf="d.tasks.length > 4" class="pro-day__more">+{{ d.tasks.length - 4 }} 更多</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Below: condensed list of selected list (today by default) -->
+        <div class="pro-listpane pro-glass">
+          <header class="pro-listpane__header">
+            <h3>{{ currentListLabel }} <span class="pro-listpane__count">{{ listPaneTasks.length }}</span></h3>
+            <div class="pro-quickadd">
+              <input type="text" [(ngModel)]="quickAddTitle" (keydown.enter)="quickAdd()" placeholder="+ 快速新增  (Enter)">
+            </div>
+          </header>
+          <div class="pro-listpane__rows ios-scroll">
+            <div *ngFor="let t of listPaneTasks"
+                 cdkDrag [cdkDragData]="t"
+                 class="pro-row"
+                 [class.is-selected]="selectedTaskId === t.id"
+                 [class.is-urgent]="t.isUrgent && t.status !== 'completed'"
+                 [class.is-done]="t.status === 'completed'"
+                 (click)="selectTask(t.id)">
+              <button class="pro-row__check" (click)="toggleCompletion(t); $event.stopPropagation()" [class.is-checked]="t.status === 'completed'">
+                <span *ngIf="t.status === 'completed'" class="material-icons" style="font-size: 14px;">check</span>
+              </button>
+              <div class="pro-row__main">
+                <div class="pro-row__title">
+                  <span *ngIf="categoryFor(t.categoryId) as cat">
+                    <span *ngIf="cat.icon && !isEmoji(cat.icon)" class="material-icons pro-row__catico">{{ cat.icon }}</span>
+                    <span *ngIf="cat.icon && isEmoji(cat.icon)" class="pro-row__catico">{{ cat.icon }}</span>
+                  </span>
+                  {{ t.title }}
+                  <span *ngIf="t.isUrgent" class="material-icons pro-row__urg">priority_high</span>
+                </div>
+                <div class="pro-row__meta" *ngIf="t.date || t.startTime || t.description">
+                  <span *ngIf="t.date" class="tabular-nums">{{ t.date }}</span>
+                  <span *ngIf="t.startTime" class="tabular-nums">{{ t.startTime }}<span *ngIf="t.endTime"> - {{ t.endTime }}</span></span>
+                  <span *ngIf="t.description" class="pro-row__desc">{{ t.description }}</span>
+                </div>
+              </div>
+            </div>
+            <div *ngIf="listPaneTasks.length === 0" class="pro-empty">
+              <span class="material-icons" style="font-size: 32px;">checklist</span>
+              <p>沒有代辦事項</p>
+              <p class="pro-empty__hint">用上方輸入框快速新增</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Layout: List primary, calendar secondary -->
+      <div *ngIf="layoutMode === 'list-first'" class="pro-center__split">
+        <div class="pro-listpane pro-glass pro-listpane--big">
+          <header class="pro-listpane__header">
+            <h3>{{ currentListLabel }} <span class="pro-listpane__count">{{ listPaneTasks.length }}</span></h3>
+            <div class="pro-quickadd">
+              <input type="text" [(ngModel)]="quickAddTitle" (keydown.enter)="quickAdd()" placeholder="+ 快速新增  (Enter)">
+            </div>
+          </header>
+          <div class="pro-listpane__rows ios-scroll">
+            <div *ngFor="let t of listPaneTasks"
+                 cdkDrag [cdkDragData]="t"
+                 class="pro-row pro-row--big"
+                 [class.is-selected]="selectedTaskId === t.id"
+                 [class.is-urgent]="t.isUrgent && t.status !== 'completed'"
+                 [class.is-done]="t.status === 'completed'"
+                 (click)="selectTask(t.id)">
+              <button class="pro-row__check" (click)="toggleCompletion(t); $event.stopPropagation()" [class.is-checked]="t.status === 'completed'">
+                <span *ngIf="t.status === 'completed'" class="material-icons" style="font-size: 14px;">check</span>
+              </button>
+              <div class="pro-row__main">
+                <div class="pro-row__title">
+                  <span *ngIf="categoryFor(t.categoryId) as cat">
+                    <span *ngIf="cat.icon && !isEmoji(cat.icon)" class="material-icons pro-row__catico">{{ cat.icon }}</span>
+                    <span *ngIf="cat.icon && isEmoji(cat.icon)" class="pro-row__catico">{{ cat.icon }}</span>
+                  </span>
+                  {{ t.title }}
+                  <span *ngIf="t.isUrgent" class="material-icons pro-row__urg">priority_high</span>
+                </div>
+                <div class="pro-row__meta" *ngIf="t.date || t.startTime || t.description">
+                  <span *ngIf="t.date" class="tabular-nums">{{ t.date }}</span>
+                  <span *ngIf="t.startTime" class="tabular-nums">{{ t.startTime }}<span *ngIf="t.endTime"> - {{ t.endTime }}</span></span>
+                  <span *ngIf="t.description" class="pro-row__desc">{{ t.description }}</span>
+                </div>
+              </div>
+            </div>
+            <div *ngIf="listPaneTasks.length === 0" class="pro-empty">
+              <span class="material-icons" style="font-size: 32px;">checklist</span>
+              <p>沒有代辦事項</p>
+              <p class="pro-empty__hint">用上方輸入框快速新增</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="pro-calendar pro-calendar--mini pro-glass">
+          <header class="pro-calendar__header">
+            <button class="pro-iconbtn" (click)="prevMonth()"><span class="material-icons" style="font-size: 18px;">chevron_left</span></button>
+            <h2>{{ currentMonthStr }}</h2>
+            <button class="pro-iconbtn" (click)="nextMonth()"><span class="material-icons" style="font-size: 18px;">chevron_right</span></button>
+            <button class="pro-pill" (click)="goToToday()">今天</button>
+          </header>
+          <div class="pro-calendar__weekheader">
+            <span *ngFor="let day of ['一','二','三','四','五','六','日']">{{ day }}</span>
+          </div>
+          <div class="pro-calendar__grid pro-calendar__grid--mini" cdkDropListGroup>
+            <div *ngFor="let d of calendarDays"
+                 class="pro-day pro-day--mini"
+                 [class.is-other-month]="!d.isCurrentMonth"
+                 [class.is-today]="d.isToday"
+                 [class.is-selected]="d.dateStr === selectedDateStr"
+                 (click)="selectDate(d.dateStr)"
+                 cdkDropList
+                 [cdkDropListData]="d.tasks"
+                 (cdkDropListDropped)="dropOnDate($event, d.dateStr)">
+              <span class="pro-day__num">{{ d.dayNum }}</span>
+              <span *ngIf="d.tasks.length > 0" class="pro-day__dot" [class.is-urgent]="d.tasks[0].isUrgent"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right splitter -->
+    <div *ngIf="showInspector" class="pro-splitter" (mousedown)="startSplitter('right', $event)"></div>
+
+    <!-- Right: Inspector -->
+    <aside *ngIf="showInspector" class="pro-inspector pro-glass">
+      <div *ngIf="!selectedTask" class="pro-inspector__empty">
+        <span class="material-icons" style="font-size: 36px;">touch_app</span>
+        <p>選一個代辦來編輯</p>
+        <p class="pro-inspector__hint">在中央區或月曆裡點任一項目</p>
+      </div>
+
+      <div *ngIf="selectedTask as t" class="pro-inspector__body ios-scroll">
+        <div class="pro-inspector__head">
+          <button class="pro-row__check" (click)="toggleCompletion(t)" [class.is-checked]="t.status === 'completed'">
+            <span *ngIf="t.status === 'completed'" class="material-icons" style="font-size: 14px;">check</span>
+          </button>
+          <input class="pro-inspector__title"
+                 [(ngModel)]="t.title"
+                 (change)="saveSelectedTask()"
+                 placeholder="代辦標題"
+                 [class.is-done]="t.status === 'completed'"
+                 [class.is-urgent]="t.isUrgent && t.status !== 'completed'">
+        </div>
+
+        <div class="pro-field-row">
+          <span class="pro-field-row__label">
+            <span class="material-icons" style="font-size: 16px;">priority_high</span>
+            標記為緊急
+          </span>
+          <label class="ios-toggle">
+            <input type="checkbox" [(ngModel)]="t.isUrgent" (change)="saveSelectedTask()">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="pro-field-card">
+          <div class="pro-field">
+            <span class="pro-field__label">日期</span>
+            <input type="date" [(ngModel)]="t.date" (change)="saveSelectedTask()">
+          </div>
+          <div class="pro-field">
+            <span class="pro-field__label">開始</span>
+            <input type="time" [(ngModel)]="t.startTime" (change)="saveSelectedTask()">
+          </div>
+          <div class="pro-field">
+            <span class="pro-field__label">結束</span>
+            <input type="time" [(ngModel)]="t.endTime" (change)="saveSelectedTask()" [disabled]="!t.startTime">
+          </div>
+        </div>
+
+        <div class="pro-field-card">
+          <div class="pro-field">
+            <span class="pro-field__label">分類</span>
+            <select [(ngModel)]="t.categoryId" (change)="saveSelectedTask()">
+              <option [ngValue]="undefined">無分類</option>
+              <option *ngFor="let c of categories" [ngValue]="c.id">{{ c.name }}</option>
+            </select>
+          </div>
+          <div class="pro-field">
+            <span class="pro-field__label">提醒</span>
+            <select [(ngModel)]="t.reminderOffset" (change)="saveSelectedTask()" [disabled]="!t.startTime">
+              <option [ngValue]="null">不提醒</option>
+              <option [ngValue]="15">提前 15 分鐘</option>
+              <option [ngValue]="30">提前 30 分鐘</option>
+              <option [ngValue]="60">提前 1 小時</option>
+              <option [ngValue]="1440">提前 1 天</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="pro-field-block">
+          <span class="pro-field__label">詳細內容</span>
+          <textarea class="ios-scroll"
+                    [(ngModel)]="t.description"
+                    (change)="saveSelectedTask()"
+                    rows="6"
+                    placeholder="輸入備註、細節、相關連結…"></textarea>
+        </div>
+
+        <div class="pro-actions">
+          <button class="pro-btn pro-btn--danger" (click)="deleteTask(t)">
+            <span class="material-icons" style="font-size: 16px;">delete</span>
+            刪除
+          </button>
+        </div>
+      </div>
+    </aside>
+
+  </main>
+</div>
