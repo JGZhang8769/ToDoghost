@@ -11,6 +11,7 @@ import { TaskService, Task } from '../../core/services/task.service';
 import { CategoryService, Category } from '../../core/services/category.service';
 import { WorkspaceService, Workspace } from '../../core/services/workspace.service';
 import { UserService, User } from '../../core/services/user.service';
+import { SvgIconComponent } from '../../core/svg-icon/svg-icon.component';
 
 type SmartList = 'today' | 'week' | 'urgent' | 'unscheduled' | 'completed' | 'inbox';
 
@@ -56,7 +57,7 @@ const USER_COLORS = [
 @Component({
   selector: 'app-pro-mobile-view',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, SvgIconComponent],
   templateUrl: './pro-mobile-view.component.html',
   styleUrl: './pro-mobile-view.component.scss',
 })
