@@ -1,254 +1,161 @@
-<div class="pmob-shell" [class.pmob-sheet-full]="sheetSnap() === 'full'">
+<div class="pmob-home">
 
-  <!-- Animated gradient background, matches desktop Pro -->
-  <div class="pmob-bg" aria-hidden="true">
-    <div class="pmob-bg__blob pmob-bg__blob--a"></div>
-    <div class="pmob-bg__blob pmob-bg__blob--b"></div>
-  </div>
+  <!-- Background tint -->
+  <div class="pmob-home__bg" aria-hidden="true"></div>
 
-  <!-- Top bar -->
-  <header class="pmob-topbar">
-    <button class="pmob-iconbtn" (click)="openSidebar()" aria-label="開啟側邊欄">
-      <span class="material-icons" style="font-size: 22px;">menu</span>
-    </button>
+  <!-- ============ Scrollable content ============ -->
+  <main class="pmob-home__scroll ios-scroll">
 
-    <div class="pmob-topbar__center">
-      <button class="pmob-period" (click)="prevPeriod()" aria-label="上一個">
-        <span class="material-icons" style="font-size: 18px;">chevron_left</span>
-      </button>
-      <div class="pmob-topbar__title">
-        <button class="pmob-title-btn" (click)="goToToday()">
-          {{ calGrain === 'month' ? currentMonthStr : currentWeekStr }}
-        </button>
-      </div>
-      <button class="pmob-period" (click)="nextPeriod()" aria-label="下一個">
-        <span class="material-icons" style="font-size: 18px;">chevron_right</span>
-      </button>
-    </div>
-
-    <button class="pmob-iconbtn" (click)="openCreate()" aria-label="新增代辦">
-      <span class="material-icons" style="font-size: 22px;">add</span>
-    </button>
-  </header>
-
-  <!-- Grain switcher -->
-  <div class="pmob-grain">
-    <button class="pmob-grain__btn" [class.is-active]="calGrain === 'month'" (click)="setGrain('month')">月</button>
-    <button class="pmob-grain__btn" [class.is-active]="calGrain === 'week'" (click)="setGrain('week')">週</button>
-  </div>
-
-  <!-- Main calendar surface. Sized so the bottom sheet's snap heights leave
-       it a comfortable amount of room. -->
-  <main class="pmob-main">
-    <!-- Month grid -->
-    <div *ngIf="calGrain === 'month'" class="pmob-month">
-      <div class="pmob-month__weekheader">
-        <span *ngFor="let day of ['一','二','三','四','五','六','日']">{{ day }}</span>
-      </div>
-      <div class="pmob-month__grid">
-        <button *ngFor="let d of calendarDays"
-                class="pmob-day"
-                [class.is-other-month]="!d.isCurrentMonth"
-                [class.is-today]="d.isToday"
-                [class.is-selected]="d.dateStr === selectedDateStr"
-                (click)="selectDate(d.dateStr)">
-          <span class="pmob-day__num">{{ d.dayNum }}</span>
-          <span *ngIf="d.lunarLabel" class="pmob-day__lunar"
-                [class.is-solar-term]="d.isSolarTerm">{{ d.lunarLabel }}</span>
-          <span *ngIf="d.hasTasks" class="pmob-day__dot"
-                [class.is-urgent]="d.hasUrgent"></span>
-        </button>
-      </div>
-    </div>
-
-    <!-- Week strip + per-day list (lighter than the desktop hour-grid) -->
-    <div *ngIf="calGrain === 'week'" class="pmob-week">
-      <div class="pmob-week__strip">
-        <button *ngFor="let d of weekDays"
-                class="pmob-week__day"
-                [class.is-today]="d.isToday"
-                [class.is-selected]="d.dateStr === selectedDateStr"
-                (click)="selectDate(d.dateStr)">
-          <span class="pmob-week__dayname">{{ ['一','二','三','四','五','六','日'][weekDays.indexOf(d)] }}</span>
-          <span class="pmob-week__daynum">{{ d.dayNum }}</span>
-          <span *ngIf="d.hasTasks" class="pmob-day__dot"
-                [class.is-urgent]="d.hasUrgent"></span>
-        </button>
-      </div>
-    </div>
-  </main>
-
-  <!-- ============ Bottom sheet ============ -->
-  <div class="pmob-sheet pmob-glass"
-       [class.is-dragging]="sheetDragging()"
-       [class.is-mini]="sheetSnap() === 'mini'"
-       [style.height]="sheetHeightStyle()">
-
-    <!-- Drag handle area; whole top bar acts as a grab strip. -->
-    <div class="pmob-sheet__handle"
-         (touchstart)="startSheetDrag($event)"
-         (mousedown)="startSheetDrag($event)">
-      <div class="pmob-sheet__bar"></div>
-    </div>
-
-    <!-- Header row: date / unscheduled chip / count -->
-    <div class="pmob-sheet__head">
-      <div class="pmob-sheet__title">
-        <button class="pmob-sheet__mode"
-                [class.is-active]="sheetMode() === 'date'"
-                (click)="sheetMode.set('date')">
-          {{ selectedDateStr }}
-        </button>
-        <button class="pmob-sheet__mode pmob-sheet__mode--chip"
-                [class.is-active]="sheetMode() === 'unscheduled'"
-                (click)="sheetMode.set('unscheduled')">
-          <span class="material-icons" style="font-size: 14px;">event_busy</span>
-          未排程 ({{ unscheduledCount() }})
-        </button>
-      </div>
-      <span class="pmob-sheet__count">{{ sheetTaskList.length }}</span>
-    </div>
-
-    <!-- Task list -->
-    <div class="pmob-sheet__body ios-scroll">
-      <div *ngIf="sheetTaskList.length === 0" class="pmob-empty">
-        <span class="material-icons" style="font-size: 32px;">checklist</span>
-        <p>{{ sheetMode() === 'unscheduled' ? '沒有未排程的代辦' : '這天沒有代辦' }}</p>
-      </div>
-
-      <button *ngFor="let t of sheetTaskList"
-              class="pmob-row"
-              [class.is-urgent]="t.isUrgent && t.status !== 'completed'"
-              [class.is-done]="t.status === 'completed'"
-              [style.--user-bar]="userColor(t.createdBy)?.bar"
-              (click)="openTask(t)">
-        <button class="pmob-check"
-                (click)="toggleCompletion(t, $event)"
-                [class.is-checked]="t.status === 'completed'"
-                [attr.aria-label]="t.status === 'completed' ? '標為未完成' : '標為已完成'">
-          <span *ngIf="t.status === 'completed'" class="material-icons" style="font-size: 14px;">check</span>
-        </button>
-        <div class="pmob-row__main">
-          <div class="pmob-row__title">
-            <ng-container *ngIf="categoryFor(t.categoryId) as cat">
-              <span *ngIf="cat.icon && !isEmoji(cat.icon)" class="material-icons pmob-row__catico">{{ cat.icon }}</span>
-              <span *ngIf="cat.icon && isEmoji(cat.icon)" class="pmob-row__catico">{{ cat.icon }}</span>
-            </ng-container>
-            <span class="pmob-row__titletext">{{ t.title }}</span>
-            <span *ngIf="t.isUrgent" class="material-icons pmob-row__urg">priority_high</span>
-          </div>
-          <div class="pmob-row__meta" *ngIf="t.startTime || t.description || (t.tags?.length && t.tags.length > 0)">
-            <span *ngIf="t.startTime" class="tabular-nums">{{ t.startTime }}<span *ngIf="t.endTime"> - {{ t.endTime }}</span></span>
-            <span *ngFor="let tag of (t.tags || [])" class="pmob-row__tag">#{{ tag }}</span>
-            <span *ngIf="t.description" class="pmob-row__desc">{{ t.description }}</span>
-          </div>
+    <!-- Top headline: date + lunar -->
+    <header class="pmob-home__head">
+      <div class="pmob-home__date">
+        <div class="pmob-home__date-main">{{ selectedDateStr() }}</div>
+        <div class="pmob-home__date-sub">
+          <span>{{ headlineDayName }}</span>
+          <span *ngIf="headlineLunar.label"
+                class="pmob-home__lunar"
+                [class.is-solar-term]="headlineLunar.isSolarTerm">
+            · {{ headlineLunar.label }}
+          </span>
+          <span *ngIf="isHeadlineToday" class="pmob-home__today-chip">今天</span>
         </div>
-        <span class="material-icons pmob-row__chev">chevron_right</span>
-      </button>
-    </div>
-  </div>
-
-  <!-- ============ Sidebar overlay ============ -->
-  <div *ngIf="sidebarOpen()" class="pmob-sidebar-scrim" (click)="closeSidebar()"></div>
-  <aside class="pmob-sidebar pmob-glass" [class.is-open]="sidebarOpen()">
-    <header class="pmob-sidebar__head">
-      <button class="pmob-iconbtn" (click)="closeSidebar()" aria-label="關閉">
-        <span class="material-icons" style="font-size: 22px;">close</span>
-      </button>
-      <span class="pmob-sidebar__brand">
-        <app-svg-icon name="logo_main" width="22px" height="22px"></app-svg-icon>
-        <span>{{ currentWorkspace?.name || 'ToDoghost' }}</span>
-      </span>
-      <button class="pmob-iconbtn" (click)="backToClassic()" aria-label="返回經典版">
-        <span class="material-icons" style="font-size: 22px;">arrow_back</span>
+      </div>
+      <button class="pmob-home__profile" (click)="backToClassic()" title="返回經典版">
+        <span class="material-icons" style="font-size: 22px;">arrow_back_ios_new</span>
       </button>
     </header>
 
-    <div class="pmob-sidebar__body ios-scroll">
-      <section class="pmob-sidebar__section">
-        <h4 class="pmob-sidebar__heading">清單</h4>
-        <button class="pmob-nav" [class.is-active]="isSelectedList('inbox')" (click)="selectSmartList('inbox')">
-          <span class="pmob-nav__icon" style="background: linear-gradient(135deg, #94a3b8, #64748b);">
-            <span class="material-icons" style="font-size: 14px;">inbox</span>
-          </span>
-          <span class="pmob-nav__label">收件匣</span>
-          <span class="pmob-nav__count">{{ smartListCount('inbox') }}</span>
-        </button>
-        <button class="pmob-nav" [class.is-active]="isSelectedList('today')" (click)="selectSmartList('today')">
-          <span class="pmob-nav__icon" style="background: linear-gradient(135deg, #fbbf24, #f59e0b);">
-            <span class="material-icons" style="font-size: 14px;">wb_sunny</span>
-          </span>
-          <span class="pmob-nav__label">今日</span>
-          <span class="pmob-nav__count">{{ smartListCount('today') }}</span>
-        </button>
-        <button class="pmob-nav" [class.is-active]="isSelectedList('week')" (click)="selectSmartList('week')">
-          <span class="pmob-nav__icon" style="background: linear-gradient(135deg, #60a5fa, #3b82f6);">
-            <span class="material-icons" style="font-size: 14px;">date_range</span>
-          </span>
-          <span class="pmob-nav__label">本週</span>
-          <span class="pmob-nav__count">{{ smartListCount('week') }}</span>
-        </button>
-        <button class="pmob-nav" [class.is-active]="isSelectedList('urgent')" (click)="selectSmartList('urgent')">
-          <span class="pmob-nav__icon" style="background: linear-gradient(135deg, #f87171, #ef4444);">
-            <span class="material-icons" style="font-size: 14px;">priority_high</span>
-          </span>
-          <span class="pmob-nav__label">緊急</span>
-          <span class="pmob-nav__count">{{ smartListCount('urgent') }}</span>
-        </button>
-        <button class="pmob-nav" [class.is-active]="isSelectedList('unscheduled')" (click)="selectSmartList('unscheduled')">
-          <span class="pmob-nav__icon" style="background: linear-gradient(135deg, #c4b5fd, #8b5cf6);">
-            <span class="material-icons" style="font-size: 14px;">event_busy</span>
-          </span>
-          <span class="pmob-nav__label">未排程</span>
-          <span class="pmob-nav__count">{{ smartListCount('unscheduled') }}</span>
-        </button>
-        <button class="pmob-nav" [class.is-active]="isSelectedList('completed')" (click)="selectSmartList('completed')">
-          <span class="pmob-nav__icon" style="background: linear-gradient(135deg, #86efac, #22c55e);">
-            <span class="material-icons" style="font-size: 14px;">done_all</span>
-          </span>
-          <span class="pmob-nav__label">已完成</span>
-          <span class="pmob-nav__count">{{ smartListCount('completed') }}</span>
-        </button>
-      </section>
+    <!-- Week strip -->
+    <section class="pmob-week-strip">
+      <button *ngFor="let d of weekStrip()"
+              class="pmob-week-strip__day"
+              [class.is-today]="d.isToday"
+              [class.is-selected]="d.isSelected"
+              (click)="selectWeekDay(d.dateStr)">
+        <span class="pmob-week-strip__name">{{ d.dayName }}</span>
+        <span class="pmob-week-strip__num">{{ d.dayNum }}</span>
+        <span class="pmob-week-strip__dot"
+              [class.is-urgent]="d.hasUrgent"
+              [class.is-empty]="!d.hasTasks"></span>
+      </button>
+    </section>
 
-      <section class="pmob-sidebar__section" *ngIf="categories.length > 0">
-        <h4 class="pmob-sidebar__heading">分類</h4>
-        <button *ngFor="let cat of categories" class="pmob-nav"
-                [class.is-active]="isSelectedCategory(cat.id)"
-                (click)="selectCategoryList(cat)">
-          <span class="pmob-nav__icon" style="background: linear-gradient(135deg, #d6cab7, #b5a78a);">
-            <span *ngIf="cat.icon && !isEmoji(cat.icon)" class="material-icons" style="font-size: 14px;">{{ cat.icon }}</span>
-            <span *ngIf="cat.icon && isEmoji(cat.icon)" style="font-size: 14px;">{{ cat.icon }}</span>
+    <!-- "Open month calendar" link -->
+    <button class="pmob-home__monthlink" (click)="openMonth()">
+      <span class="material-icons" style="font-size: 18px;">calendar_month</span>
+      查看月曆
+      <span class="material-icons" style="font-size: 18px; margin-left: auto;">chevron_right</span>
+    </button>
+
+    <!-- Smart list cards (2x2) -->
+    <section class="pmob-cards">
+      <button class="pmob-card pmob-card--today" (click)="openSmartList('today')">
+        <span class="pmob-card__icon">
+          <span class="material-icons" style="font-size: 22px;">wb_sunny</span>
+        </span>
+        <span class="pmob-card__count">{{ smartListCount('today') }}</span>
+        <span class="pmob-card__label">今日</span>
+      </button>
+      <button class="pmob-card pmob-card--week" (click)="openSmartList('week')">
+        <span class="pmob-card__icon">
+          <span class="material-icons" style="font-size: 22px;">date_range</span>
+        </span>
+        <span class="pmob-card__count">{{ smartListCount('week') }}</span>
+        <span class="pmob-card__label">本週</span>
+      </button>
+      <button class="pmob-card pmob-card--urgent" (click)="openSmartList('urgent')">
+        <span class="pmob-card__icon">
+          <span class="material-icons" style="font-size: 22px;">priority_high</span>
+        </span>
+        <span class="pmob-card__count">{{ smartListCount('urgent') }}</span>
+        <span class="pmob-card__label">緊急</span>
+      </button>
+      <button class="pmob-card pmob-card--unscheduled" (click)="openSmartList('unscheduled')">
+        <span class="pmob-card__icon">
+          <span class="material-icons" style="font-size: 22px;">event_busy</span>
+        </span>
+        <span class="pmob-card__count">{{ smartListCount('unscheduled') }}</span>
+        <span class="pmob-card__label">未排程</span>
+      </button>
+    </section>
+
+    <!-- Categories list -->
+    <section class="pmob-group" *ngIf="categories.length > 0 || noCategoryCount() > 0">
+      <h4 class="pmob-group__title">我的分類</h4>
+      <div class="pmob-group__card">
+        <button *ngFor="let c of categories" class="pmob-grouprow" (click)="openCategoryList(c)">
+          <span class="pmob-grouprow__icon" style="background: linear-gradient(135deg, #d6cab7, #b5a78a);">
+            <ng-container *ngIf="c.icon && !isEmoji(c.icon)">
+              <span class="material-icons" style="font-size: 14px;">{{ c.icon }}</span>
+            </ng-container>
+            <span *ngIf="c.icon && isEmoji(c.icon)" style="font-size: 14px;">{{ c.icon }}</span>
           </span>
-          <span class="pmob-nav__label">{{ cat.name }}</span>
-          <span class="pmob-nav__count">{{ categoryCount(cat.id) }}</span>
+          <span class="pmob-grouprow__label">{{ c.name }}</span>
+          <span class="pmob-grouprow__count">{{ categoryCount(c.id) }}</span>
+          <span class="material-icons pmob-grouprow__chev">chevron_right</span>
         </button>
-        <button class="pmob-nav"
-                [class.is-active]="isSelectedNoCategory()"
-                (click)="selectNoCategoryList()"
-                *ngIf="noCategoryCount() > 0">
-          <span class="pmob-nav__icon" style="background: linear-gradient(135deg, #e5e5e5, #a3a3a3); color: #fff;">
+        <button class="pmob-grouprow" *ngIf="noCategoryCount() > 0" (click)="openNoCategoryList()">
+          <span class="pmob-grouprow__icon" style="background: linear-gradient(135deg, #e5e5e5, #a3a3a3); color: #fff;">
             <span class="material-icons" style="font-size: 14px;">block</span>
           </span>
-          <span class="pmob-nav__label">無分類</span>
-          <span class="pmob-nav__count">{{ noCategoryCount() }}</span>
+          <span class="pmob-grouprow__label">無分類</span>
+          <span class="pmob-grouprow__count">{{ noCategoryCount() }}</span>
+          <span class="material-icons pmob-grouprow__chev">chevron_right</span>
         </button>
-      </section>
-
-      <section class="pmob-sidebar__section" *ngIf="workspaceUsers.length > 1">
-        <h4 class="pmob-sidebar__heading">建立者</h4>
-        <button *ngFor="let u of workspaceUsers" class="pmob-nav"
-                [class.is-active]="isSelectedUser(u.id)"
-                (click)="selectUserList(u)">
-          <span class="pmob-nav__icon"
-                [style.background]="userColor(u.id)?.avatar"
-                [style.color]="userColor(u.id)?.text">
-            <span style="font-size: 11px; font-weight: 800;">{{ userInitial(u.id) }}</span>
+        <button class="pmob-grouprow" (click)="openSmartList('inbox')">
+          <span class="pmob-grouprow__icon" style="background: linear-gradient(135deg, #94a3b8, #64748b);">
+            <span class="material-icons" style="font-size: 14px;">inbox</span>
           </span>
-          <span class="pmob-nav__label">{{ u.name }}</span>
-          <span class="pmob-nav__count">{{ userCount(u.id) }}</span>
+          <span class="pmob-grouprow__label">所有代辦</span>
+          <span class="pmob-grouprow__count">{{ smartListCount('inbox') }}</span>
+          <span class="material-icons pmob-grouprow__chev">chevron_right</span>
         </button>
-      </section>
-    </div>
-  </aside>
+        <button class="pmob-grouprow" (click)="openSmartList('completed')">
+          <span class="pmob-grouprow__icon" style="background: linear-gradient(135deg, #86efac, #22c55e);">
+            <span class="material-icons" style="font-size: 14px;">done_all</span>
+          </span>
+          <span class="pmob-grouprow__label">已完成</span>
+          <span class="pmob-grouprow__count">{{ smartListCount('completed') }}</span>
+          <span class="material-icons pmob-grouprow__chev">chevron_right</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Collaborators -->
+    <section class="pmob-group" *ngIf="workspaceUsers.length > 1">
+      <h4 class="pmob-group__title">建立者</h4>
+      <div class="pmob-group__chips">
+        <button *ngFor="let u of workspaceUsers" class="pmob-userchip"
+                [style.background]="userColor(u.id)?.avatar"
+                [style.color]="userColor(u.id)?.text"
+                (click)="openUserList(u)">
+          <span class="pmob-userchip__avatar" [style.background]="userColor(u.id)?.bar">
+            {{ userInitial(u.id) }}
+          </span>
+          <span>{{ u.name }}</span>
+          <span class="pmob-userchip__count">{{ userCount(u.id) }}</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Spacer so quick-add bar doesn't overlap last row -->
+    <div class="pmob-home__spacer"></div>
+  </main>
+
+  <!-- ============ Docked quick add ============ -->
+  <div class="pmob-quickadd">
+    <span class="material-icons pmob-quickadd__icon">edit_note</span>
+    <input class="pmob-quickadd__input"
+           [ngModel]="quickAddTitle()"
+           (ngModelChange)="quickAddTitle.set($event)"
+           (keydown.enter)="submitQuickAdd()"
+           placeholder="新增代辦…"
+           inputmode="text">
+    <button class="pmob-quickadd__btn"
+            [class.is-ready]="quickAddTitle().trim().length > 0"
+            (click)="openCreateFromQuick()"
+            [title]="quickAddTitle().trim() ? '展開填寫細節' : '新增代辦'">
+      <span class="material-icons" style="font-size: 20px;">{{ quickAddTitle().trim() ? 'arrow_upward' : 'add' }}</span>
+    </button>
+  </div>
 </div>

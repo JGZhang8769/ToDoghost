@@ -1,9 +1,9 @@
-import { Component, HostListener, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
-import { addDays, addMonths, addWeeks, endOfMonth, endOfWeek, format, isSameMonth, startOfMonth, startOfWeek, subMonths, subWeeks } from 'date-fns';
+import { addDays, endOfWeek, format, startOfWeek } from 'date-fns';
 // @ts-ignore — pure JS lib, no types shipped
 import { getLunar } from 'chinese-lunar-calendar';
 
@@ -11,30 +11,18 @@ import { TaskService, Task } from '../../core/services/task.service';
 import { CategoryService, Category } from '../../core/services/category.service';
 import { WorkspaceService, Workspace } from '../../core/services/workspace.service';
 import { UserService, User } from '../../core/services/user.service';
-import { SvgIconComponent } from '../../core/svg-icon/svg-icon.component';
 
-type CalGrain = 'month' | 'week';
-type SmartList = 'inbox' | 'today' | 'week' | 'urgent' | 'unscheduled' | 'completed';
-type SelectedList = SmartList | { kind: 'category'; id: string } | { kind: 'category-none' } | { kind: 'user'; id: string };
-/** Three bottom-sheet snap heights in vh, à la Apple Maps. */
-type SheetSnap = 'mini' | 'half' | 'full';
+type SmartList = 'today' | 'week' | 'urgent' | 'unscheduled' | 'completed' | 'inbox';
 
-interface CalendarDay {
+interface WeekDot {
   dateStr: string;
   dayNum: number;
-  isCurrentMonth: boolean;
+  dayName: string;
   isToday: boolean;
+  isSelected: boolean;
   hasTasks: boolean;
   hasUrgent: boolean;
-  lunarLabel: string;
-  isSolarTerm: boolean;
 }
-
-const SHEET_HEIGHTS: Record<SheetSnap, number> = {
-  mini: 96,   // px peeking above the bottom — just shows date + count + drag handle
-  half: 0.5,  // 50vh
-  full: 0.92, // 92vh
-};
 
 const USER_COLORS = [
   { bar: '#3b82f6', avatar: '#dbeafe', text: '#1d4ed8' },
@@ -45,10 +33,20 @@ const USER_COLORS = [
   { bar: '#14b8a6', avatar: '#ccfbf1', text: '#0f766e' },
 ];
 
+/**
+ * Pro Mobile home screen, redesigned to match Apple Reminders' card-first feel:
+ * - Top region: short week strip + "view calendar" link.
+ * - Middle: 2x2 smart-list cards (Today / This Week / Urgent / Unscheduled).
+ * - Below: 「我的分類」 grouped list and 「建立者」 chips for collab.
+ * - Bottom: docked quick-add bar — type + Enter creates an unscheduled task.
+ *
+ * All deep navigation pushes a new route (/pro/list, /pro/month, /pro/task/:id,
+ * /pro/new) — no in-page sheets. iOS-style "page push" feel.
+ */
 @Component({
   selector: 'app-pro-mobile-view',
   standalone: true,
-  imports: [CommonModule, FormsModule, SvgIconComponent],
+  imports: [CommonModule, FormsModule],
   templateUrl: './pro-mobile-view.component.html',
   styleUrl: './pro-mobile-view.component.scss',
 })
@@ -67,34 +65,14 @@ export class ProMobileViewComponent implements OnInit, OnDestroy {
   categories: Category[] = [];
   workspaceUsers: User[] = [];
 
-  // ----- View state -----
-  calGrain: CalGrain = 'month';
-  currentDate = new Date();
-  selectedDateStr = format(new Date(), 'yyyy-MM-dd');
-  selectedList: SelectedList = 'today';
-  searchQuery = '';
+  // ----- UI state -----
+  searchQuery = signal('');
+  quickAddTitle = signal('');
+  weekStrip = signal<WeekDot[]>([]);
+  /** Headline date the user is "viewing" — drives the week strip dot. */
+  selectedDateStr = signal(format(new Date(), 'yyyy-MM-dd'));
 
-  // ----- Calendar -----
-  calendarDays: CalendarDay[] = [];
-  weekDays: CalendarDay[] = [];
-  currentMonthStr = '';
-  currentWeekStr = '';
-
-  // ----- Sidebar overlay -----
-  sidebarOpen = signal(false);
-
-  // ----- Bottom sheet -----
-  sheetSnap = signal<SheetSnap>('half');
-  /** True while the user is dragging the sheet handle. */
-  sheetDragging = signal(false);
-  sheetDragOffset = signal(0); // px from the snap height
-  private sheetDragStartY = 0;
-  private sheetDragStartHeight = 0;
-
-  /** 'date' = show selectedDateStr's tasks, 'unscheduled' = show unscheduled bucket. */
-  sheetMode = signal<'date' | 'unscheduled'>('date');
-
-  // ----- Lunar mapping (zh-TW solar terms) -----
+  // Lunar / solar terms zh-TW mapping
   private static readonly SOLAR_TERM_TW: Record<string, string> = {
     '立春': '立春', '雨水': '雨水', '惊蛰': '驚蟄', '春分': '春分',
     '清明': '清明', '谷雨': '穀雨', '立夏': '立夏', '小满': '小滿',
@@ -111,8 +89,7 @@ export class ProMobileViewComponent implements OnInit, OnDestroy {
       this.currentWorkspace = ws;
       this.taskService.getTasks(ws.id).pipe(takeUntil(this.destroy$)).subscribe(tasks => {
         this.tasks = tasks;
-        this.buildCalendar();
-        this.buildWeek();
+        this.buildWeekStrip();
       });
       this.categoryService.getCategories(ws.id).pipe(takeUntil(this.destroy$)).subscribe(cats => {
         this.categories = cats.sort((a, b) => a.order - b.order);
@@ -124,8 +101,7 @@ export class ProMobileViewComponent implements OnInit, OnDestroy {
       const filtered = memberIds.size > 0 ? users.filter(u => memberIds.has(u.id)) : users;
       this.workspaceUsers = [...filtered].sort((a, b) => a.id.localeCompare(b.id));
     });
-    this.buildCalendar();
-    this.buildWeek();
+    this.buildWeekStrip();
   }
 
   ngOnDestroy() {
@@ -133,172 +109,31 @@ export class ProMobileViewComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
-  // ----- Filtering -----
-  passesGlobalFilter(task: Task): boolean {
-    const sel = this.selectedList;
-    if (typeof sel === 'object') {
-      if (sel.kind === 'category' && task.categoryId !== sel.id) return false;
-      if (sel.kind === 'category-none' && task.categoryId) return false;
-      if (sel.kind === 'user' && task.createdBy !== sel.id) return false;
-    }
-    const q = this.searchQuery.trim().toLowerCase();
-    if (q) {
-      const hay = (task.title + ' ' + (task.description ?? '') + ' ' + (task.tags ?? []).join(' ')).toLowerCase();
-      if (!hay.includes(q)) return false;
-    }
-    return true;
-  }
-
-  tasksForDate(dateStr: string): Task[] {
-    return this.tasks
-      .filter(t => t.date === dateStr && this.passesGlobalFilter(t))
-      .sort((a, b) => {
-        if (a.status !== b.status) return a.status === 'completed' ? 1 : -1;
-        const at = a.startTime ?? '99:99';
-        const bt = b.startTime ?? '99:99';
-        if (at !== bt) return at < bt ? -1 : 1;
-        return (a.order ?? 0) - (b.order ?? 0);
-      });
-  }
-
-  unscheduledTasks(): Task[] {
-    return this.tasks
-      .filter(t => !t.date && t.status !== 'completed' && this.passesGlobalFilter(t))
-      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-  }
-
-  unscheduledCount(): number { return this.unscheduledTasks().length; }
-
-  // ----- Calendar build -----
-  buildCalendar() {
-    const monthStart = startOfMonth(this.currentDate);
-    const monthEnd = endOfMonth(this.currentDate);
-    const gridStart = startOfWeek(monthStart, { weekStartsOn: 1 });
-    const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
-    const todayStr = format(new Date(), 'yyyy-MM-dd');
-    const days: CalendarDay[] = [];
-    let d = gridStart;
-    while (d <= gridEnd) {
-      const dateStr = format(d, 'yyyy-MM-dd');
-      const dayTasks = this.tasks.filter(t => t.date === dateStr && this.passesGlobalFilter(t));
-      const lunar = this.lunarLabelFor(dateStr);
-      days.push({
-        dateStr,
-        dayNum: d.getDate(),
-        isCurrentMonth: isSameMonth(d, this.currentDate),
-        isToday: dateStr === todayStr,
-        hasTasks: dayTasks.length > 0,
-        hasUrgent: dayTasks.some(t => t.isUrgent && t.status !== 'completed'),
-        lunarLabel: lunar.label,
-        isSolarTerm: lunar.isSolarTerm,
-      });
-      d = addDays(d, 1);
-    }
-    this.calendarDays = days;
-    this.currentMonthStr = format(this.currentDate, 'yyyy 年 M 月');
-  }
-
-  buildWeek() {
-    const start = startOfWeek(this.currentDate, { weekStartsOn: 1 });
-    const end = endOfWeek(this.currentDate, { weekStartsOn: 1 });
-    const todayStr = format(new Date(), 'yyyy-MM-dd');
-    const days: CalendarDay[] = [];
+  // ----- Derived data -----
+  buildWeekStrip() {
+    // Always show the current week relative to today, not selectedDateStr —
+    // home should feel anchored to "now". User can tap any dot to jump.
+    const today = new Date();
+    const todayStr = format(today, 'yyyy-MM-dd');
+    const start = startOfWeek(today, { weekStartsOn: 1 });
+    const names = ['一', '二', '三', '四', '五', '六', '日'];
+    const sel = this.selectedDateStr();
+    const result: WeekDot[] = [];
     for (let i = 0; i < 7; i++) {
       const d = addDays(start, i);
-      const dateStr = format(d, 'yyyy-MM-dd');
-      const dayTasks = this.tasks.filter(t => t.date === dateStr && this.passesGlobalFilter(t));
-      const lunar = this.lunarLabelFor(dateStr);
-      days.push({
-        dateStr,
+      const ds = format(d, 'yyyy-MM-dd');
+      const dayTasks = this.tasks.filter(t => t.date === ds && t.status !== 'completed');
+      result.push({
+        dateStr: ds,
         dayNum: d.getDate(),
-        isCurrentMonth: true,
-        isToday: dateStr === todayStr,
+        dayName: names[i],
+        isToday: ds === todayStr,
+        isSelected: ds === sel,
         hasTasks: dayTasks.length > 0,
-        hasUrgent: dayTasks.some(t => t.isUrgent && t.status !== 'completed'),
-        lunarLabel: lunar.label,
-        isSolarTerm: lunar.isSolarTerm,
+        hasUrgent: dayTasks.some(t => t.isUrgent),
       });
     }
-    this.weekDays = days;
-    this.currentWeekStr = `${format(start, 'M/d')} – ${format(end, 'M/d')}`;
-  }
-
-  // ----- Navigation -----
-  setGrain(grain: CalGrain) {
-    this.calGrain = grain;
-    localStorage.setItem('pro-mobile:calGrain', grain);
-  }
-
-  prevPeriod() {
-    this.currentDate = this.calGrain === 'month' ? subMonths(this.currentDate, 1) : subWeeks(this.currentDate, 1);
-    this.buildCalendar();
-    this.buildWeek();
-  }
-
-  nextPeriod() {
-    this.currentDate = this.calGrain === 'month' ? addMonths(this.currentDate, 1) : addWeeks(this.currentDate, 1);
-    this.buildCalendar();
-    this.buildWeek();
-  }
-
-  goToToday() {
-    this.currentDate = new Date();
-    this.selectedDateStr = format(new Date(), 'yyyy-MM-dd');
-    this.buildCalendar();
-    this.buildWeek();
-  }
-
-  selectDate(dateStr: string) {
-    this.selectedDateStr = dateStr;
-    this.sheetMode.set('date');
-    if (this.sheetSnap() === 'mini') this.sheetSnap.set('half');
-  }
-
-  // ----- Sidebar -----
-  openSidebar() { this.sidebarOpen.set(true); }
-  closeSidebar() { this.sidebarOpen.set(false); }
-
-  selectSmartList(list: SmartList) {
-    this.selectedList = list;
-    if (list === 'today' || list === 'week') {
-      this.currentDate = new Date();
-      this.selectedDateStr = format(new Date(), 'yyyy-MM-dd');
-    }
-    this.buildCalendar();
-    this.buildWeek();
-    this.closeSidebar();
-  }
-
-  selectCategoryList(cat: Category) {
-    this.selectedList = { kind: 'category', id: cat.id };
-    this.buildCalendar();
-    this.buildWeek();
-    this.closeSidebar();
-  }
-
-  selectNoCategoryList() {
-    this.selectedList = { kind: 'category-none' };
-    this.buildCalendar();
-    this.buildWeek();
-    this.closeSidebar();
-  }
-
-  selectUserList(user: User) {
-    this.selectedList = { kind: 'user', id: user.id };
-    this.buildCalendar();
-    this.buildWeek();
-    this.closeSidebar();
-  }
-
-  isSelectedList(list: SmartList): boolean { return this.selectedList === list; }
-  isSelectedCategory(catId: string): boolean {
-    return typeof this.selectedList === 'object' && this.selectedList.kind === 'category' && this.selectedList.id === catId;
-  }
-  isSelectedNoCategory(): boolean {
-    return typeof this.selectedList === 'object' && this.selectedList.kind === 'category-none';
-  }
-  isSelectedUser(userId: string): boolean {
-    return typeof this.selectedList === 'object' && this.selectedList.kind === 'user' && this.selectedList.id === userId;
+    this.weekStrip.set(result);
   }
 
   smartListCount(list: SmartList): number {
@@ -315,104 +150,104 @@ export class ProMobileViewComponent implements OnInit, OnDestroy {
     }
     return 0;
   }
+
   categoryCount(catId: string): number {
     return this.tasks.filter(t => t.categoryId === catId && t.status !== 'completed').length;
   }
+
   noCategoryCount(): number {
     return this.tasks.filter(t => !t.categoryId && t.status !== 'completed').length;
   }
+
   userCount(userId: string): number {
     return this.tasks.filter(t => t.createdBy === userId && t.status !== 'completed').length;
   }
 
-  // ----- Bottom sheet drag -----
-  startSheetDrag(e: TouchEvent | MouseEvent) {
-    const y = this.eventClientY(e);
-    this.sheetDragStartY = y;
-    this.sheetDragStartHeight = this.snapHeightPx(this.sheetSnap());
-    this.sheetDragging.set(true);
-    this.sheetDragOffset.set(0);
-    if (e instanceof MouseEvent) e.preventDefault();
+  // ----- Headline -----
+  get headlineDate(): string {
+    const ds = this.selectedDateStr();
+    return ds;
+  }
+  get headlineDayName(): string {
+    const [y, m, d] = this.selectedDateStr().split('-').map(Number);
+    const names = ['週日', '週一', '週二', '週三', '週四', '週五', '週六'];
+    return names[new Date(y, m - 1, d).getDay()];
+  }
+  get headlineLunar(): { label: string; isSolarTerm: boolean } {
+    return this.lunarLabelFor(this.selectedDateStr());
+  }
+  get isHeadlineToday(): boolean {
+    return this.selectedDateStr() === format(new Date(), 'yyyy-MM-dd');
   }
 
-  @HostListener('document:mousemove', ['$event'])
-  @HostListener('document:touchmove', ['$event'])
-  onSheetDragMove(e: TouchEvent | MouseEvent) {
-    if (!this.sheetDragging()) return;
-    const y = this.eventClientY(e);
-    // dragging up = negative delta → height grows; dragging down = positive → shrink.
-    const delta = this.sheetDragStartY - y;
-    this.sheetDragOffset.set(delta);
-    if (e.cancelable && 'preventDefault' in e) e.preventDefault();
+  // ----- Navigation -----
+  selectWeekDay(dateStr: string) {
+    this.selectedDateStr.set(dateStr);
+    this.buildWeekStrip();
+    // Push the day's list immediately so users see their tasks for that day
+    // — tapping a date in iOS Calendar / Reminders feels meaningless if nothing
+    // happens.
+    this.router.navigate(['/pro/list', 'date-' + dateStr]);
   }
 
-  @HostListener('document:mouseup')
-  @HostListener('document:touchend')
-  @HostListener('document:touchcancel')
-  endSheetDrag() {
-    if (!this.sheetDragging()) return;
-    const finalHeight = this.sheetDragStartHeight + this.sheetDragOffset();
-    this.sheetSnap.set(this.nearestSnap(finalHeight));
-    this.sheetDragging.set(false);
-    this.sheetDragOffset.set(0);
+  openSmartList(list: SmartList) {
+    this.router.navigate(['/pro/list', list]);
+  }
+  openCategoryList(cat: Category) {
+    this.router.navigate(['/pro/list', 'cat-' + cat.id]);
+  }
+  openNoCategoryList() {
+    this.router.navigate(['/pro/list', 'cat-none']);
+  }
+  openUserList(user: User) {
+    this.router.navigate(['/pro/list', 'user-' + user.id]);
   }
 
-  /** Translates a SheetSnap into its current pixel height, accounting for vh units. */
-  private snapHeightPx(snap: SheetSnap): number {
-    const h = SHEET_HEIGHTS[snap];
-    if (snap === 'mini') return h as number;
-    return (h as number) * window.innerHeight;
+  openMonth() {
+    this.router.navigate(['/pro/month']);
   }
 
-  private nearestSnap(heightPx: number): SheetSnap {
-    const mini = this.snapHeightPx('mini');
-    const half = this.snapHeightPx('half');
-    const full = this.snapHeightPx('full');
-    const candidates: [SheetSnap, number][] = [['mini', mini], ['half', half], ['full', full]];
-    let best: SheetSnap = 'half';
-    let bestDist = Infinity;
-    for (const [snap, target] of candidates) {
-      const d = Math.abs(heightPx - target);
-      if (d < bestDist) { bestDist = d; best = snap; }
-    }
-    return best;
-  }
-
-  /** CSS height value to apply during drag / on rest. */
-  sheetHeightStyle(): string {
-    const base = this.snapHeightPx(this.sheetSnap());
-    if (!this.sheetDragging()) return base + 'px';
-    const live = Math.max(48, Math.min(window.innerHeight - 16, base + this.sheetDragOffset()));
-    return live + 'px';
-  }
-
-  private eventClientY(e: TouchEvent | MouseEvent): number {
-    if ('touches' in e) {
-      return e.touches[0]?.clientY ?? e.changedTouches[0]?.clientY ?? 0;
-    }
-    return e.clientY;
-  }
-
-  // ----- Task actions -----
-  async toggleCompletion(task: Task, ev?: Event) {
-    if (ev) { ev.stopPropagation(); ev.preventDefault(); }
-    const next = task.status === 'completed' ? 'pending' : 'completed';
-    await this.taskService.updateTask(task.id, { status: next });
-  }
-
-  /** Tap a task → push the full-screen detail / edit view. */
-  openTask(task: Task) {
-    this.router.navigate(['/pro/task', task.id]);
-  }
-
-  /** + button → push the full-screen create view, pre-filled with the
-   *  currently selected calendar date. */
   openCreate() {
-    this.router.navigate(['/pro/new'], { queryParams: { date: this.selectedDateStr } });
+    this.router.navigate(['/pro/new'], { queryParams: { date: this.selectedDateStr() } });
   }
 
   backToClassic() {
     this.router.navigate(['/main']);
+  }
+
+  // ----- Quick add -----
+  async submitQuickAdd() {
+    const title = this.quickAddTitle().trim();
+    if (!title || !this.currentWorkspace || !this.currentUser) return;
+    const maxOrder = this.tasks.reduce((m, t) => Math.max(m, t.order ?? 0), 0);
+    await this.taskService.addTask({
+      workspaceId: this.currentWorkspace.id,
+      title,
+      // Quick-add is intentionally fast: it drops the task into the
+      // unscheduled bucket so the user can plan it later from the list.
+      date: null,
+      startTime: null,
+      endTime: null,
+      tags: [],
+      isUrgent: false,
+      createdBy: this.currentUser.id,
+      status: 'pending',
+      reminderOffset: null,
+      order: maxOrder + 1,
+    } as any);
+    this.quickAddTitle.set('');
+  }
+
+  /** Click the right-side arrow on the quick-add bar → open the full form
+   *  pre-filled with whatever's in the input. */
+  openCreateFromQuick() {
+    const title = this.quickAddTitle().trim();
+    if (title) {
+      this.router.navigate(['/pro/new'], { queryParams: { date: this.selectedDateStr(), title } });
+      this.quickAddTitle.set('');
+    } else {
+      this.openCreate();
+    }
   }
 
   // ----- Helpers -----
@@ -444,10 +279,6 @@ export class ProMobileViewComponent implements OnInit, OnDestroy {
     return '';
   }
 
-  categoryFor(catId?: string): Category | undefined {
-    return this.categories.find(c => c.id === catId);
-  }
-
   isEmoji(str: string): boolean {
     if (!str) return false;
     return /\p{Extended_Pictographic}/u.test(str);
@@ -460,25 +291,8 @@ export class ProMobileViewComponent implements OnInit, OnDestroy {
     return USER_COLORS[idx % USER_COLORS.length];
   }
 
-  userName(userId: string | undefined): string {
-    if (!userId) return '';
-    return this.workspaceUsers.find(u => u.id === userId)?.name ?? '';
-  }
-
   userInitial(userId: string | undefined): string {
-    const name = this.userName(userId);
-    return name ? name[0] : '?';
-  }
-
-  /** Today's task list, shown as the default sheet content for selectedDateStr. */
-  get sheetTitle(): string {
-    if (this.sheetMode() === 'unscheduled') return '未排程';
-    return this.selectedDateStr;
-  }
-
-  get sheetTaskList(): Task[] {
-    return this.sheetMode() === 'unscheduled'
-      ? this.unscheduledTasks()
-      : this.tasksForDate(this.selectedDateStr);
+    if (!userId) return '?';
+    return (this.workspaceUsers.find(u => u.id === userId)?.name ?? '?')[0];
   }
 }
