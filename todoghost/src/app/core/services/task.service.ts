@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { Firestore, collection, collectionData, doc, addDoc, updateDoc, deleteDoc, query, where, serverTimestamp } from '@angular/fire/firestore';
+import { Firestore, collection, collectionData, doc, addDoc, updateDoc, deleteDoc, deleteField, query, where, serverTimestamp } from '@angular/fire/firestore';
 import { Observable } from 'rxjs';
 
 export interface Task {
@@ -55,10 +55,20 @@ export class TaskService {
   async updateTask(taskId: string, data: Partial<Task>) {
     const taskRef = doc(this.firestore, `tasks/${taskId}`);
     try {
-      // Remove undefined values
-      const cleanData = Object.fromEntries(
-        Object.entries(data).filter(([_, v]) => v !== undefined)
-      );
+      // Map values:
+      //   undefined → strip (caller didn't pass this key)
+      //   null on optional fields (categoryId) → deleteField() so Firestore
+      //     actually removes the property; passing literal null leaves stale
+      //     data on read and won't match `where(..., '==', undefined)` queries.
+      const cleanData: Record<string, any> = {};
+      for (const [k, v] of Object.entries(data)) {
+        if (v === undefined) continue;
+        if (v === null && k === 'categoryId') {
+          cleanData[k] = deleteField();
+        } else {
+          cleanData[k] = v;
+        }
+      }
 
       await updateDoc(taskRef, {
         ...cleanData,
