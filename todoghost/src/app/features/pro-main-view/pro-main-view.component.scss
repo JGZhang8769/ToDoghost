@@ -1618,35 +1618,28 @@
 }
 
 /* The source element that's currently being dragged.
-   Keep its layout space (so siblings don't collapse and jump around when
-   the drag starts / ends), just hide its content. Using visibility +
-   opacity rather than display: none preserves the original height/width
-   in every container — critical for the week timeline where events are
-   absolutely positioned and a missing event would let siblings recalculate
-   their column packing. */
+   Stay in place at 30% opacity instead of hiding entirely — that way:
+     1. The "ghost" stays grounded so users see exactly where the drag
+        started; no visual hole opens up to the right of it (which the
+        user saw as "the cell pulled apart a bit").
+     2. siblings don't even attempt to reflow, because the source still
+        occupies the same flex/grid slot.
+     3. transform: none defeats CDK's translate3d on the source — only the
+        preview clone (.cdk-drag-preview) should move with the cursor. */
 .pro-row.is-drag-source,
 .pro-day__task.is-drag-source,
 .pro-week__chip.is-drag-source,
 .pro-week__event.is-drag-source,
 .cdk-drag-placeholder {
-    visibility: hidden !important;
-    opacity: 0 !important;
-    /* Belt and braces: stop any CDK-applied transform from translating the
-       ghost around, since visibility:hidden still respects transforms. */
+    opacity: 0.3 !important;
     transform: none !important;
+    pointer-events: none !important;
+    transition: opacity 0.12s ease !important;
 }
 
-/* In-list reorder still benefits from a visible insertion target, so the
-   list pane upgrades the placeholder from invisible to a dashed slot.
-   visibility: visible to re-show the auto-generated placeholder above. */
-.pro-listpane__rows .cdk-drag-placeholder {
-    visibility: visible !important;
-    opacity: 0.4 !important;
-    background: rgba(120, 100, 80, 0.12);
-    border: 2px dashed rgba(120, 100, 80, 0.3);
-    border-radius: 12px;
-    min-height: 36px;
-}
+/* sortingDisabled (PR #53) removed the in-list reorder preview, so the
+   list pane no longer needs the dashed placeholder slot. The 30% source
+   styling above handles all containers uniformly. */
 
 /* Category icon inside calendar / week pills — kept small so the title still
    gets most of the horizontal room. */
