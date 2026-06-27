@@ -426,8 +426,10 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
 
   // ---------- Lifecycle ----------
   ngOnInit() {
-    const savedLayout = localStorage.getItem('pro:layoutMode') as LayoutMode | null;
-    if (savedLayout === 'calendar-first' || savedLayout === 'list-first') this.layoutMode = savedLayout;
+    // list-first layout was removed from the UI (caused several layout-sync
+    // bugs and didn't differ enough from calendar-first to be worth keeping).
+    // Force calendar-first regardless of any previously saved preference.
+    this.layoutMode = 'calendar-first';
     const savedGrain = localStorage.getItem('pro:calGrain') as CalGrain | null;
     if (savedGrain === 'month' || savedGrain === 'week') this.calGrain = savedGrain;
     const lw = parseInt(localStorage.getItem('pro:leftWidth') ?? '', 10);

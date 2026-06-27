@@ -40,22 +40,6 @@
         </button>
       </div>
 
-      <!-- Layout primary: calendar-first / list-first -->
-      <div class="pro-segment">
-        <button type="button" class="pro-segment__btn"
-              [class.is-active]="layoutMode === 'calendar-first'"
-              (click)="setLayout('calendar-first')">
-          <span class="material-icons" style="font-size: 16px;">view_quilt</span>
-          <span>月曆為主</span>
-        </button>
-        <button type="button" class="pro-segment__btn"
-              [class.is-active]="layoutMode === 'list-first'"
-              (click)="setLayout('list-first')">
-          <span class="material-icons" style="font-size: 16px;">view_list</span>
-          <span>清單為主</span>
-        </button>
-      </div>
-
       <button class="pro-add" (click)="openCreateForSelectedDate()" title="新增到 {{ selectedDateStr }}">
         <span class="material-icons" style="font-size: 18px;">add</span>
         <span>新增</span>
@@ -275,7 +259,10 @@
               <div *ngFor="let h of dayHours" class="pro-week__hour-label">{{ h }}:00</div>
             </div>
             <div *ngFor="let d of weekDays" class="pro-week__col"
-                 [class.is-today]="d.isToday">
+                 [class.is-today]="d.isToday"
+                 cdkDropList
+                 [cdkDropListData]="d.timedBlocks"
+                 (cdkDropListDropped)="dropOnDate($event, d.dateStr)">
               <div *ngFor="let h of dayHours" class="pro-week__hour-cell"
                    (dblclick)="openCreateForDateTime(d.dateStr, h)"></div>
               <div *ngFor="let block of d.timedBlocks"
