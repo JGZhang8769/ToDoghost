@@ -28,6 +28,19 @@ export class MainViewComponent implements OnInit, OnDestroy {
       this.contextMenuState.show = false;
   }
 
+  @HostListener('document:mousemove', ['$event'])
+  @HostListener('document:touchmove', ['$event'])
+  onDocumentDrawerMove(e: TouchEvent | MouseEvent) {
+    if (this.drawerDrag.dragging) this.moveDrawerDrag(e);
+  }
+
+  @HostListener('document:mouseup')
+  @HostListener('document:touchend')
+  @HostListener('document:touchcancel')
+  onDocumentDrawerUp() {
+    if (this.drawerDrag.dragging) this.endDrawerDrag();
+  }
+
   private workspaceService = inject(WorkspaceService);
   private taskService = inject(TaskService);
   private categoryService = inject(CategoryService);
@@ -113,6 +126,92 @@ isDropdownOpen = false;
 
   contextMenuState = { show: false, x: 0, y: 0, task: null as any };
   isDragging = false;
+
+  // iOS bottom-sheet drag state — handles rubber-band & snap on the two
+  // bottom drawers (drawerOpen = unassigned tasks, scheduledDrawerOpen = day list).
+  // dragOffset is positive when finger drags down from current open position.
+  drawerDrag = {
+    target: null as null | 'unassigned' | 'scheduled',
+    startY: 0,
+    offset: 0,
+    dragging: false,
+    didMove: false,
+  };
+
+  // Suppress the click that fires right after a touchend/mouseup
+  // when the user actually dragged the handle.
+  suppressNextDrawerClick(): boolean {
+    if (this.drawerDrag.didMove) {
+      this.drawerDrag.didMove = false;
+      return true;
+    }
+    return false;
+  }
+
+  startDrawerDrag(target: 'unassigned' | 'scheduled', e: TouchEvent | MouseEvent) {
+    if (e instanceof MouseEvent && e.button !== 0) return;
+    this.drawerDrag.target = target;
+    this.drawerDrag.startY = this.eventClientY(e);
+    this.drawerDrag.offset = 0;
+    this.drawerDrag.dragging = true;
+  }
+
+  moveDrawerDrag(e: TouchEvent | MouseEvent) {
+    if (!this.drawerDrag.dragging) return;
+    const delta = this.eventClientY(e) - this.drawerDrag.startY;
+    if (Math.abs(delta) > 4) this.drawerDrag.didMove = true;
+    const isOpen = this.drawerDrag.target === 'unassigned' ? this.drawerOpen : this.scheduledDrawerOpen;
+    // When open: only allow dragging down (delta > 0). When closed: only up (delta < 0).
+    // Rubber-band the disallowed direction by dividing by 3.
+    let next = delta;
+    if (isOpen && delta < 0) next = delta / 3;
+    if (!isOpen && delta > 0) next = delta / 3;
+    this.drawerDrag.offset = next;
+    if (e.cancelable) e.preventDefault();
+  }
+
+  endDrawerDrag() {
+    if (!this.drawerDrag.dragging) return;
+    const target = this.drawerDrag.target;
+    const offset = this.drawerDrag.offset;
+    const threshold = 80; // px past which we toggle state
+    if (target === 'unassigned') {
+      if (this.drawerOpen && offset > threshold) this.drawerOpen = false;
+      else if (!this.drawerOpen && offset < -threshold) this.drawerOpen = true;
+    } else if (target === 'scheduled') {
+      if (this.scheduledDrawerOpen && offset > threshold) this.scheduledDrawerOpen = false;
+      else if (!this.scheduledDrawerOpen && offset < -threshold) this.scheduledDrawerOpen = true;
+    }
+    this.drawerDrag.target = null;
+    this.drawerDrag.offset = 0;
+    this.drawerDrag.dragging = false;
+  }
+
+  private eventClientY(e: TouchEvent | MouseEvent): number {
+    if ('touches' in e) {
+      return e.touches[0]?.clientY ?? e.changedTouches[0]?.clientY ?? 0;
+    }
+    return e.clientY;
+  }
+
+  drawerTransform(target: 'unassigned' | 'scheduled'): string {
+    const isOpen = target === 'unassigned' ? this.drawerOpen : this.scheduledDrawerOpen;
+    const isDraggingThis = this.drawerDrag.dragging && this.drawerDrag.target === target;
+    if (target === 'unassigned') {
+      // Closed state shows a peek of 60px above the bottom.
+      const base = isOpen ? 0 : `calc(100% - 60px)`;
+      if (!isDraggingThis) return `translateY(${typeof base === 'number' ? base + 'px' : base})`;
+      const baseNum = isOpen ? 0 : null;
+      if (baseNum !== null) return `translateY(${baseNum + this.drawerDrag.offset}px)`;
+      // closed: base = calc(100% - 60px); apply offset as additional translation
+      return `translateY(calc(100% - 60px + ${this.drawerDrag.offset}px))`;
+    } else {
+      const base = isOpen ? 0 : 100; // percent
+      if (!isDraggingThis) return `translateY(${base}%)`;
+      if (isOpen) return `translateY(${this.drawerDrag.offset}px)`;
+      return `translateY(calc(100% + ${this.drawerDrag.offset}px))`;
+    }
+  }
 
   // Swipe logic
   swipeState: Record<string, { offset: number, startX: number, startY: number, active: boolean, state: string }> = {};
