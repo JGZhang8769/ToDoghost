@@ -89,6 +89,16 @@ export class ProMobileViewComponent implements OnInit, OnDestroy {
   /** Title shown above the strip / grid: "2026 年 6 月" or "6/22 – 6/28". */
   periodTitle = signal('');
 
+  // Inline category create dialog state
+  showCategoryCreate = signal(false);
+  newCategoryName = signal('');
+  newCategoryIcon = signal('category');
+  readonly availableCategoryIcons = [
+    'home', 'work', 'fitness_center', 'restaurant', 'flight', 'shopping_cart',
+    'directions_car', 'music_note', 'local_cafe', 'school', 'pets', 'favorite',
+    'attach_money', 'event', 'cake', 'menu_book', 'brush', 'videogame_asset',
+  ];
+
   // Lunar / solar terms zh-TW mapping
   private static readonly SOLAR_TERM_TW: Record<string, string> = {
     '立春': '立春', '雨水': '雨水', '惊蛰': '驚蟄', '春分': '春分',
@@ -333,6 +343,30 @@ export class ProMobileViewComponent implements OnInit, OnDestroy {
     } else {
       this.openCreate();
     }
+  }
+
+  // ----- Inline category create -----
+  openCategoryCreate() {
+    this.newCategoryName.set('');
+    this.newCategoryIcon.set('category');
+    this.showCategoryCreate.set(true);
+  }
+  closeCategoryCreate() {
+    this.showCategoryCreate.set(false);
+  }
+  async submitCategoryCreate() {
+    const name = this.newCategoryName().trim();
+    if (!name || !this.currentWorkspace || !this.currentUser) return;
+    const maxOrder = this.categories.reduce((m, c) => Math.max(m, c.order ?? 0), -1);
+    await this.categoryService.addCategory({
+      workspaceId: this.currentWorkspace.id,
+      name,
+      icon: this.newCategoryIcon(),
+      order: maxOrder + 1,
+      createdBy: this.currentUser.id,
+      createdAt: Date.now(),
+    });
+    this.showCategoryCreate.set(false);
   }
 
   // ----- Helpers -----

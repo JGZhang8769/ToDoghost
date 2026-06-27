@@ -129,23 +129,20 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 14px;
+    padding: 10px 14px;
     gap: 12px;
     border: 0;
     background: transparent;
     text-align: left;
     cursor: pointer;
-    /* Belt-and-braces against flex overflow on narrow screens — without this,
-       a long category label + a wide native input can push the row beyond
-       the card and break the entire form layout. */
     box-sizing: border-box;
     width: 100%;
     min-width: 0;
-    /* Reserve enough vertical room for the iOS toggle (26px) and native
-       time/date inputs (~32px). Without this, rows in edit mode got
-       squashed by their siblings — create mode lacked the extra 「已完成」
-       row so the bug only surfaced when editing. */
-    min-height: 52px;
+    /* min-height alone wasn't enough — iOS Safari renders native date/time
+       inputs at ~28-32px which got clipped when the row tried to compress.
+       Bumping to 56px guarantees toggle (26px) + native input (~32px) +
+       padding always fit without iOS deciding to ellipsise the contents. */
+    min-height: 56px;
 }
 .pmt-row + .pmt-row {
     border-top: 1px solid rgba(120, 100, 80, 0.08);
@@ -165,6 +162,10 @@
 .pmt-row > .pmt-input {
     min-width: 0;
     max-width: 60%;
+    /* Don't let the native input get squashed vertically — iOS picks the
+       larger of intrinsic height / our height, so set it explicitly. */
+    min-height: 32px;
+    line-height: 1.2;
 }
 
 /* Native inputs styled to match */

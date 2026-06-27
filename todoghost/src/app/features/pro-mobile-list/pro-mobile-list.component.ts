@@ -65,6 +65,9 @@ export class ProMobileListComponent implements OnInit, OnDestroy {
   schedulingTaskId = signal<string | null>(null);
   pickerDate = signal<string>(format(new Date(), 'yyyy-MM-dd'));
 
+  /** Task currently waiting for delete confirmation (triggered by left swipe). */
+  pendingDeleteTask = signal<Task | null>(null);
+
   ngOnInit() {
     this.scope.set(this.route.snapshot.paramMap.get('scope') ?? 'inbox');
 
@@ -194,9 +197,20 @@ export class ProMobileListComponent implements OnInit, OnDestroy {
     await this.taskService.updateTask(task.id, { status: next });
   }
 
-  /** Left-swipe handler — soft-delete with no confirm to keep the gesture snappy. */
-  async onSwipeDelete(task: Task) {
-    await this.taskService.deleteTask(task.id);
+  /**
+   * Left-swipe → show an iOS-style confirm dialog before actually deleting.
+   * Swipe distance alone isn't conclusive enough for a destructive action;
+   * users wanted a safety net.
+   */
+  onSwipeDelete(task: Task) {
+    this.pendingDeleteTask.set(task);
+  }
+  cancelDelete() { this.pendingDeleteTask.set(null); }
+  async confirmDelete() {
+    const t = this.pendingDeleteTask();
+    if (!t) return;
+    await this.taskService.deleteTask(t.id);
+    this.pendingDeleteTask.set(null);
   }
 
   // ----- Schedule unscheduled task -----

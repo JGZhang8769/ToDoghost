@@ -112,8 +112,13 @@
     </section>
 
     <!-- Categories list -->
-    <section class="pmob-group" *ngIf="categories.length > 0 || noCategoryCount() > 0">
-      <h4 class="pmob-group__title">我的分類</h4>
+    <section class="pmob-group">
+      <div class="pmob-group__head">
+        <h4 class="pmob-group__title">我的分類</h4>
+        <button class="pmob-group__add" (click)="openCategoryCreate()" aria-label="新增分類">
+          <span class="material-icons" style="font-size: 18px;">add</span>
+        </button>
+      </div>
       <div class="pmob-group__card">
         <button *ngFor="let c of categories" class="pmob-grouprow" (click)="openCategoryList(c)">
           <span class="pmob-grouprow__icon" style="background: linear-gradient(135deg, #d6cab7, #b5a78a);">
@@ -189,5 +194,34 @@
             [title]="quickAddTitle().trim() ? '送出' : '新增代辦'">
       <span class="material-icons" style="font-size: 20px;">{{ quickAddTitle().trim() ? 'arrow_upward' : 'add' }}</span>
     </button>
+  </div>
+
+  <!-- ============ Inline new-category dialog ============ -->
+  <div *ngIf="showCategoryCreate()" class="pmob-catnew-scrim" (click)="closeCategoryCreate()">
+    <div class="pmob-catnew" (click)="$event.stopPropagation()">
+      <div class="pmob-catnew__head">
+        <h3>新增分類</h3>
+      </div>
+      <input class="pmob-catnew__name"
+             [ngModel]="newCategoryName()"
+             (ngModelChange)="newCategoryName.set($event)"
+             (keydown.enter)="submitCategoryCreate()"
+             placeholder="分類名稱"
+             autofocus>
+      <div class="pmob-catnew__icons">
+        <button *ngFor="let ic of availableCategoryIcons"
+                class="pmob-catnew__icon"
+                [class.is-active]="newCategoryIcon() === ic"
+                (click)="newCategoryIcon.set(ic)">
+          <span class="material-icons" style="font-size: 18px;">{{ ic }}</span>
+        </button>
+      </div>
+      <div class="pmob-catnew__actions">
+        <button class="pmob-catnew__btn pmob-catnew__btn--cancel" (click)="closeCategoryCreate()">取消</button>
+        <button class="pmob-catnew__btn pmob-catnew__btn--save"
+                [disabled]="!newCategoryName().trim()"
+                (click)="submitCategoryCreate()">建立</button>
+      </div>
+    </div>
   </div>
 </div>
