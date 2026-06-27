@@ -1,6 +1,7 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { PushNotificationService } from './core/services/push-notification.service';
+import { AppUpdateService } from './core/services/app-update.service';
 
 @Component({
   selector: 'app-root',
@@ -10,10 +11,12 @@ import { PushNotificationService } from './core/services/push-notification.servi
 })
 export class AppComponent implements OnInit {
   private pushService = inject(PushNotificationService);
+  private appUpdate = inject(AppUpdateService);
 
   ngOnInit() {
      this.pushService.listen();
      this.preventIOSSwipeNavigation();
+     this.appUpdate.init();
   }
 
   private preventIOSSwipeNavigation() {
