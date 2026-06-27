@@ -208,13 +208,19 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
       filtered = this.tasks;
     }
 
+    // Search filter is shared with calendar/week via passesGlobalFilter().
+    // We don't call passesGlobalFilter() directly here because the smart-list
+    // branches above already apply the category/user narrowing — instead just
+    // re-use the search portion to keep the surfaces in sync.
     const q = this.searchQuery.trim().toLowerCase();
     if (q) {
-      filtered = filtered.filter(t =>
-        t.title.toLowerCase().includes(q) ||
-        (t.description ?? '').toLowerCase().includes(q) ||
-        (t.tags ?? []).some(tag => tag.toLowerCase().includes(q))
-      );
+      filtered = filtered.filter(t => {
+        const hay =
+          t.title.toLowerCase() + ' ' +
+          (t.description ?? '').toLowerCase() + ' ' +
+          (t.tags ?? []).join(' ').toLowerCase();
+        return hay.includes(q);
+      });
     }
 
     return filtered.sort((a, b) => {
@@ -287,11 +293,27 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
   passesGlobalFilter(task: Task): boolean {
     const sel = this.selectedList as any;
     if (typeof sel === 'object' && sel !== null) {
-      if (sel.kind === 'category') return task.categoryId === sel.id;
-      if (sel.kind === 'category-none') return !task.categoryId;
-      if (sel.kind === 'user') return task.createdBy === sel.id;
+      if (sel.kind === 'category' && task.categoryId !== sel.id) return false;
+      if (sel.kind === 'category-none' && task.categoryId) return false;
+      if (sel.kind === 'user' && task.createdBy !== sel.id) return false;
+    }
+    // Search applies to every surface (calendar, week, day pane, list pane)
+    // so the user sees the same filtered set everywhere.
+    const q = this.searchQuery.trim().toLowerCase();
+    if (q) {
+      const hay =
+        task.title.toLowerCase() + ' ' +
+        (task.description ?? '').toLowerCase() + ' ' +
+        (task.tags ?? []).join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
     }
     return true;
+  }
+
+  /** Called from the search input — rebuild calendar/week as the user types. */
+  onSearchChange() {
+    this.buildCalendar();
+    this.buildWeek();
   }
 
   /** All tasks (including completed) for a given dateStr, sorted by startTime then order. */
