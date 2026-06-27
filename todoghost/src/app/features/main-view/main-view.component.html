@@ -559,10 +559,14 @@
 
       <!-- Bottom Drawer handle & Backdrop -->
       <div *ngIf="drawerOpen" class="fixed inset-0 bg-black/20 z-30 transition-opacity" (click)="drawerOpen = false"></div>
-      <div class="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md rounded-t-3xl shadow-[0_-4px_15px_rgba(0,0,0,0.1)] border border-milktea-200/50 transition-transform duration-300 z-40 max-w-3xl mx-auto flex flex-col max-h-[50vh] min-h-[50vh]"
-           [style.transform]="drawerOpen ? 'translateY(0)' : 'translateY(calc(100% - 60px))'">
-        <div class="h-[60px] shrink-0 flex items-center justify-center cursor-pointer relative" (click)="drawerOpen = !drawerOpen">
-          <div class="w-12 h-1.5 bg-milktea-200 rounded-full mb-1"></div>
+      <div class="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md rounded-t-3xl shadow-[0_-4px_15px_rgba(0,0,0,0.1)] border border-milktea-200/50 z-40 max-w-3xl mx-auto flex flex-col max-h-[50vh] min-h-[50vh] ios-drawer"
+           [class.is-dragging]="drawerDrag.dragging && drawerDrag.target === 'unassigned'"
+           [style.transform]="drawerTransform('unassigned')">
+        <div class="h-[60px] shrink-0 flex items-center justify-center cursor-grab active:cursor-grabbing relative touch-none select-none"
+             (click)="!suppressNextDrawerClick() && (drawerOpen = !drawerOpen)"
+             (touchstart)="startDrawerDrag('unassigned', $event)"
+             (mousedown)="startDrawerDrag('unassigned', $event)">
+          <div class="w-12 h-1.5 bg-milktea-300 rounded-full mb-1"></div>
           <span class="absolute right-6 bg-milktea-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">未排程 ({{ unassignedTasks.length }})</span>
         </div>
 
@@ -620,11 +624,15 @@
 
       <!-- Scheduled Task Drawer -->
       <div *ngIf="scheduledDrawerOpen" class="fixed inset-0 bg-black/20 z-[60] transition-opacity" (click)="scheduledDrawerOpen = false"></div>
-      <div class="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md rounded-t-3xl shadow-[0_-4px_15px_rgba(0,0,0,0.1)] border border-milktea-200/50 transition-transform duration-300 z-[65] max-w-3xl mx-auto flex flex-col max-h-[50vh] min-h-[50vh]"
-           [style.transform]="scheduledDrawerOpen ? 'translateY(0)' : 'translateY(100%)'">
-        <div class="h-[60px] shrink-0 flex items-center justify-between px-6 cursor-pointer relative border-b border-milktea-100" (click)="scheduledDrawerOpen = !scheduledDrawerOpen">
+      <div class="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md rounded-t-3xl shadow-[0_-4px_15px_rgba(0,0,0,0.1)] border border-milktea-200/50 z-[65] max-w-3xl mx-auto flex flex-col max-h-[50vh] min-h-[50vh] ios-drawer"
+           [class.is-dragging]="drawerDrag.dragging && drawerDrag.target === 'scheduled'"
+           [style.transform]="drawerTransform('scheduled')">
+        <div class="h-[60px] shrink-0 flex items-center justify-between px-6 cursor-grab active:cursor-grabbing relative border-b border-milktea-100 touch-none select-none"
+             (click)="!suppressNextDrawerClick() && (scheduledDrawerOpen = !scheduledDrawerOpen)"
+             (touchstart)="startDrawerDrag('scheduled', $event)"
+             (mousedown)="startDrawerDrag('scheduled', $event)">
           <span class="font-bold text-milktea-900">{{ scheduledDrawerDate }} 排程</span>
-          <div class="w-12 h-1.5 bg-milktea-200 rounded-full absolute left-1/2 -translate-x-1/2 top-2"></div>
+          <div class="w-12 h-1.5 bg-milktea-300 rounded-full absolute left-1/2 -translate-x-1/2 top-2"></div>
           <span class="bg-milktea-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">{{ scheduledDrawerTasks.length }}</span>
         </div>
 
