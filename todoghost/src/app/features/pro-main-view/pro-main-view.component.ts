@@ -133,6 +133,19 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
   createForm: NewTaskForm = this.blankCreateForm();
   createFormTagInput = '';
 
+  // Inline category create (lives in left sidebar)
+  showCategoryCreate = false;
+  newCategoryName = '';
+  newCategoryIcon = 'category';
+  readonly availableCategoryIcons = [
+    'home', 'work', 'fitness_center', 'restaurant', 'flight', 'shopping_cart',
+    'directions_car', 'music_note', 'local_cafe', 'school', 'pets', 'favorite',
+    'attach_money', 'event', 'cake', 'menu_book', 'brush', 'videogame_asset',
+  ];
+
+  // Inline confirm dialog (replaces window.confirm for delete)
+  confirmDialog: null | { title: string; message: string; action: () => void } = null;
+
   // Calendar data
   calendarDays: CalendarDay[] = [];
   weekDays: WeekDay[] = [];
@@ -595,6 +608,15 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     this.selectedList = list;
     this.selectedTaskId = null;
     this.inspectorMode = 'day';
+    // Sync calendar focus so the month/week view scrolls to match the
+    // semantic scope of the chosen list (otherwise the user sees, e.g.,
+    // "今日" highlighted but the calendar is still parked on a past month).
+    if (list === 'today' || list === 'week') {
+      this.currentDate = new Date();
+      this.selectedDateStr = format(new Date(), 'yyyy-MM-dd');
+      this.buildCalendar();
+      this.buildWeek();
+    }
   }
 
   selectCategoryList(cat: Category) {
@@ -691,10 +713,50 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     setTimeout(() => { this.selectedTaskId = id; this.inspectorMode = 'edit'; this.showInspector = true; }, 200);
   }
 
-  async deleteTask(task: Task) {
-    if (!confirm(`刪除「${task.title}」？`)) return;
-    await this.taskService.deleteTask(task.id);
-    if (this.selectedTaskId === task.id) this.selectedTaskId = null;
+  deleteTask(task: Task) {
+    this.confirmDialog = {
+      title: '刪除代辦',
+      message: `確定要刪除「${task.title}」嗎？此操作無法復原。`,
+      action: async () => {
+        await this.taskService.deleteTask(task.id);
+        if (this.selectedTaskId === task.id) {
+          this.selectedTaskId = null;
+          this.inspectorMode = 'day';
+        }
+        this.confirmDialog = null;
+      },
+    };
+  }
+
+  cancelConfirm() {
+    this.confirmDialog = null;
+  }
+
+  // ---------- Category mutations (sidebar inline create) ----------
+  openCategoryCreate() {
+    this.showCategoryCreate = true;
+    this.newCategoryName = '';
+    this.newCategoryIcon = 'category';
+  }
+
+  closeCategoryCreate() {
+    this.showCategoryCreate = false;
+  }
+
+  async submitCategoryCreate() {
+    const name = this.newCategoryName.trim();
+    if (!name || !this.currentWorkspace || !this.currentUser) return;
+    const maxOrder = this.categories.reduce((m, c) => Math.max(m, c.order ?? 0), -1);
+    await this.categoryService.addCategory({
+      workspaceId: this.currentWorkspace.id,
+      name,
+      icon: this.newCategoryIcon,
+      order: maxOrder + 1,
+      createdBy: this.currentUser.id,
+      createdAt: Date.now(),
+    });
+    this.showCategoryCreate = false;
+    this.newCategoryName = '';
   }
 
   async saveSelectedTask() {
@@ -711,6 +773,22 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
       categoryId: t.categoryId,
       reminderOffset: t.reminderOffset,
     });
+  }
+
+  /**
+   * Set or clear category. Passing null clears it (we route through
+   * TaskService.updateTask which translates null → deleteField()).
+   */
+  async setSelectedTaskCategory(categoryId: string | null) {
+    if (!this.selectedTask) return;
+    // Mutate local copy so UI updates immediately; Firestore round-trip will
+    // overwrite with the same value shortly.
+    if (categoryId === null) {
+      delete this.selectedTask.categoryId;
+    } else {
+      this.selectedTask.categoryId = categoryId;
+    }
+    await this.taskService.updateTask(this.selectedTask.id, { categoryId: categoryId as any });
   }
 
   // ---------- Drag & drop ----------

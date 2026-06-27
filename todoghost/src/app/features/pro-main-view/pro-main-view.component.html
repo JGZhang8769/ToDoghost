@@ -117,8 +117,13 @@
         </button>
       </section>
 
-      <section class="pro-sidebar__section" *ngIf="categories.length > 0">
-        <h4 class="pro-sidebar__heading">分類</h4>
+      <section class="pro-sidebar__section">
+        <div class="pro-sidebar__heading-row">
+          <h4 class="pro-sidebar__heading">分類</h4>
+          <button class="pro-sidebar__addbtn" title="新增分類" (click)="openCategoryCreate()">
+            <span class="material-icons" style="font-size: 16px;">add</span>
+          </button>
+        </div>
         <button *ngFor="let cat of categories" class="pro-nav" [class.is-active]="isSelectedCategory(cat.id)" (click)="selectCategoryList(cat)">
           <span class="pro-nav__icon" style="background: linear-gradient(135deg, #d6cab7, #b5a78a);">
             <span *ngIf="cat.icon && !isEmoji(cat.icon)" class="material-icons" style="font-size: 14px;">{{ cat.icon }}</span>
@@ -127,6 +132,30 @@
           <span class="pro-nav__label">{{ cat.name }}</span>
           <span class="pro-nav__count">{{ categoryCount(cat.id) }}</span>
         </button>
+
+        <!-- Inline new-category form -->
+        <div *ngIf="showCategoryCreate" class="pro-catnew">
+          <input class="pro-catnew__name"
+                 [(ngModel)]="newCategoryName"
+                 (keydown.enter)="submitCategoryCreate()"
+                 (keydown.escape)="closeCategoryCreate()"
+                 placeholder="分類名稱"
+                 autofocus>
+          <div class="pro-catnew__icons">
+            <button *ngFor="let ic of availableCategoryIcons"
+                    class="pro-catnew__icon"
+                    [class.is-active]="newCategoryIcon === ic"
+                    (click)="newCategoryIcon = ic">
+              <span class="material-icons" style="font-size: 14px;">{{ ic }}</span>
+            </button>
+          </div>
+          <div class="pro-catnew__actions">
+            <button class="pro-catnew__btn pro-catnew__btn--cancel" (click)="closeCategoryCreate()">取消</button>
+            <button class="pro-catnew__btn pro-catnew__btn--save"
+                    [disabled]="!newCategoryName.trim()"
+                    (click)="submitCategoryCreate()">建立</button>
+          </div>
+        </div>
       </section>
 
       <section class="pro-sidebar__section" *ngIf="workspaceUsers.length > 1">
@@ -508,13 +537,13 @@
           <div class="pro-field-block">
             <span class="pro-field__label">分類</span>
             <div class="pro-cat-grid">
-              <button class="pro-cat-chip" [class.is-active]="!t.categoryId" (click)="t.categoryId = undefined; saveSelectedTask()">
+              <button class="pro-cat-chip" [class.is-active]="!t.categoryId" (click)="setSelectedTaskCategory(null)">
                 <span class="material-icons" style="font-size: 14px;">block</span>
                 無分類
               </button>
               <button *ngFor="let c of categories" class="pro-cat-chip"
                       [class.is-active]="t.categoryId === c.id"
-                      (click)="t.categoryId = c.id; saveSelectedTask()">
+                      (click)="setSelectedTaskCategory(c.id)">
                 <span *ngIf="c.icon && !isEmoji(c.icon)" class="material-icons" style="font-size: 14px;">{{ c.icon }}</span>
                 <span *ngIf="c.icon && isEmoji(c.icon)" style="font-size: 14px;">{{ c.icon }}</span>
                 {{ c.name }}
@@ -677,4 +706,18 @@
     </aside>
 
   </main>
+
+  <!-- ====== iOS-style confirm dialog (replaces window.confirm) ====== -->
+  <div *ngIf="confirmDialog" class="pro-confirm-scrim" (click)="cancelConfirm()">
+    <div class="pro-confirm" (click)="$event.stopPropagation()">
+      <div class="pro-confirm__head">
+        <h3>{{ confirmDialog.title }}</h3>
+        <p>{{ confirmDialog.message }}</p>
+      </div>
+      <div class="pro-confirm__actions">
+        <button class="pro-confirm__btn pro-confirm__btn--cancel" (click)="cancelConfirm()">取消</button>
+        <button class="pro-confirm__btn pro-confirm__btn--danger" (click)="confirmDialog.action()">刪除</button>
+      </div>
+    </div>
+  </div>
 </div>
