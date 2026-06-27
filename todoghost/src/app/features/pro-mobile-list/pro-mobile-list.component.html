@@ -90,4 +90,18 @@
       </div>
     </div>
   </div>
+
+  <!-- ============ Delete confirm (from row swipe) ============ -->
+  <div *ngIf="pendingDeleteTask()" class="pml-confirm-scrim" (click)="cancelDelete()">
+    <div class="pml-confirm" (click)="$event.stopPropagation()">
+      <div class="pml-confirm__head">
+        <h3>刪除代辦</h3>
+        <p>「{{ pendingDeleteTask()!.title }}」此操作無法復原</p>
+      </div>
+      <div class="pml-confirm__actions">
+        <button class="pml-confirm__btn pml-confirm__btn--cancel" (click)="cancelDelete()">取消</button>
+        <button class="pml-confirm__btn pml-confirm__btn--danger" (click)="confirmDelete()">刪除</button>
+      </div>
+    </div>
+  </div>
 </div>
