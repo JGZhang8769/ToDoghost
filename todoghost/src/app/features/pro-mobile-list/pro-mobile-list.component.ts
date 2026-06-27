@@ -1,5 +1,5 @@
 import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule, Location } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
@@ -49,6 +49,7 @@ export class ProMobileListComponent implements OnInit, OnDestroy {
   private userService = inject(UserService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
+  private location = inject(Location);
   private destroy$ = new Subject<void>();
 
   // ----- Data -----
@@ -188,7 +189,7 @@ export class ProMobileListComponent implements OnInit, OnDestroy {
   }
 
   // ----- Actions -----
-  back() { this.router.navigate(['/pro']); }
+  back() { this.location.back(); }
   openTask(task: Task) { this.router.navigate(['/pro/task', task.id]); }
 
   openCreate() {
@@ -202,12 +203,6 @@ export class ProMobileListComponent implements OnInit, OnDestroy {
 
   async toggleCompletion(task: Task, ev?: Event) {
     if (ev) { ev.stopPropagation(); ev.preventDefault(); }
-    const next = task.status === 'completed' ? 'pending' : 'completed';
-    await this.taskService.updateTask(task.id, { status: next });
-  }
-
-  /** Right-swipe handler — mark complete (or toggle back). */
-  async onSwipeComplete(task: Task) {
     const next = task.status === 'completed' ? 'pending' : 'completed';
     await this.taskService.updateTask(task.id, { status: next });
   }

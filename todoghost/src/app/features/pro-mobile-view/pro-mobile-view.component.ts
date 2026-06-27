@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
-import { addDays, endOfWeek, format, startOfWeek } from 'date-fns';
+import { addDays, addMonths, addWeeks, endOfMonth, endOfWeek, format, isSameMonth, startOfMonth, startOfWeek, subMonths, subWeeks } from 'date-fns';
 // @ts-ignore — pure JS lib, no types shipped
 import { getLunar } from 'chinese-lunar-calendar';
 
@@ -18,6 +18,16 @@ interface WeekDot {
   dateStr: string;
   dayNum: number;
   dayName: string;
+  isToday: boolean;
+  isSelected: boolean;
+  hasTasks: boolean;
+  hasUrgent: boolean;
+}
+
+interface MonthCell {
+  dateStr: string;
+  dayNum: number;
+  isCurrentMonth: boolean;
   isToday: boolean;
   isSelected: boolean;
   hasTasks: boolean;
@@ -69,8 +79,15 @@ export class ProMobileViewComponent implements OnInit, OnDestroy {
   searchQuery = signal('');
   quickAddTitle = signal('');
   weekStrip = signal<WeekDot[]>([]);
-  /** Headline date the user is "viewing" — drives the week strip dot. */
+  monthCells = signal<MonthCell[]>([]);
+  /** When true, the home shows the full month grid; otherwise just the week strip. */
+  calExpanded = signal(false);
+  /** Anchor date for the visible week / month (advances with prev/next arrows). */
+  anchorDate = signal(new Date());
+  /** Headline date the user is "viewing" — drives the highlighted cell. */
   selectedDateStr = signal(format(new Date(), 'yyyy-MM-dd'));
+  /** Title shown above the strip / grid: "2026 年 6 月" or "6/22 – 6/28". */
+  periodTitle = signal('');
 
   // Lunar / solar terms zh-TW mapping
   private static readonly SOLAR_TERM_TW: Record<string, string> = {
@@ -84,12 +101,16 @@ export class ProMobileViewComponent implements OnInit, OnDestroy {
 
   // ----- Lifecycle -----
   ngOnInit() {
+    // Restore last expanded preference so the home stays consistent
+    // across reloads.
+    this.calExpanded.set(localStorage.getItem('pmob-home:calExpanded') === '1');
+
     this.workspaceService.currentWorkspace$.pipe(takeUntil(this.destroy$)).subscribe(ws => {
       if (!ws) { this.router.navigate(['/workspaces']); return; }
       this.currentWorkspace = ws;
       this.taskService.getTasks(ws.id).pipe(takeUntil(this.destroy$)).subscribe(tasks => {
         this.tasks = tasks;
-        this.buildWeekStrip();
+        this.rebuildCalendar();
       });
       this.categoryService.getCategories(ws.id).pipe(takeUntil(this.destroy$)).subscribe(cats => {
         this.categories = cats.sort((a, b) => a.order - b.order);
@@ -101,7 +122,7 @@ export class ProMobileViewComponent implements OnInit, OnDestroy {
       const filtered = memberIds.size > 0 ? users.filter(u => memberIds.has(u.id)) : users;
       this.workspaceUsers = [...filtered].sort((a, b) => a.id.localeCompare(b.id));
     });
-    this.buildWeekStrip();
+    this.rebuildCalendar();
   }
 
   ngOnDestroy() {
@@ -109,13 +130,19 @@ export class ProMobileViewComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
-  // ----- Derived data -----
+  // ----- Calendar build -----
+  /** Rebuild whichever grain is currently visible. Title always updates so
+   *  toggling between week and month is instantaneous and consistent. */
+  rebuildCalendar() {
+    if (this.calExpanded()) this.buildMonth();
+    else this.buildWeekStrip();
+  }
+
   buildWeekStrip() {
-    // Always show the current week relative to today, not selectedDateStr —
-    // home should feel anchored to "now". User can tap any dot to jump.
-    const today = new Date();
-    const todayStr = format(today, 'yyyy-MM-dd');
-    const start = startOfWeek(today, { weekStartsOn: 1 });
+    const anchor = this.anchorDate();
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    const start = startOfWeek(anchor, { weekStartsOn: 1 });
+    const end = endOfWeek(anchor, { weekStartsOn: 1 });
     const names = ['一', '二', '三', '四', '五', '六', '日'];
     const sel = this.selectedDateStr();
     const result: WeekDot[] = [];
@@ -134,6 +161,63 @@ export class ProMobileViewComponent implements OnInit, OnDestroy {
       });
     }
     this.weekStrip.set(result);
+    this.periodTitle.set(`${format(start, 'M/d')} – ${format(end, 'M/d')}`);
+  }
+
+  buildMonth() {
+    const anchor = this.anchorDate();
+    const monthStart = startOfMonth(anchor);
+    const monthEnd = endOfMonth(anchor);
+    const gridStart = startOfWeek(monthStart, { weekStartsOn: 1 });
+    const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    const sel = this.selectedDateStr();
+    const cells: MonthCell[] = [];
+    let d = gridStart;
+    while (d <= gridEnd) {
+      const ds = format(d, 'yyyy-MM-dd');
+      const dayTasks = this.tasks.filter(t => t.date === ds && t.status !== 'completed');
+      cells.push({
+        dateStr: ds,
+        dayNum: d.getDate(),
+        isCurrentMonth: isSameMonth(d, anchor),
+        isToday: ds === todayStr,
+        isSelected: ds === sel,
+        hasTasks: dayTasks.length > 0,
+        hasUrgent: dayTasks.some(t => t.isUrgent),
+      });
+      d = addDays(d, 1);
+    }
+    this.monthCells.set(cells);
+    this.periodTitle.set(format(anchor, 'yyyy 年 M 月'));
+  }
+
+  // ----- Calendar navigation -----
+  toggleCalExpanded() {
+    const next = !this.calExpanded();
+    this.calExpanded.set(next);
+    localStorage.setItem('pmob-home:calExpanded', next ? '1' : '0');
+    this.rebuildCalendar();
+  }
+
+  prevPeriod() {
+    this.anchorDate.set(this.calExpanded()
+      ? subMonths(this.anchorDate(), 1)
+      : subWeeks(this.anchorDate(), 1));
+    this.rebuildCalendar();
+  }
+
+  nextPeriod() {
+    this.anchorDate.set(this.calExpanded()
+      ? addMonths(this.anchorDate(), 1)
+      : addWeeks(this.anchorDate(), 1));
+    this.rebuildCalendar();
+  }
+
+  resetToToday() {
+    this.anchorDate.set(new Date());
+    this.selectedDateStr.set(format(new Date(), 'yyyy-MM-dd'));
+    this.rebuildCalendar();
   }
 
   smartListCount(list: SmartList): number {
@@ -181,12 +265,12 @@ export class ProMobileViewComponent implements OnInit, OnDestroy {
   }
 
   // ----- Navigation -----
-  selectWeekDay(dateStr: string) {
+  /** Tap a day in either the week strip or the month grid — push the list
+   *  for that day. Calendar still shows the highlight while the new page
+   *  loads on top, so when the user swipes back it stays visually anchored. */
+  selectCalendarDay(dateStr: string) {
     this.selectedDateStr.set(dateStr);
-    this.buildWeekStrip();
-    // Push the day's list immediately so users see their tasks for that day
-    // — tapping a date in iOS Calendar / Reminders feels meaningless if nothing
-    // happens.
+    this.rebuildCalendar();
     this.router.navigate(['/pro/list', 'date-' + dateStr]);
   }
 
@@ -201,10 +285,6 @@ export class ProMobileViewComponent implements OnInit, OnDestroy {
   }
   openUserList(user: User) {
     this.router.navigate(['/pro/list', 'user-' + user.id]);
-  }
-
-  openMonth() {
-    this.router.navigate(['/pro/month']);
   }
 
   openCreate() {
@@ -238,13 +318,18 @@ export class ProMobileViewComponent implements OnInit, OnDestroy {
     this.quickAddTitle.set('');
   }
 
-  /** Click the right-side arrow on the quick-add bar → open the full form
-   *  pre-filled with whatever's in the input. */
-  openCreateFromQuick() {
-    const title = this.quickAddTitle().trim();
-    if (title) {
-      this.router.navigate(['/pro/new'], { queryParams: { date: this.selectedDateStr(), title } });
-      this.quickAddTitle.set('');
+  /**
+   * Click the right-side button on the quick-add bar:
+   *   - has text     → submit (same as Enter): adds an unscheduled task
+   *   - empty input  → open the full create form for elaborate setup
+   *
+   * Previously the "has text" branch navigated to /pro/new with title in
+   * the query params, but the detail page didn't read that param so the
+   * form opened blank — user reported "點向上箭頭無法新增".
+   */
+  async onQuickAddButton() {
+    if (this.quickAddTitle().trim()) {
+      await this.submitQuickAdd();
     } else {
       this.openCreate();
     }
