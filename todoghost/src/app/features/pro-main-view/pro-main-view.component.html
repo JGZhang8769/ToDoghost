@@ -72,14 +72,19 @@
   <main class="pro-grid"
         [style.grid-template-columns]="gridTemplateColumns">
 
-    <!-- Floating expand button: only visible when sidebar is collapsed. -->
+    <!-- Single toggle button anchored at the top-left of the main grid.
+         When expanded, it's a small chevron at the sidebar's top-right
+         corner (click to collapse). When collapsed, a floating glass
+         button shows in the same approximate area to expand again. -->
     <button *ngIf="sidebarCollapsed" class="pro-sidebar__expand" (click)="toggleSidebar()" title="展開側邊欄">
       <span class="material-icons" style="font-size: 18px;">menu</span>
     </button>
 
     <!-- Left: Sidebar (hidden entirely when collapsed) -->
-    <aside *ngIf="!sidebarCollapsed" class="pro-sidebar pro-glass" [style.order]="1">
-      <!-- Collapse toggle, pinned top-right of the sidebar. -->
+    <aside *ngIf="!sidebarCollapsed" class="pro-sidebar pro-glass">
+      <!-- Collapse toggle: anchored at the *bottom-right* of the sidebar
+           so it doesn't overlap the floating expand button's position when
+           re-expanded. -->
       <button class="pro-sidebar__collapse" (click)="toggleSidebar()" title="收起側邊欄">
         <span class="material-icons" style="font-size: 18px;">chevron_left</span>
       </button>
@@ -206,10 +211,11 @@
     </aside>
 
     <!-- Left splitter (hidden when sidebar is collapsed — there's nothing to resize) -->
-    <div *ngIf="!sidebarCollapsed" class="pro-splitter" [style.order]="1.5"
+    <div *ngIf="!sidebarCollapsed" class="pro-splitter"
          (mousedown)="startSplitter('left', $event)" title="拖曳調整側邊欄寬度"></div>
 
-    <!-- Center: main view -->
+    <!-- Center: main view. CSS order swaps with inspector when
+         inspectorPosition === 'middle'. -->
     <section class="pro-center" [style.order]="centerOrder">
 
       <!-- ============ Calendar-first layout ============ -->
