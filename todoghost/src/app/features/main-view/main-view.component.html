@@ -589,43 +589,55 @@
           <span class="absolute right-6 bg-milktea-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">未排程 ({{ unassignedTasks.length }})</span>
         </div>
 
-        <div class="flex-1 overflow-y-auto ios-scroll px-4 pb-8 overflow-x-hidden" [class.invisible]="!drawerOpen" [class.hidden]="!drawerOpen"
+        <div class="flex-1 overflow-y-auto ios-scroll px-3 pt-3 pb-8 overflow-x-hidden reminder-list" [class.invisible]="!drawerOpen" [class.hidden]="!drawerOpen"
              cdkDropList
              id="unassigned-list"
              [cdkDropListData]="unassignedTasks"
              (cdkDropListDropped)="dropToUnassigned($event)">
-          <div *ngFor="let task of unassignedTasks"
+          <div *ngFor="let task of unassignedTasks; let isLast = last"
                cdkDrag [cdkDragData]="task"
                (cdkDragStarted)="dragStarted(task.id)" (cdkDragEnded)="dragEnded()"
-               class="relative bg-milktea-50 p-3 rounded-xl mb-2 shadow-sm cursor-move active:shadow-md touch-none flex items-center justify-between group overflow-hidden"
+               class="reminder-row relative bg-white touch-none overflow-hidden"
+               [class.is-last]="isLast"
                [class.opacity-0]="draggingId === task.id">
-            <div *cdkDragPreview class="w-8 h-8 bg-red-500 rounded-full shadow-xl z-[9999]"></div>
-            <!-- Main Content Container -->
-            <div class="relative z-10 w-full flex items-center justify-between transition-transform duration-200 bg-milktea-50 rounded-xl cursor-pointer" (click)="editTask(task)">
-              <div class="flex items-center gap-2 flex-1 min-w-0 pr-6 relative">
-                 <button class="shrink-0 flex items-center justify-center w-5 h-5 rounded-full border-2 border-milktea-400 focus:outline-none"
-                         [class.bg-milktea-400]="task.status === 'completed'"
-                         (click)="toggleCompletion(task); $event.stopPropagation()">
-                     <span *ngIf="task.status === 'completed'" class="material-icons text-white text-[12px] font-bold">check</span>
-                 </button>
-                 <div class="flex-1 flex flex-col justify-center min-w-0">
-                    <div class="flex items-center gap-1 w-full relative">
-                        <ng-container *ngIf="getCategoryForForm(task.categoryId) as cat">
-                            <span *ngIf="cat.icon && !isEmoji(cat.icon)" class="material-icons text-[14px] text-milktea-500 shrink-0">{{ cat.icon }}</span>
-                            <span *ngIf="cat.icon && isEmoji(cat.icon)" class="text-[14px] shrink-0">{{ cat.icon }}</span>
-                        </ng-container>
-                        <span class="font-bold text-sm truncate" [class.text-milktea-400]="task.status === 'completed'" [class.line-through]="task.status === 'completed'" [class.text-red-500]="task.isUrgent && task.status !== 'completed'" [class.text-milktea-900]="!task.isUrgent && task.status !== 'completed'">{{ task.title }}</span>
-                        <span *ngIf="task.isUrgent" class="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0 ml-1"></span>
-                    </div>
-                    <div class="text-[10px] text-milktea-500 mt-0.5" *ngIf="task.startTime || task.endTime">{{ task.startTime || '' }} <ng-container *ngIf="task.endTime">- {{ task.endTime }}</ng-container></div>
-                 </div>
-                 <div cdkDragHandle class="absolute top-1/2 -translate-y-1/2 right-0 w-12 h-12 flex items-center justify-center cursor-move z-20 text-milktea-400 hover:bg-milktea-200 rounded" (click)="$event.stopPropagation()">
-                     <span class="material-icons text-lg">drag_indicator</span>
-                 </div>
+            <div class="reminder-row__content relative z-10 w-full flex items-center bg-white cursor-pointer" (click)="editTask(task)">
+              <button class="shrink-0 flex items-center justify-center w-6 h-6 rounded-full border-2 ml-4 focus:outline-none transition-colors"
+                      [class.border-milktea-300]="task.status !== 'completed'"
+                      [class.border-milktea-500]="task.status === 'completed'"
+                      [class.bg-milktea-500]="task.status === 'completed'"
+                      (click)="toggleCompletion(task); $event.stopPropagation()">
+                  <span *ngIf="task.status === 'completed'" class="material-icons text-white" style="font-size: 16px;">check</span>
+              </button>
+              <div class="flex-1 min-w-0 py-3 pl-3 pr-2 reminder-row__divider">
+                  <div class="flex items-center gap-1 w-full">
+                      <ng-container *ngIf="getCategoryForForm(task.categoryId) as cat">
+                          <span *ngIf="cat.icon && !isEmoji(cat.icon)" class="material-icons text-[15px] text-milktea-400 shrink-0">{{ cat.icon }}</span>
+                          <span *ngIf="cat.icon && isEmoji(cat.icon)" class="text-[14px] shrink-0">{{ cat.icon }}</span>
+                      </ng-container>
+                      <span class="font-semibold text-[15px] truncate"
+                            [class.text-milktea-400]="task.status === 'completed'"
+                            [class.line-through]="task.status === 'completed'"
+                            [class.text-red-500]="task.isUrgent && task.status !== 'completed'"
+                            [class.text-milktea-900]="!task.isUrgent && task.status !== 'completed'">{{ task.title }}</span>
+                      <span *ngIf="task.isUrgent" class="material-icons text-red-500 shrink-0 ml-1" style="font-size: 12px;">priority_high</span>
+                  </div>
+                  <div class="flex items-center gap-2 text-[12px] text-milktea-500 mt-0.5" *ngIf="task.startTime || task.endTime || task.description">
+                      <span *ngIf="task.startTime || task.endTime" class="tabular-nums">
+                          {{ task.startTime || '' }}<ng-container *ngIf="task.endTime"> - {{ task.endTime }}</ng-container>
+                      </span>
+                      <span *ngIf="task.description" class="truncate flex-1">{{ task.description }}</span>
+                  </div>
+              </div>
+              <div cdkDragHandle class="w-10 h-10 flex items-center justify-center cursor-grab active:cursor-grabbing z-20 text-milktea-300 hover:text-milktea-500 rounded-full mr-2" (click)="$event.stopPropagation()">
+                  <span class="material-icons" style="font-size: 20px;">drag_indicator</span>
               </div>
             </div>
-
-            <div *cdkDragPreview class="w-8 h-8 bg-red-500 rounded-full shadow-xl z-[9999]"></div>
+            <div *cdkDragPreview class="reminder-drag-preview">
+              <div class="flex items-center gap-3 px-3 py-2.5">
+                <span class="material-icons text-milktea-400" style="font-size: 20px;">drag_indicator</span>
+                <span class="font-semibold text-[15px] text-milktea-900 truncate">{{ task.title }}</span>
+              </div>
+            </div>
           </div>
           <div *ngIf="unassignedTasks.length === 0" class="text-center text-milktea-400 mt-8 text-sm">
             沒有未排程代辦
@@ -655,30 +667,38 @@
           <span class="bg-milktea-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">{{ scheduledDrawerTasks.length }}</span>
         </div>
 
-        <div class="flex-1 overflow-y-auto ios-scroll px-4 py-4 overflow-x-hidden"
+        <div class="flex-1 overflow-y-auto ios-scroll px-3 pt-3 pb-6 overflow-x-hidden reminder-list"
              cdkDropList
              id="scheduled-list"
              [cdkDropListConnectedTo]="['trash-list', 'unassigned-list']"
              [cdkDropListData]="scheduledDrawerTasks"
              (cdkDropListDropped)="dropToDate($event, scheduledDrawerDate!)">
-          <div *ngFor="let task of scheduledDrawerTasks"
+          <div *ngFor="let task of scheduledDrawerTasks; let isLast = last"
                cdkDrag [cdkDragData]="task"
                (cdkDragStarted)="dragStarted(task.id)" (cdkDragEnded)="dragEnded()"
-               class="relative bg-milktea-50 p-3 rounded-xl mb-2 shadow-sm touch-none flex items-center justify-between group overflow-hidden"
+               class="reminder-row relative bg-white touch-none overflow-hidden"
                [class.opacity-50]="task.status === 'completed'"
                [class.opacity-0]="draggingId === task.id"
+               [class.is-first]="$any(true)"
+               [class.is-last]="isLast"
                (contextmenu)="onContextMenu($event, task)">
 
-            <!-- Mobile Swipe Actions -->
-            <div class="absolute inset-y-0 right-0 w-16 bg-blue-500 text-white flex items-center justify-center font-bold z-0 text-[10px]"
+            <!-- Swipe action backgrounds: full-height colored zones -->
+            <div class="absolute inset-y-0 right-0 w-24 bg-blue-500 text-white flex flex-col items-center justify-center font-bold z-0 gap-0.5"
                  [style.opacity]="getSwipeState(task.id) === 'left' ? 1 : 0"
-                 (click)="copyTask(task); scheduledDrawerOpen = false; $event.stopPropagation()">複製</div>
-            <div class="absolute inset-y-0 left-0 w-16 bg-red-500 text-white flex items-center justify-center font-bold z-0 text-[10px]"
+                 (click)="copyTask(task); scheduledDrawerOpen = false; $event.stopPropagation()">
+                 <span class="material-icons" style="font-size: 20px;">content_copy</span>
+                 <span class="text-[11px]">複製</span>
+            </div>
+            <div class="absolute inset-y-0 left-0 w-24 bg-red-500 text-white flex flex-col items-center justify-center font-bold z-0 gap-0.5"
                  [style.opacity]="getSwipeState(task.id) === 'right' ? 1 : 0"
-                 (click)="unscheduleTask(task); scheduledDrawerOpen = false; $event.stopPropagation()">取消</div>
+                 (click)="unscheduleTask(task); scheduledDrawerOpen = false; $event.stopPropagation()">
+                 <span class="material-icons" style="font-size: 20px;">event_busy</span>
+                 <span class="text-[11px]">取消</span>
+            </div>
 
-            <!-- Main Content Container -->
-            <div class="relative z-10 w-full flex items-center justify-between transition-transform duration-200 bg-milktea-50 rounded-xl cursor-pointer"
+            <!-- Foreground row content -->
+            <div class="reminder-row__content relative z-10 w-full flex items-center bg-white cursor-pointer"
                  [style.transform]="'translateX(' + getSwipeOffset(task.id) + 'px)'"
                  (mousedown)="onTouchStart($event, task.id)" (touchstart)="onTouchStart($event, task.id)"
                  (mousemove)="onTouchMove($event, task.id)" (touchmove)="onTouchMove($event, task.id)"
@@ -687,39 +707,58 @@
                  (contextmenu)="onContextMenu($event, task)"
                  (click)="editTask(task)">
 
-              <div class="flex items-center gap-2 flex-1 min-w-0 pr-2">
-                 <button class="shrink-0 flex items-center justify-center w-5 h-5 rounded-full border-2 border-milktea-400 focus:outline-none"
-                         [class.bg-milktea-400]="task.status === 'completed'"
-                         (click)="toggleCompletion(task); $event.stopPropagation()">
-                     <span *ngIf="task.status === 'completed'" class="material-icons text-white text-[12px] font-bold">check</span>
-                 </button>
-                 <div class="flex-1 flex flex-col justify-center min-w-0">
-                    <div class="flex items-center gap-1 w-full relative">
-                        <ng-container *ngIf="getCategoryForForm(task.categoryId) as cat">
-                            <span *ngIf="cat.icon && !isEmoji(cat.icon)" class="material-icons text-[14px] text-milktea-500 shrink-0">{{ cat.icon }}</span>
-                            <span *ngIf="cat.icon && isEmoji(cat.icon)" class="text-[14px] shrink-0">{{ cat.icon }}</span>
-                        </ng-container>
-                        <span class="font-bold text-sm truncate" [class.text-milktea-400]="task.status === 'completed'" [class.line-through]="task.status === 'completed'" [class.text-red-500]="task.isUrgent && task.status !== 'completed'" [class.text-milktea-900]="!task.isUrgent && task.status !== 'completed'">{{ task.title }}</span>
-                        <span *ngIf="task.isUrgent" class="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0 ml-1"></span>
-                    </div>
-                    <div class="text-[10px] text-milktea-500 mt-0.5" *ngIf="task.startTime || task.endTime">{{ task.startTime || '' }} <ng-container *ngIf="task.endTime">- {{ task.endTime }}</ng-container></div>
-                 </div>
-              </div>
-              <div class="flex items-center gap-2 shrink-0">
-                  <div class="flex flex-col gap-1 items-center justify-center z-20">
-                     <button class="w-6 h-6 flex items-center justify-center text-milktea-400 hover:bg-milktea-200 rounded active:bg-milktea-300" (click)="moveTaskUp(task); $event.stopPropagation()">
-                        <span class="material-icons text-sm">keyboard_arrow_up</span>
-                     </button>
-                     <button class="w-6 h-6 flex items-center justify-center text-milktea-400 hover:bg-milktea-200 rounded active:bg-milktea-300" (click)="moveTaskDown(task); $event.stopPropagation()">
-                        <span class="material-icons text-sm">keyboard_arrow_down</span>
-                     </button>
+              <!-- Checkbox circle (24px iOS-style) -->
+              <button class="shrink-0 flex items-center justify-center w-6 h-6 rounded-full border-2 ml-4 focus:outline-none transition-colors"
+                      [class.border-milktea-300]="task.status !== 'completed'"
+                      [class.border-milktea-500]="task.status === 'completed'"
+                      [class.bg-milktea-500]="task.status === 'completed'"
+                      (click)="toggleCompletion(task); $event.stopPropagation()">
+                  <span *ngIf="task.status === 'completed'" class="material-icons text-white" style="font-size: 16px;">check</span>
+              </button>
+
+              <!-- Title block + subtitle (time / category) -->
+              <div class="flex-1 min-w-0 py-3 pl-3 pr-2 reminder-row__divider">
+                  <div class="flex items-center gap-1 w-full">
+                      <ng-container *ngIf="getCategoryForForm(task.categoryId) as cat">
+                          <span *ngIf="cat.icon && !isEmoji(cat.icon)" class="material-icons text-[15px] text-milktea-400 shrink-0">{{ cat.icon }}</span>
+                          <span *ngIf="cat.icon && isEmoji(cat.icon)" class="text-[14px] shrink-0">{{ cat.icon }}</span>
+                      </ng-container>
+                      <span class="font-semibold text-[15px] truncate"
+                            [class.text-milktea-400]="task.status === 'completed'"
+                            [class.line-through]="task.status === 'completed'"
+                            [class.text-red-500]="task.isUrgent && task.status !== 'completed'"
+                            [class.text-milktea-900]="!task.isUrgent && task.status !== 'completed'">{{ task.title }}</span>
+                      <span *ngIf="task.isUrgent" class="material-icons text-red-500 shrink-0 ml-1" style="font-size: 12px;">priority_high</span>
                   </div>
-                  <div cdkDragHandle class="w-12 h-12 flex items-center justify-center cursor-move z-20 text-milktea-400 hover:bg-milktea-200 rounded" (click)="$event.stopPropagation()">
-                    <span class="material-icons">drag_indicator</span>
+                  <div class="flex items-center gap-2 text-[12px] text-milktea-500 mt-0.5" *ngIf="task.startTime || task.endTime || task.description">
+                      <span *ngIf="task.startTime || task.endTime" class="tabular-nums">
+                          {{ task.startTime || '' }}<ng-container *ngIf="task.endTime"> - {{ task.endTime }}</ng-container>
+                      </span>
+                      <span *ngIf="task.description" class="truncate flex-1">{{ task.description }}</span>
+                  </div>
+              </div>
+
+              <!-- Right action group: reorder + drag handle -->
+              <div class="flex items-center shrink-0 pr-2">
+                  <div class="flex flex-col items-center justify-center z-20 mr-1">
+                      <button class="w-7 h-7 flex items-center justify-center text-milktea-400 hover:bg-milktea-100 rounded-full active:bg-milktea-200" (click)="moveTaskUp(task); $event.stopPropagation()">
+                          <span class="material-icons" style="font-size: 18px;">keyboard_arrow_up</span>
+                      </button>
+                      <button class="w-7 h-7 flex items-center justify-center text-milktea-400 hover:bg-milktea-100 rounded-full active:bg-milktea-200" (click)="moveTaskDown(task); $event.stopPropagation()">
+                          <span class="material-icons" style="font-size: 18px;">keyboard_arrow_down</span>
+                      </button>
+                  </div>
+                  <div cdkDragHandle class="w-10 h-10 flex items-center justify-center cursor-grab active:cursor-grabbing z-20 text-milktea-300 hover:text-milktea-500 rounded-full" (click)="$event.stopPropagation()">
+                      <span class="material-icons" style="font-size: 20px;">drag_indicator</span>
                   </div>
               </div>
             </div>
-            <div *cdkDragPreview class="w-8 h-8 bg-red-500 rounded-full shadow-xl z-[9999]"></div>
+            <div *cdkDragPreview class="reminder-drag-preview">
+              <div class="flex items-center gap-3 px-3 py-2.5">
+                <span class="material-icons text-milktea-400" style="font-size: 20px;">drag_indicator</span>
+                <span class="font-semibold text-[15px] text-milktea-900 truncate">{{ task.title }}</span>
+              </div>
+            </div>
           </div>
           <div *ngIf="scheduledDrawerTasks.length === 0" class="text-center text-milktea-400 mt-8 text-sm">
             無代辦事項
@@ -876,14 +915,37 @@
 
             <!-- Group: 詳細內容 -->
             <div class="bg-milktea-50 rounded-2xl px-3 py-2.5">
-              <label class="text-sm text-milktea-700 flex items-center gap-1.5 mb-2">
-                <span class="material-icons text-milktea-500" style="font-size: 18px;">notes</span>
-                詳細內容 <span class="text-milktea-400 text-xs">（選填）</span>
-              </label>
+              <div class="flex items-center justify-between mb-2">
+                <label class="text-sm text-milktea-700 flex items-center gap-1.5">
+                  <span class="material-icons text-milktea-500" style="font-size: 18px;">notes</span>
+                  詳細內容 <span class="text-milktea-400 text-xs">（選填）</span>
+                </label>
+                <button type="button"
+                        class="text-milktea-500 hover:text-milktea-700 active:scale-95 transition-transform p-1 -mr-1"
+                        (click)="descFullscreen = true"
+                        title="全螢幕編輯">
+                  <span class="material-icons" style="font-size: 18px;">open_in_full</span>
+                </button>
+              </div>
               <textarea [(ngModel)]="formTask.description"
                         placeholder="輸入備註或細節..."
-                        rows="4"
-                        class="ios-scroll w-full p-2 pr-1.5 border border-milktea-200 rounded-lg bg-white text-[13px] leading-relaxed text-milktea-900 outline-none focus:border-milktea-400 h-[120px]"></textarea>
+                        class="ios-scroll w-full p-2.5 pr-2 border border-milktea-200 rounded-lg bg-white text-[14px] leading-snug text-milktea-900 outline-none focus:border-milktea-400 h-[160px]"></textarea>
+            </div>
+
+            <!-- Fullscreen description editor (iOS Notes-style) -->
+            <div *ngIf="descFullscreen" class="fixed inset-0 z-[80] bg-white flex flex-col" (click)="$event.stopPropagation()">
+              <div class="px-5 py-3 border-b border-milktea-100 flex items-center justify-between shrink-0">
+                <button class="text-milktea-500 flex items-center gap-1 text-sm font-medium" (click)="descFullscreen = false">
+                  <span class="material-icons" style="font-size: 20px;">chevron_left</span>
+                  返回
+                </button>
+                <span class="font-bold text-milktea-900 text-base">詳細內容</span>
+                <button class="text-milktea-600 text-sm font-bold" (click)="descFullscreen = false">完成</button>
+              </div>
+              <textarea [(ngModel)]="formTask.description"
+                        placeholder="輸入備註或細節..."
+                        autofocus
+                        class="ios-scroll flex-1 w-full px-5 py-4 bg-white text-[16px] leading-relaxed text-milktea-900 outline-none border-0"></textarea>
             </div>
 
             <!-- 完成狀態 (僅編輯時) -->

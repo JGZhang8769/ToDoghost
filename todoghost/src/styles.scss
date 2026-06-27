@@ -100,6 +100,55 @@ textarea.ios-scroll::-webkit-resizer {
     display: none;
 }
 
+/* iOS Reminders-style list inside drawers */
+.reminder-list {
+    background: linear-gradient(180deg, #ffffff 0%, #fdfbf7 100%);
+    border-radius: 14px;
+    padding: 0;
+    margin: 0 12px;
+    overflow: hidden;
+}
+.reminder-list .reminder-row {
+    border-radius: 0;
+    margin: 0;
+}
+.reminder-list .reminder-row:first-child .reminder-row__content {
+    border-top-left-radius: 14px;
+    border-top-right-radius: 14px;
+}
+.reminder-list .reminder-row.is-last .reminder-row__content {
+    border-bottom-left-radius: 14px;
+    border-bottom-right-radius: 14px;
+}
+.reminder-row__content {
+    min-height: 52px;
+    transition: transform 0.18s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.reminder-row__divider {
+    position: relative;
+}
+.reminder-row:not(.is-last) .reminder-row__divider::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: -8px;
+    bottom: 0;
+    height: 1px;
+    background: rgba(120, 100, 80, 0.12);
+}
+.reminder-row:active .reminder-row__content {
+    background-color: #f7f0e2;
+}
+.reminder-drag-preview {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-radius: 14px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(120, 100, 80, 0.12);
+    min-width: 200px;
+    transform: scale(1.02);
+}
+
 /* iOS-style toggle switch */
 .ios-toggle {
     position: relative;

@@ -104,6 +104,7 @@ export class MainViewComponent implements OnInit, OnDestroy {
   // Form
   showForm = false;
   showTimeReminder = false;
+  descFullscreen = false;
   isSaving = false;
   editingTask: Task | null = null;
   formTask: any = {};
