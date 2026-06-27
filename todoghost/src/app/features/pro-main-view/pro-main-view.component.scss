@@ -1617,24 +1617,30 @@
     cursor: grabbing !important;
 }
 
-/* The source element that's currently being dragged: fully collapse it
-   so siblings don't get pushed around by an invisible ghost. The drag
-   preview the user sees moves with the cursor; the original is hidden. */
+/* The source element that's currently being dragged.
+   Keep its layout space (so siblings don't collapse and jump around when
+   the drag starts / ends), just hide its content. Using visibility +
+   opacity rather than display: none preserves the original height/width
+   in every container — critical for the week timeline where events are
+   absolutely positioned and a missing event would let siblings recalculate
+   their column packing. */
 .pro-row.is-drag-source,
 .pro-day__task.is-drag-source,
 .pro-week__chip.is-drag-source,
-.pro-week__event.is-drag-source {
-    display: none !important;
+.pro-week__event.is-drag-source,
+.cdk-drag-placeholder {
+    visibility: hidden !important;
+    opacity: 0 !important;
+    /* Belt and braces: stop any CDK-applied transform from translating the
+       ghost around, since visibility:hidden still respects transforms. */
+    transform: none !important;
 }
 
-/* CDK's auto-generated placeholder. Keep a tiny dashed marker only inside
-   the list pane (where reorder is meaningful); hide it everywhere else
-   to match the source-collapse behaviour above. */
-.cdk-drag-placeholder {
-    display: none !important;
-}
+/* In-list reorder still benefits from a visible insertion target, so the
+   list pane upgrades the placeholder from invisible to a dashed slot.
+   visibility: visible to re-show the auto-generated placeholder above. */
 .pro-listpane__rows .cdk-drag-placeholder {
-    display: block !important;
+    visibility: visible !important;
     opacity: 0.4 !important;
     background: rgba(120, 100, 80, 0.12);
     border: 2px dashed rgba(120, 100, 80, 0.3);
