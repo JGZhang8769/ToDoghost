@@ -61,19 +61,12 @@ export class ProMobileListComponent implements OnInit, OnDestroy {
   // ----- Scope -----
   scope = signal<string>('inbox');
 
-  /** Whether the docked unscheduled section should appear below the main list. */
-  showUnscheduledSection = signal(true);
-
   /** Task currently waiting for a date pick. Null when the picker is closed. */
   schedulingTaskId = signal<string | null>(null);
   pickerDate = signal<string>(format(new Date(), 'yyyy-MM-dd'));
 
   ngOnInit() {
     this.scope.set(this.route.snapshot.paramMap.get('scope') ?? 'inbox');
-    // 'unscheduled' / 'completed' scopes don't need their own list at the bottom.
-    if (['unscheduled', 'completed'].includes(this.scope())) {
-      this.showUnscheduledSection.set(false);
-    }
 
     this.workspaceService.currentWorkspace$.pipe(takeUntil(this.destroy$)).subscribe(ws => {
       if (!ws) { this.router.navigate(['/workspaces']); return; }
@@ -181,12 +174,6 @@ export class ProMobileListComponent implements OnInit, OnDestroy {
 
   /** Tasks in the bottom "未排程" section. Hidden entirely if there are none
    *  or the main scope already shows them. */
-  get unscheduledTasks(): Task[] {
-    if (!this.showUnscheduledSection()) return [];
-    return this.tasks
-      .filter(t => !t.date && t.status !== 'completed')
-      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-  }
 
   // ----- Actions -----
   back() { this.location.back(); }
