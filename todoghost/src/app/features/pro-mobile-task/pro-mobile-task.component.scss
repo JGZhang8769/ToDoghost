@@ -15,6 +15,13 @@
         radial-gradient(100% 80% at 100% 100%, #f0dccc 0%, transparent 60%),
         linear-gradient(140deg, #f8f2e4 0%, #efe5d2 50%, #f3e5d6 100%);
     overflow: hidden;
+    box-sizing: border-box;
+    width: 100%;
+}
+.pmt-shell *,
+.pmt-shell *::before,
+.pmt-shell *::after {
+    box-sizing: border-box;
 }
 
 .pmt-bg { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
@@ -128,6 +135,12 @@
     background: transparent;
     text-align: left;
     cursor: pointer;
+    /* Belt-and-braces against flex overflow on narrow screens — without this,
+       a long category label + a wide native input can push the row beyond
+       the card and break the entire form layout. */
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
 }
 .pmt-row + .pmt-row {
     border-top: 1px solid rgba(120, 100, 80, 0.08);
@@ -139,6 +152,14 @@
     font-size: 14px;
     color: #4a3a22;
     font-weight: 500;
+    flex-shrink: 0;
+    min-width: 0;
+}
+.pmt-row > input,
+.pmt-row > select,
+.pmt-row > .pmt-input {
+    min-width: 0;
+    max-width: 60%;
 }
 
 /* Native inputs styled to match */
