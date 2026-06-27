@@ -66,41 +66,6 @@
       <p class="pml-empty__hint">點右上 + 新增一個</p>
     </div>
 
-    <!-- Unscheduled section docked at the bottom of scheduled scopes -->
-    <section class="pml-unscheduled" *ngIf="unscheduledTasks.length > 0">
-      <header class="pml-unscheduled__head">
-        <span class="material-icons" style="font-size: 16px; color: #8b5cf6;">event_busy</span>
-        <h4>未排程 ({{ unscheduledTasks.length }})</h4>
-      </header>
-      <div class="pml-unscheduled__list">
-        <div *ngFor="let t of unscheduledTasks"
-             class="pml-uprow"
-             [class.is-urgent]="t.isUrgent && t.status !== 'completed'"
-             [style.--user-bar]="userColor(t.createdBy)?.bar"
-             (click)="openTask(t)">
-          <button class="pml-check"
-                  (click)="toggleCompletion(t, $event)"
-                  [class.is-checked]="t.status === 'completed'">
-            <span *ngIf="t.status === 'completed'" class="material-icons" style="font-size: 14px;">check</span>
-          </button>
-          <div class="pml-uprow__main">
-            <div class="pml-uprow__title">
-              <ng-container *ngIf="categoryFor(t.categoryId) as cat">
-                <span *ngIf="cat.icon && !isEmoji(cat.icon)" class="material-icons pml-row__catico">{{ cat.icon }}</span>
-                <span *ngIf="cat.icon && isEmoji(cat.icon)" class="pml-row__catico">{{ cat.icon }}</span>
-              </ng-container>
-              <span class="pml-row__titletext">{{ t.title }}</span>
-            </div>
-          </div>
-          <button class="pml-schedule-btn"
-                  (click)="startScheduling(t.id, $event)">
-            <span class="material-icons" style="font-size: 16px;">event</span>
-            安排
-          </button>
-        </div>
-      </div>
-    </section>
-
   </main>
 
   <!-- ============ Inline scheduling dialog ============ -->
