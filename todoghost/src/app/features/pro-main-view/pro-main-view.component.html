@@ -209,11 +209,12 @@
               <div class="pro-day__tasks">
                 <ng-container *ngFor="let t of d.tasks; let i = index">
                   <div *ngIf="i < 4"
-                       cdkDrag [cdkDragData]="t" (cdkDragStarted)="onTaskDragStarted()" (cdkDragEnded)="onTaskDragEnded()" (cdkDragStarted)="onTaskDragStarted()" (cdkDragEnded)="onTaskDragEnded()"
+                       cdkDrag [cdkDragData]="t" (cdkDragStarted)="onTaskDragStarted(t)" (cdkDragEnded)="onTaskDragEnded()"
                        class="pro-day__task"
                        [class.is-urgent]="t.isUrgent && t.status !== 'completed'"
                        [class.is-done]="t.status === 'completed'"
                        [class.is-selected]="selectedTaskId === t.id"
+                       [class.is-drag-source]="draggingTaskId === t.id"
                        [style.--user-bar]="userColor(t.createdBy)?.bar"
                        (click)="selectTask(t.id); $event.stopPropagation()">
                     <span *ngIf="t.startTime" class="pro-day__time tabular-nums">{{ t.startTime }}</span>
@@ -253,11 +254,12 @@
                  (click)="selectDate(d.dateStr)"
                  (dblclick)="openCreateForDate(d.dateStr)">
               <div *ngFor="let t of d.allDay"
-                   cdkDrag [cdkDragData]="t" (cdkDragStarted)="onTaskDragStarted()" (cdkDragEnded)="onTaskDragEnded()"
+                   cdkDrag [cdkDragData]="t" (cdkDragStarted)="onTaskDragStarted(t)" (cdkDragEnded)="onTaskDragEnded()"
                    class="pro-week__chip"
                    [class.is-urgent]="t.isUrgent && t.status !== 'completed'"
                    [class.is-done]="t.status === 'completed'"
                    [class.is-selected]="selectedTaskId === t.id"
+                   [class.is-drag-source]="draggingTaskId === t.id"
                    [style.--user-bar]="userColor(t.createdBy)?.bar"
                    (click)="selectTask(t.id); $event.stopPropagation()">
                 <ng-container *ngIf="categoryFor(t.categoryId) as cat">
@@ -281,11 +283,12 @@
               <div *ngFor="let h of dayHours" class="pro-week__hour-cell"
                    (dblclick)="openCreateForDateTime(d.dateStr, h)"></div>
               <div *ngFor="let block of d.timedBlocks"
-                   cdkDrag [cdkDragData]="block.task" (cdkDragStarted)="onTaskDragStarted()" (cdkDragEnded)="onTaskDragEnded()"
+                   cdkDrag [cdkDragData]="block.task" (cdkDragStarted)="onTaskDragStarted(block.task)" (cdkDragEnded)="onTaskDragEnded()"
                    class="pro-week__event"
                    [class.is-urgent]="block.task.isUrgent && block.task.status !== 'completed'"
                    [class.is-done]="block.task.status === 'completed'"
                    [class.is-selected]="selectedTaskId === block.task.id"
+                   [class.is-drag-source]="draggingTaskId === block.task.id"
                    [style.top.px]="block.top"
                    [style.height.px]="block.height"
                    [style.left]="(block.col * (100 / block.totalCols)) + '%'"
@@ -382,12 +385,13 @@
              [cdkDropListData]="listPaneTasks"
              (cdkDropListDropped)="reorderInList($event)">
           <div *ngFor="let t of listPaneTasks"
-               cdkDrag [cdkDragData]="t" (cdkDragStarted)="onTaskDragStarted()" (cdkDragEnded)="onTaskDragEnded()"
+               cdkDrag [cdkDragData]="t" (cdkDragStarted)="onTaskDragStarted(t)" (cdkDragEnded)="onTaskDragEnded()"
                class="pro-row"
                [class.pro-row--big]="big"
                [class.is-selected]="selectedTaskId === t.id"
                [class.is-urgent]="t.isUrgent && t.status !== 'completed'"
                [class.is-done]="t.status === 'completed'"
+               [class.is-drag-source]="draggingTaskId === t.id"
                [style.--user-bar]="userColor(t.createdBy)?.bar"
                (click)="selectTask(t.id)">
             <button class="pro-row__check" (click)="toggleCompletion(t); $event.stopPropagation()" [class.is-checked]="t.status === 'completed'">

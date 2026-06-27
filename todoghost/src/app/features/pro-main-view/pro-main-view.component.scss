@@ -1616,8 +1616,30 @@
 .cdk-drag-preview {
     cursor: grabbing !important;
 }
+
+/* The source element that's currently being dragged: fully collapse it
+   so siblings don't get pushed around by an invisible ghost. The drag
+   preview the user sees moves with the cursor; the original is hidden. */
+.pro-row.is-drag-source,
+.pro-day__task.is-drag-source,
+.pro-week__chip.is-drag-source,
+.pro-week__event.is-drag-source {
+    display: none !important;
+}
+
+/* CDK's auto-generated placeholder. Keep a tiny dashed marker only inside
+   the list pane (where reorder is meaningful); hide it everywhere else
+   to match the source-collapse behaviour above. */
 .cdk-drag-placeholder {
-    opacity: 0.25 !important;
+    display: none !important;
+}
+.pro-listpane__rows .cdk-drag-placeholder {
+    display: block !important;
+    opacity: 0.4 !important;
+    background: rgba(120, 100, 80, 0.12);
+    border: 2px dashed rgba(120, 100, 80, 0.3);
+    border-radius: 12px;
+    min-height: 36px;
 }
 
 /* Category icon inside calendar / week pills — kept small so the title still

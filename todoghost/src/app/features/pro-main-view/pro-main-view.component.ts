@@ -966,18 +966,25 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
   // Used to highlight valid drop targets (calendar cells, unscheduled zone)
   // so users have a clear visual hint that they can reschedule by dragging.
   isDraggingTask = false;
+  // ID of the task being dragged — used to fully collapse its source row so
+  // sibling rows don't get pushed out of place by CDK's stand-in placeholder.
+  draggingTaskId: string | null = null;
   // dateStr that just received a drop — used to pulse the cell as success feedback.
   recentlyDroppedDate: string | null = null;
   private pulseTimer: any;
 
-  onTaskDragStarted() {
+  onTaskDragStarted(task?: Task) {
     this.isDraggingTask = true;
+    this.draggingTaskId = task?.id ?? null;
   }
 
   onTaskDragEnded() {
     // CDK fires dragEnded after drop, so leave the flag for one tick to
     // let the drop handler highlight first, then clear it.
-    setTimeout(() => { this.isDraggingTask = false; }, 50);
+    setTimeout(() => {
+      this.isDraggingTask = false;
+      this.draggingTaskId = null;
+    }, 50);
   }
 
   /**
