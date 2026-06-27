@@ -10,6 +10,7 @@ import { getLunar } from 'chinese-lunar-calendar';
 import { TaskService, Task } from '../../core/services/task.service';
 import { CategoryService, Category } from '../../core/services/category.service';
 import { WorkspaceService, Workspace } from '../../core/services/workspace.service';
+import { SwipeBackDirective } from '../../core/directives/swipe-back.directive';
 
 type Grain = 'month' | 'week';
 const HOUR_PX = 56;
@@ -60,7 +61,7 @@ interface WeekColumn {
 @Component({
   selector: 'app-pro-mobile-month',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, SwipeBackDirective],
   templateUrl: './pro-mobile-month.component.html',
   styleUrl: './pro-mobile-month.component.scss',
 })

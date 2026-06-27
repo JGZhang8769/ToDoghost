@@ -1,4 +1,4 @@
-<div class="pml-shell">
+<div class="pml-shell" appSwipeBack>
   <div class="pml-bg" aria-hidden="true"></div>
 
   <!-- Nav bar -->
@@ -19,35 +19,49 @@
 
     <!-- Main scope list -->
     <div class="pml-list" *ngIf="scopeTasks.length > 0">
-      <button *ngFor="let t of scopeTasks"
-              class="pml-row"
-              [class.is-urgent]="t.isUrgent && t.status !== 'completed'"
-              [class.is-done]="t.status === 'completed'"
-              [style.--user-bar]="userColor(t.createdBy)?.bar"
-              (click)="openTask(t)">
-        <button class="pml-check"
-                (click)="toggleCompletion(t, $event)"
-                [class.is-checked]="t.status === 'completed'">
-          <span *ngIf="t.status === 'completed'" class="material-icons" style="font-size: 14px;">check</span>
-        </button>
-        <div class="pml-row__main">
-          <div class="pml-row__title">
-            <ng-container *ngIf="categoryFor(t.categoryId) as cat">
-              <span *ngIf="cat.icon && !isEmoji(cat.icon)" class="material-icons pml-row__catico">{{ cat.icon }}</span>
-              <span *ngIf="cat.icon && isEmoji(cat.icon)" class="pml-row__catico">{{ cat.icon }}</span>
-            </ng-container>
-            <span class="pml-row__titletext">{{ t.title }}</span>
-            <span *ngIf="t.isUrgent" class="material-icons pml-row__urg">priority_high</span>
-          </div>
-          <div class="pml-row__meta" *ngIf="t.date || t.startTime || t.description || (t.tags?.length && t.tags.length > 0)">
-            <span *ngIf="t.date && !scope().startsWith('date-')" class="tabular-nums">{{ t.date }}</span>
-            <span *ngIf="t.startTime" class="tabular-nums">{{ t.startTime }}<span *ngIf="t.endTime"> - {{ t.endTime }}</span></span>
-            <span *ngFor="let tag of (t.tags || [])" class="pml-row__tag">#{{ tag }}</span>
-            <span *ngIf="t.description" class="pml-row__desc">{{ t.description }}</span>
-          </div>
+      <div *ngFor="let t of scopeTasks" class="pml-row-wrap">
+        <!-- Background actions (visible while the foreground is swiped aside) -->
+        <div class="pml-row-bg pml-row-bg--complete">
+          <span class="material-icons" style="font-size: 18px;">check_circle</span>
+          {{ t.status === 'completed' ? '取消完成' : '完成' }}
         </div>
-        <span class="material-icons pml-row__chev">chevron_right</span>
-      </button>
+        <div class="pml-row-bg pml-row-bg--delete">
+          <span class="material-icons" style="font-size: 18px;">delete</span>
+          刪除
+        </div>
+        <!-- Foreground row receives the swipe-row directive -->
+        <button class="pml-row"
+                appSwipeRow
+                (swipeComplete)="onSwipeComplete(t)"
+                (swipeDelete)="onSwipeDelete(t)"
+                [class.is-urgent]="t.isUrgent && t.status !== 'completed'"
+                [class.is-done]="t.status === 'completed'"
+                [style.--user-bar]="userColor(t.createdBy)?.bar"
+                (click)="openTask(t)">
+          <button class="pml-check"
+                  (click)="toggleCompletion(t, $event)"
+                  [class.is-checked]="t.status === 'completed'">
+            <span *ngIf="t.status === 'completed'" class="material-icons" style="font-size: 14px;">check</span>
+          </button>
+          <div class="pml-row__main">
+            <div class="pml-row__title">
+              <ng-container *ngIf="categoryFor(t.categoryId) as cat">
+                <span *ngIf="cat.icon && !isEmoji(cat.icon)" class="material-icons pml-row__catico">{{ cat.icon }}</span>
+                <span *ngIf="cat.icon && isEmoji(cat.icon)" class="pml-row__catico">{{ cat.icon }}</span>
+              </ng-container>
+              <span class="pml-row__titletext">{{ t.title }}</span>
+              <span *ngIf="t.isUrgent" class="material-icons pml-row__urg">priority_high</span>
+            </div>
+            <div class="pml-row__meta" *ngIf="t.date || t.startTime || t.description || (t.tags?.length && t.tags.length > 0)">
+              <span *ngIf="t.date && !scope().startsWith('date-')" class="tabular-nums">{{ t.date }}</span>
+              <span *ngIf="t.startTime" class="tabular-nums">{{ t.startTime }}<span *ngIf="t.endTime"> - {{ t.endTime }}</span></span>
+              <span *ngFor="let tag of (t.tags || [])" class="pml-row__tag">#{{ tag }}</span>
+              <span *ngIf="t.description" class="pml-row__desc">{{ t.description }}</span>
+            </div>
+          </div>
+          <span class="material-icons pml-row__chev">chevron_right</span>
+        </button>
+      </div>
     </div>
 
     <div *ngIf="scopeTasks.length === 0" class="pml-empty">

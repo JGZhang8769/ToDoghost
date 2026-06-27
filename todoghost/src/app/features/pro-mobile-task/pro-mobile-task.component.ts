@@ -8,6 +8,7 @@ import { TaskService, Task } from '../../core/services/task.service';
 import { CategoryService, Category } from '../../core/services/category.service';
 import { WorkspaceService, Workspace } from '../../core/services/workspace.service';
 import { UserService, User } from '../../core/services/user.service';
+import { SwipeBackDirective } from '../../core/directives/swipe-back.directive';
 
 /**
  * Full-screen task detail / edit / create view for the Pro Mobile flow.
@@ -24,7 +25,7 @@ import { UserService, User } from '../../core/services/user.service';
 @Component({
   selector: 'app-pro-mobile-task',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, SwipeBackDirective],
   templateUrl: './pro-mobile-task.component.html',
   styleUrl: './pro-mobile-task.component.scss',
 })
