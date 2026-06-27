@@ -19,7 +19,7 @@
 
     <div class="pro-topbar__search">
       <span class="material-icons" style="font-size: 18px;">search</span>
-      <input type="text" [(ngModel)]="searchQuery" placeholder="搜尋代辦事項、標籤、描述…">
+      <input type="text" [(ngModel)]="searchQuery" (ngModelChange)="onSearchChange()" placeholder="搜尋代辦事項、標籤、描述…">
       <kbd>⌘K</kbd>
     </div>
 
