@@ -95,6 +95,48 @@
     border-radius: 14px;
     overflow: hidden;
 }
+
+/* Wraps each row + its swipe-action backgrounds. The foreground row is
+   absolutely positioned over the backgrounds; the directive translates
+   the foreground to reveal whichever action the swipe direction targets. */
+.pml-row-wrap {
+    position: relative;
+    overflow: hidden;
+}
+.pml-row-wrap + .pml-row-wrap {
+    border-top: 1px solid rgba(120, 100, 80, 0.08);
+}
+.pml-row-bg {
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 50%;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 16px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+    pointer-events: none;
+}
+.pml-row-bg--complete {
+    left: 0;
+    justify-content: flex-start;
+    background: #22c55e;
+}
+.pml-row-bg--delete {
+    right: 0;
+    justify-content: flex-end;
+    background: #ef4444;
+}
+.pml-row-wrap .pml-row {
+    position: relative;
+    z-index: 2;
+    background: rgba(255, 255, 255, 0.85);
+    /* directive sets transform inline */
+}
+/* Override the original top-border because the wrap takes that role now. */
+.pml-list .pml-row + .pml-row { border-top: 0; }
 .pml-row {
     display: flex;
     align-items: center;

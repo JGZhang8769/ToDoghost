@@ -9,6 +9,8 @@ import { TaskService, Task } from '../../core/services/task.service';
 import { CategoryService, Category } from '../../core/services/category.service';
 import { WorkspaceService, Workspace } from '../../core/services/workspace.service';
 import { UserService, User } from '../../core/services/user.service';
+import { SwipeRowDirective } from '../../core/directives/swipe-row.directive';
+import { SwipeBackDirective } from '../../core/directives/swipe-back.directive';
 
 const USER_COLORS = [
   { bar: '#3b82f6', avatar: '#dbeafe', text: '#1d4ed8' },
@@ -36,7 +38,7 @@ const USER_COLORS = [
 @Component({
   selector: 'app-pro-mobile-list',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, SwipeRowDirective, SwipeBackDirective],
   templateUrl: './pro-mobile-list.component.html',
   styleUrl: './pro-mobile-list.component.scss',
 })
@@ -202,6 +204,17 @@ export class ProMobileListComponent implements OnInit, OnDestroy {
     if (ev) { ev.stopPropagation(); ev.preventDefault(); }
     const next = task.status === 'completed' ? 'pending' : 'completed';
     await this.taskService.updateTask(task.id, { status: next });
+  }
+
+  /** Right-swipe handler — mark complete (or toggle back). */
+  async onSwipeComplete(task: Task) {
+    const next = task.status === 'completed' ? 'pending' : 'completed';
+    await this.taskService.updateTask(task.id, { status: next });
+  }
+
+  /** Left-swipe handler — soft-delete with no confirm to keep the gesture snappy. */
+  async onSwipeDelete(task: Task) {
+    await this.taskService.deleteTask(task.id);
   }
 
   // ----- Schedule unscheduled task -----
