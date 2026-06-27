@@ -1,5 +1,5 @@
 /* ===========================================================
-   ToDoghost — Pro Mobile (iOS-style touch workspace)
+   ToDoghost — Pro Mobile Home (Apple Reminders-style)
    =========================================================== */
 
 :host {
@@ -8,606 +8,384 @@
     overflow: hidden;
 }
 
-.pmob-shell {
+.pmob-home {
     position: relative;
     height: 100%;
     display: flex;
     flex-direction: column;
-    color: #3b2f1e;
-    background:
-        radial-gradient(120% 80% at 0% 0%, #f4e9d3 0%, transparent 60%),
-        radial-gradient(100% 80% at 100% 100%, #f0dccc 0%, transparent 60%),
-        linear-gradient(140deg, #f8f2e4 0%, #efe5d2 50%, #f3e5d6 100%);
-    overflow: hidden;
-    -webkit-user-select: none;
-    user-select: none;
+    color: #2a1f10;
+    box-sizing: border-box;
+}
+.pmob-home *,
+.pmob-home *::before,
+.pmob-home *::after {
+    box-sizing: border-box;
 }
 
-/* Slow animated colour wash, kept lighter than desktop to save battery. */
-.pmob-bg {
+/* Sandy gradient background, no animated blobs to keep mobile painters happy */
+.pmob-home__bg {
     position: absolute;
     inset: 0;
     z-index: 0;
+    background:
+        radial-gradient(120% 80% at 0% 0%, #f4e9d3 0%, transparent 60%),
+        radial-gradient(100% 80% at 100% 100%, #f0dccc 0%, transparent 60%),
+        linear-gradient(170deg, #f8f2e4 0%, #efe5d2 60%, #f3e5d6 100%);
     pointer-events: none;
 }
-.pmob-bg__blob {
-    position: absolute;
-    width: 80vmax;
-    height: 80vmax;
-    border-radius: 50%;
-    filter: blur(60px);
-    opacity: 0.4;
-}
-.pmob-bg__blob--a { background: #e8d4a8; top: -30vmax; left: -20vmax; }
-.pmob-bg__blob--b { background: #d4a8a8; bottom: -30vmax; right: -20vmax; opacity: 0.3; }
 
-/* Reusable glass surface */
-.pmob-glass {
-    background: rgba(255, 255, 255, 0.78);
-    backdrop-filter: blur(22px) saturate(160%);
-    -webkit-backdrop-filter: blur(22px) saturate(160%);
-}
-
-/* ---------- Top bar ---------- */
-.pmob-topbar {
-    position: relative;
-    z-index: 5;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 8px;
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(16px) saturate(160%);
-    -webkit-backdrop-filter: blur(16px) saturate(160%);
-    border-bottom: 1px solid rgba(120, 100, 80, 0.08);
-}
-.pmob-iconbtn {
-    width: 40px;
-    height: 40px;
-    border: 0;
-    border-radius: 10px;
-    background: transparent;
-    color: #4a3a22;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: background 0.12s ease;
-}
-.pmob-iconbtn:active { background: rgba(120, 100, 80, 0.14); }
-.pmob-topbar__center {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-    min-width: 0;
-}
-.pmob-period {
-    width: 32px;
-    height: 32px;
-    border: 0;
-    border-radius: 50%;
-    background: rgba(120, 100, 80, 0.08);
-    color: #4a3a22;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-}
-.pmob-period:active { background: rgba(120, 100, 80, 0.2); }
-.pmob-topbar__title {
-    flex: 1;
-    text-align: center;
-    min-width: 0;
-}
-.pmob-title-btn {
-    background: transparent;
-    border: 0;
-    font-size: 16px;
-    font-weight: 700;
-    color: #2a1f10;
-    letter-spacing: -0.01em;
-    cursor: pointer;
-    padding: 6px 10px;
-    border-radius: 8px;
-}
-.pmob-title-btn:active { background: rgba(120, 100, 80, 0.1); }
-
-/* ---------- Grain switcher ---------- */
-.pmob-grain {
-    position: relative;
-    z-index: 4;
-    display: inline-flex;
-    align-self: center;
-    margin: 10px auto 6px;
-    background: rgba(120, 100, 80, 0.08);
-    border-radius: 999px;
-    padding: 3px;
-}
-.pmob-grain__btn {
-    padding: 6px 18px;
-    border: 0;
-    background: transparent;
-    color: #7a6850;
-    font-size: 13px;
-    font-weight: 600;
-    border-radius: 999px;
-    cursor: pointer;
-    transition: all 0.15s ease;
-}
-.pmob-grain__btn.is-active {
-    background: #fff;
-    color: #2a1f10;
-    box-shadow: 0 1px 3px rgba(60, 40, 20, 0.1);
-}
-
-/* ---------- Main calendar surface ---------- */
-.pmob-main {
+/* ---------- Scrollable content ---------- */
+.pmob-home__scroll {
     position: relative;
     z-index: 2;
     flex: 1;
-    overflow: hidden;
-    padding: 0 12px 12px;
-    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 16px 18px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
 }
 
-/* Month grid */
-.pmob-month {
+/* ---------- Headline date ---------- */
+.pmob-home__head {
     display: flex;
-    flex-direction: column;
-    height: 100%;
-    min-height: 0;
+    align-items: flex-end;
+    gap: 12px;
 }
-.pmob-month__weekheader {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
+.pmob-home__date {
+    flex: 1;
+    min-width: 0;
+}
+.pmob-home__date-main {
+    font-size: 30px;
+    font-weight: 800;
+    color: #2a1f10;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+}
+.pmob-home__date-sub {
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
     gap: 6px;
-    padding: 4px 0 8px;
+    font-size: 13px;
+    color: #7a6850;
+    flex-wrap: wrap;
+}
+.pmob-home__lunar { color: #a3917a; }
+.pmob-home__lunar.is-solar-term { color: #16a34a; font-weight: 600; }
+.pmob-home__today-chip {
+    background: linear-gradient(135deg, #d4a64a, #b58535);
+    color: #fff;
     font-size: 11px;
     font-weight: 700;
-    color: #a3917a;
-    text-align: center;
+    padding: 2px 8px;
+    border-radius: 999px;
+    margin-left: 4px;
 }
-.pmob-month__grid {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    grid-auto-rows: 1fr;
-    gap: 6px;
-    flex: 1;
-    min-height: 0;
-}
-.pmob-day {
-    background: rgba(255, 255, 255, 0.65);
-    border-radius: 10px;
-    padding: 4px 4px 6px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-    gap: 1px;
+.pmob-home__profile {
+    width: 40px;
+    height: 40px;
     border: 0;
-    cursor: pointer;
-    position: relative;
-    transition: background 0.12s ease, transform 0.12s ease;
-    color: #2a1f10;
-}
-.pmob-day:active { transform: scale(0.97); background: rgba(255, 255, 255, 0.9); }
-.pmob-day.is-other-month { opacity: 0.35; }
-.pmob-day.is-today {
-    background: rgba(255, 220, 180, 0.55);
-}
-.pmob-day.is-selected {
-    box-shadow: inset 0 0 0 2px #b5a78a;
-}
-.pmob-day__num {
-    font-size: 14px;
-    font-weight: 600;
-}
-.pmob-day.is-today .pmob-day__num {
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    color: #4a3a22;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    background: #ef4444;
-    color: #fff;
-    font-size: 12px;
+    cursor: pointer;
 }
-.pmob-day__lunar {
-    font-size: 9px;
-    color: #a3917a;
-    line-height: 1;
-}
-.pmob-day__lunar.is-solar-term { color: #16a34a; font-weight: 600; }
-.pmob-day__dot {
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: #b5a78a;
-    margin-top: 1px;
-}
-.pmob-day__dot.is-urgent { background: #ef4444; }
+.pmob-home__profile:active { background: #fff; }
 
-/* Week strip */
-.pmob-week {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    min-height: 0;
-}
-.pmob-week__strip {
+/* ---------- Week strip ---------- */
+.pmob-week-strip {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    gap: 6px;
-    padding: 8px 0;
-}
-.pmob-week__day {
-    background: rgba(255, 255, 255, 0.65);
+    gap: 4px;
+    padding: 8px 4px;
+    background: rgba(255, 255, 255, 0.55);
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.6);
     border-radius: 14px;
-    padding: 10px 0;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.7) inset;
+}
+.pmob-week-strip__day {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 4px;
     border: 0;
+    background: transparent;
+    padding: 6px 0 8px;
+    border-radius: 10px;
     cursor: pointer;
-    color: #2a1f10;
-    position: relative;
     transition: background 0.12s ease;
 }
-.pmob-week__day:active { background: rgba(255, 255, 255, 0.9); }
-.pmob-week__day.is-selected {
-    box-shadow: inset 0 0 0 2px #b5a78a;
+.pmob-week-strip__day:active { background: rgba(120, 100, 80, 0.08); }
+.pmob-week-strip__day.is-selected {
+    background: rgba(120, 100, 80, 0.15);
 }
-.pmob-week__dayname {
+.pmob-week-strip__name {
     font-size: 10px;
     font-weight: 700;
     color: #a3917a;
     letter-spacing: 0.05em;
 }
-.pmob-week__daynum {
-    font-size: 18px;
+.pmob-week-strip__num {
+    font-size: 16px;
     font-weight: 700;
+    color: #2a1f10;
 }
-.pmob-week__day.is-today .pmob-week__daynum {
+.pmob-week-strip__day.is-today .pmob-week-strip__num {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
+    width: 26px;
+    height: 26px;
     border-radius: 50%;
     background: #ef4444;
     color: #fff;
-    font-size: 14px;
-}
-
-/* ---------- Bottom sheet ---------- */
-.pmob-sheet {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 30;
-    background: rgba(255, 255, 255, 0.92);
-    backdrop-filter: blur(24px) saturate(170%);
-    -webkit-backdrop-filter: blur(24px) saturate(170%);
-    border-top: 1px solid rgba(120, 100, 80, 0.1);
-    border-top-left-radius: 22px;
-    border-top-right-radius: 22px;
-    box-shadow: 0 -8px 32px rgba(60, 40, 20, 0.15);
-    display: flex;
-    flex-direction: column;
-    transition: height 0.32s cubic-bezier(0.32, 0.72, 0, 1);
-    overflow: hidden;
-}
-.pmob-sheet.is-dragging { transition: none; }
-
-/* Grab handle on top of the sheet */
-.pmob-sheet__handle {
-    flex-shrink: 0;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: grab;
-    touch-action: none;
-    -webkit-touch-callout: none;
-}
-.pmob-sheet__handle:active { cursor: grabbing; }
-.pmob-sheet__bar {
-    width: 40px;
-    height: 5px;
-    border-radius: 999px;
-    background: rgba(120, 100, 80, 0.3);
-}
-
-/* Header inside the sheet (date / unscheduled chip / count) */
-.pmob-sheet__head {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 4px 16px 12px;
-}
-.pmob-sheet__title {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    overflow-x: auto;
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-}
-.pmob-sheet__title::-webkit-scrollbar { display: none; }
-.pmob-sheet__mode {
-    background: transparent;
-    border: 0;
-    padding: 6px 10px;
-    font-size: 14px;
-    font-weight: 700;
-    color: #a3917a;
-    border-radius: 999px;
-    cursor: pointer;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-}
-.pmob-sheet__mode.is-active {
-    color: #2a1f10;
-}
-.pmob-sheet__mode--chip {
-    font-size: 12px;
-    font-weight: 600;
-    background: rgba(196, 181, 253, 0.25);
-    color: #6d28d9;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-}
-.pmob-sheet__mode--chip.is-active {
-    background: rgba(139, 92, 246, 0.3);
-    color: #5b21b6;
-}
-.pmob-sheet__count {
-    font-size: 12px;
-    font-weight: 700;
-    color: #fff;
-    background: #7a6850;
-    padding: 2px 8px;
-    border-radius: 999px;
-    font-variant-numeric: tabular-nums;
-}
-
-/* Scrollable body */
-.pmob-sheet__body {
-    flex: 1;
-    overflow-y: auto;
-    padding: 0 8px 24px;
-    min-height: 0;
-    /* iOS momentum scroll */
-    -webkit-overflow-scrolling: touch;
-}
-
-.pmob-empty {
-    padding: 48px 16px;
-    text-align: center;
-    color: #a3917a;
-}
-.pmob-empty p {
-    margin: 8px 0 0;
     font-size: 13px;
 }
+.pmob-week-strip__dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: #b5a78a;
+}
+.pmob-week-strip__dot.is-empty {
+    background: transparent;
+}
+.pmob-week-strip__dot.is-urgent {
+    background: #ef4444;
+}
 
-/* Task row */
-.pmob-row {
-    width: 100%;
-    display: flex;
+/* ---------- "Open month calendar" link ---------- */
+.pmob-home__monthlink {
+    display: inline-flex;
     align-items: center;
-    gap: 10px;
-    padding: 10px 12px 10px 16px;
+    gap: 6px;
+    padding: 10px 14px;
+    background: rgba(255, 255, 255, 0.65);
     border: 0;
     border-radius: 12px;
-    background: transparent;
+    color: #4a3a22;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
     text-align: left;
-    cursor: pointer;
-    transition: background 0.12s ease;
-    position: relative;
-    color: #2a1f10;
 }
-.pmob-row::before {
-    content: "";
-    position: absolute;
-    left: 6px;
-    top: 12px;
-    bottom: 12px;
-    width: 3px;
-    border-radius: 2px;
-    background: var(--user-bar, transparent);
-}
-.pmob-row + .pmob-row { margin-top: 2px; }
-.pmob-row:active { background: rgba(255, 255, 255, 0.6); }
-.pmob-row.is-done { opacity: 0.5; }
+.pmob-home__monthlink:active { background: rgba(255, 255, 255, 0.95); }
 
-.pmob-check {
-    flex-shrink: 0;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    border: 2px solid rgba(120, 100, 80, 0.4);
-    background: transparent;
+/* ---------- Smart-list 2x2 cards ---------- */
+.pmob-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+.pmob-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding: 14px 16px 12px;
+    aspect-ratio: 1.5 / 1;
+    border: 0;
+    border-radius: 18px;
+    color: #fff;
     cursor: pointer;
+    overflow: hidden;
+    box-shadow: 0 4px 14px -4px rgba(60, 40, 20, 0.18);
+    text-align: left;
+}
+.pmob-card:active { transform: scale(0.98); transition: transform 0.08s ease; }
+.pmob-card__icon {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.25);
     color: #fff;
-    padding: 0;
-    transition: all 0.15s ease;
 }
-.pmob-check.is-checked {
-    background: #7a6850;
-    border-color: #7a6850;
+.pmob-card__count {
+    font-size: 30px;
+    font-weight: 800;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    align-self: flex-start;
+    margin-top: 4px;
 }
-
-.pmob-row__main {
-    flex: 1;
-    min-width: 0;
-}
-.pmob-row__title {
+.pmob-card__label {
     font-size: 14px;
     font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    overflow: hidden;
-}
-.pmob-row__titletext {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-.pmob-row.is-urgent .pmob-row__title { color: #dc2626; }
-.pmob-row.is-done .pmob-row__title { text-decoration: line-through; color: #a3917a; }
-.pmob-row__catico { font-size: 14px; opacity: 0.7; }
-.pmob-row__urg { font-size: 13px; color: #ef4444; }
-.pmob-row__meta {
-    font-size: 11px;
-    color: #a3917a;
-    display: flex;
-    gap: 6px;
-    margin-top: 2px;
-    overflow: hidden;
-    flex-wrap: wrap;
-}
-.pmob-row__tag { color: #7a6850; font-weight: 500; }
-.pmob-row__desc {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    flex: 1;
-    min-width: 0;
-}
-.pmob-row__chev {
-    color: #c4b59a;
-    font-size: 20px;
-    flex-shrink: 0;
+    opacity: 0.92;
 }
 
-/* ---------- Sidebar overlay ---------- */
-.pmob-sidebar-scrim {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.32);
-    backdrop-filter: blur(2px);
-    z-index: 90;
-    animation: pmob-fade 0.18s ease;
-}
-@keyframes pmob-fade {
-    from { opacity: 0; } to { opacity: 1; }
-}
-.pmob-sidebar {
-    position: fixed;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    width: 82vw;
-    max-width: 340px;
-    background: rgba(255, 255, 255, 0.92);
-    backdrop-filter: blur(28px) saturate(170%);
-    -webkit-backdrop-filter: blur(28px) saturate(170%);
-    border-right: 1px solid rgba(255, 255, 255, 0.7);
-    box-shadow: 8px 0 32px rgba(60, 40, 20, 0.18);
-    z-index: 100;
-    transform: translateX(-100%);
-    transition: transform 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+.pmob-card--today      { background: linear-gradient(135deg, #fbbf24, #f59e0b); }
+.pmob-card--week       { background: linear-gradient(135deg, #60a5fa, #3b82f6); }
+.pmob-card--urgent     { background: linear-gradient(135deg, #f87171, #ef4444); }
+.pmob-card--unscheduled{ background: linear-gradient(135deg, #c4b5fd, #8b5cf6); }
+
+/* ---------- Grouped sections (categories, etc.) ---------- */
+.pmob-group {
     display: flex;
     flex-direction: column;
-}
-.pmob-sidebar.is-open {
-    transform: translateX(0);
-}
-.pmob-sidebar__head {
-    display: flex;
-    align-items: center;
     gap: 8px;
-    padding: 8px 8px;
-    border-bottom: 1px solid rgba(120, 100, 80, 0.08);
 }
-.pmob-sidebar__brand {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-weight: 700;
-    color: #2a1f10;
-    font-size: 15px;
-}
-.pmob-sidebar__body {
-    flex: 1;
-    overflow-y: auto;
-    padding: 12px;
-    -webkit-overflow-scrolling: touch;
-}
-.pmob-sidebar__section {
-    margin-bottom: 16px;
-}
-.pmob-sidebar__heading {
-    font-size: 11px;
+.pmob-group__title {
+    margin: 0 4px;
+    font-size: 13px;
     font-weight: 700;
     color: #a3917a;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    margin: 0 0 6px 8px;
 }
-.pmob-nav {
+.pmob-group__card {
+    background: rgba(255, 255, 255, 0.6);
+    border-radius: 14px;
+    overflow: hidden;
+}
+.pmob-grouprow {
+    width: 100%;
     display: flex;
     align-items: center;
-    gap: 10px;
-    width: 100%;
-    padding: 10px 8px;
-    border-radius: 10px;
-    color: #4a3a22;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    background: transparent;
+    gap: 12px;
+    padding: 12px 14px;
     border: 0;
+    background: transparent;
+    cursor: pointer;
     text-align: left;
-    transition: background 0.12s ease;
-}
-.pmob-nav:active, .pmob-nav.is-active {
-    background: rgba(120, 100, 80, 0.12);
-}
-.pmob-nav.is-active {
     color: #2a1f10;
-    font-weight: 600;
 }
-.pmob-nav__icon {
-    width: 26px;
-    height: 26px;
-    border-radius: 7px;
+.pmob-grouprow + .pmob-grouprow {
+    border-top: 1px solid rgba(120, 100, 80, 0.08);
+}
+.pmob-grouprow:active { background: rgba(120, 100, 80, 0.06); }
+.pmob-grouprow__icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     color: #fff;
     flex-shrink: 0;
 }
-.pmob-nav__label {
+.pmob-grouprow__label {
     flex: 1;
+    font-size: 15px;
+    font-weight: 500;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    min-width: 0;
 }
-.pmob-nav__count {
-    font-size: 12px;
+.pmob-grouprow__count {
+    font-size: 13px;
     color: #a3917a;
     font-variant-numeric: tabular-nums;
 }
-.pmob-nav.is-active .pmob-nav__count { color: #7a6850; }
-
-/* Avoid the calendar squishing too much when the sheet is open. The sheet
-   itself overlays; padding-bottom on .pmob-main grants the calendar enough
-   space when sheet is at its min height. */
-.pmob-shell:not(.pmob-sheet-full) .pmob-main {
-    padding-bottom: 6px;
+.pmob-grouprow__chev {
+    color: #c4b59a;
+    font-size: 18px;
+    flex-shrink: 0;
 }
+
+/* ---------- Collaborator chips ---------- */
+.pmob-group__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.pmob-userchip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px 6px 6px;
+    border: 0;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.pmob-userchip__avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 800;
+}
+.pmob-userchip__count {
+    font-size: 11px;
+    background: rgba(255, 255, 255, 0.5);
+    padding: 1px 8px;
+    border-radius: 999px;
+}
+
+/* ---------- Docked quick-add bar ---------- */
+.pmob-home__spacer { height: 80px; flex-shrink: 0; }
+.pmob-quickadd {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 8px 8px 14px;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    border-radius: 999px;
+    box-shadow: 0 6px 20px rgba(60, 40, 20, 0.15);
+}
+.pmob-quickadd__icon {
+    font-size: 22px;
+    color: #a3917a;
+    flex-shrink: 0;
+}
+.pmob-quickadd__input {
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+    border: 0;
+    outline: 0;
+    font-size: 15px;
+    color: #2a1f10;
+    font-family: inherit;
+}
+.pmob-quickadd__input::placeholder { color: #a3917a; }
+.pmob-quickadd__btn {
+    width: 38px;
+    height: 38px;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(120, 100, 80, 0.15);
+    color: #7a6850;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.12s ease;
+}
+.pmob-quickadd__btn.is-ready {
+    background: linear-gradient(135deg, #d4a64a, #b58535);
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(180, 120, 40, 0.4);
+}
+.pmob-quickadd__btn:active { transform: scale(0.92); }
