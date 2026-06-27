@@ -192,7 +192,7 @@ export class SettingsComponent implements OnInit, OnDestroy {
   }
 
   goBack() {
-    this.router.navigate(['/main']);
+    this.router.navigate(['/pro']);
   }
 
   openCategoryDrawer() {

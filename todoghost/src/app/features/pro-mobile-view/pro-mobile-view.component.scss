@@ -92,7 +92,10 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 8px 14px;
+    /* Top padding respects iOS safe-area (notch / Dynamic Island). Without
+       this, on iPhone 12 / 15 Pro the logo and workspace name get tucked
+       under the camera notch and the topbar feels "cut". */
+    padding: max(8px, env(safe-area-inset-top)) 14px 8px;
     background: rgba(255, 255, 255, 0.78);
     backdrop-filter: blur(16px) saturate(160%);
     -webkit-backdrop-filter: blur(16px) saturate(160%);
@@ -504,12 +507,19 @@
 }
 
 /* ---------- Docked quick-add bar ---------- */
-.pmob-home__spacer { height: 80px; flex-shrink: 0; }
+/* Spacer at the bottom of the scroll surface so the last row of content
+   isn't hidden under the docked quick-add bar. Has to account for the bar's
+   height (~54px) + its bottom offset + the home-indicator safe area. */
+.pmob-home__spacer {
+    height: calc(80px + env(safe-area-inset-bottom));
+    flex-shrink: 0;
+}
 .pmob-quickadd {
     position: absolute;
     left: 12px;
     right: 12px;
-    bottom: 12px;
+    /* Pin above the home indicator on iPhones with a gesture bar. */
+    bottom: max(12px, env(safe-area-inset-bottom));
     z-index: 5;
     display: flex;
     align-items: center;
