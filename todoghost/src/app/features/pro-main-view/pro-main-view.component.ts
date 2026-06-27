@@ -5,6 +5,8 @@ import { Router } from '@angular/router';
 import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { Subject, takeUntil } from 'rxjs';
 import { addDays, addMonths, addWeeks, endOfMonth, endOfWeek, format, isSameMonth, startOfMonth, startOfWeek, subMonths, subWeeks } from 'date-fns';
+// @ts-ignore — pure JS lib, no types shipped
+import { getLunar } from 'chinese-lunar-calendar';
 
 import { TaskService, Task } from '../../core/services/task.service';
 import { CategoryService, Category } from '../../core/services/category.service';
@@ -14,8 +16,19 @@ import { SvgIconComponent } from '../../core/svg-icon/svg-icon.component';
 
 type LayoutMode = 'calendar-first' | 'list-first';
 type CalGrain = 'month' | 'week';
-type SmartList = 'inbox' | 'today' | 'week' | 'urgent' | 'unscheduled' | 'completed';
-type SelectedList = SmartList | { kind: 'category'; id: string };
+type SmartList = 'inbox' | 'today' | 'week' | 'urgent' | 'unscheduled' | 'completed' | 'selected-date';
+type SelectedList = SmartList | { kind: 'category'; id: string } | { kind: 'user'; id: string };
+type InspectorMode = 'day' | 'edit';
+
+interface CalendarDay {
+  dateStr: string;
+  dayNum: number;
+  isCurrentMonth: boolean;
+  isToday: boolean;
+  tasks: Task[];
+  lunarLabel: string;        // e.g. "初一", "立春"
+  isSolarTerm: boolean;      // true if lunarLabel is a 節氣
+}
 
 interface WeekDay {
   dateStr: string;
@@ -25,9 +38,40 @@ interface WeekDay {
   tasks: Task[];
   allDay: Task[];
   timedBlocks: { task: Task; top: number; height: number }[];
+  lunarLabel: string;
+  isSolarTerm: boolean;
 }
 
 const HOUR_PX = 48; // visible height per hour in week timeline
+
+/**
+ * Per-user accent palette used to mark task creator. Cycles based on user
+ * order in the workspace so the assignment is stable across reloads.
+ */
+const USER_COLORS = [
+  { bar: '#3b82f6', avatar: '#dbeafe', text: '#1d4ed8' },   // blue
+  { bar: '#ec4899', avatar: '#fce7f3', text: '#be185d' },   // pink
+  { bar: '#10b981', avatar: '#d1fae5', text: '#047857' },   // green
+  { bar: '#f59e0b', avatar: '#fef3c7', text: '#b45309' },   // amber
+  { bar: '#8b5cf6', avatar: '#ede9fe', text: '#6d28d9' },   // violet
+  { bar: '#14b8a6', avatar: '#ccfbf1', text: '#0f766e' },   // teal
+];
+
+/**
+ * Form model used by the Pro inline create form. Mirrors a Task shape but
+ * without the IDs the service generates.
+ */
+interface NewTaskForm {
+  title: string;
+  date: string | null;
+  startTime: string | null;
+  endTime: string | null;
+  isUrgent: boolean;
+  categoryId?: string;
+  tags: string[];
+  reminderOffset: number | null;
+  description: string;
+}
 
 @Component({
   selector: 'app-pro-main-view',
@@ -66,24 +110,31 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
   currentUser: User | null = null;
   tasks: Task[] = [];
   categories: Category[] = [];
+  workspaceUsers: User[] = [];
 
   // View state
   selectedList: SelectedList = 'today';
   currentDate = new Date();
   selectedDateStr = format(new Date(), 'yyyy-MM-dd');
 
-  // Selection & inspector
+  // Inspector: 'day' = list of selectedDateStr's tasks, 'edit' = single task editor
+  inspectorMode: InspectorMode = 'day';
   selectedTaskId: string | null = null;
   get selectedTask(): Task | null {
     return this.selectedTaskId ? this.tasks.find(t => t.id === this.selectedTaskId) ?? null : null;
   }
 
-  // Quick add
+  // Quick add (legacy quickAdd box still lives in list pane header)
   quickAddTitle = '';
   searchQuery = '';
 
+  // Pro inline create form
+  showCreateForm = false;
+  createForm: NewTaskForm = this.blankCreateForm();
+  createFormTagInput = '';
+
   // Calendar data
-  calendarDays: { dateStr: string; dayNum: number; isCurrentMonth: boolean; isToday: boolean; tasks: Task[] }[] = [];
+  calendarDays: CalendarDay[] = [];
   weekDays: WeekDay[] = [];
   currentMonthStr = '';
   currentWeekStr = '';
@@ -91,11 +142,6 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
   nowLineTop = 0;
 
   private nowTimer: any;
-
-  // Form modal — Pro reuses a thin wrapper around create
-  showQuickForm = false;
-  quickFormDate: string | null = null;
-  quickFormStartTime: string | null = null;
 
   // ---------- Smart list ----------
   get quickAddTargetDate(): string | null {
@@ -109,7 +155,13 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     const weekStart = format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd');
     const weekEnd = format(endOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd');
 
-    if (this.selectedList === 'today') {
+    // When layout is "list-first", the list always follows the selected date
+    // from the mini-calendar regardless of which smart list is active.
+    if (this.layoutMode === 'list-first') {
+      filtered = this.tasks.filter(t => t.date === this.selectedDateStr && t.status !== 'completed');
+    } else if (this.selectedList === 'selected-date') {
+      filtered = this.tasks.filter(t => t.date === this.selectedDateStr && t.status !== 'completed');
+    } else if (this.selectedList === 'today') {
       filtered = this.tasks.filter(t => t.date === today && t.status !== 'completed');
     } else if (this.selectedList === 'week') {
       filtered = this.tasks.filter(t => t.date && t.date >= weekStart && t.date <= weekEnd && t.status !== 'completed');
@@ -124,6 +176,9 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     } else if (typeof this.selectedList === 'object' && this.selectedList.kind === 'category') {
       const catId = this.selectedList.id;
       filtered = this.tasks.filter(t => t.categoryId === catId && t.status !== 'completed');
+    } else if (typeof this.selectedList === 'object' && this.selectedList.kind === 'user') {
+      const userId = this.selectedList.id;
+      filtered = this.tasks.filter(t => t.createdBy === userId && t.status !== 'completed');
     } else {
       filtered = this.tasks;
     }
@@ -150,6 +205,8 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
   }
 
   get currentListLabel(): string {
+    if (this.layoutMode === 'list-first') return this.selectedDateStr;
+    if (this.selectedList === 'selected-date') return this.selectedDateStr;
     if (this.selectedList === 'today') return '今日';
     if (this.selectedList === 'week') return '本週';
     if (this.selectedList === 'urgent') return '緊急';
@@ -159,6 +216,9 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     if (typeof this.selectedList === 'object' && this.selectedList.kind === 'category') {
       return this.categories.find(c => c.id === (this.selectedList as any).id)?.name ?? '分類';
     }
+    if (typeof this.selectedList === 'object' && this.selectedList.kind === 'user') {
+      return this.workspaceUsers.find(u => u.id === (this.selectedList as any).id)?.name ?? '建立者';
+    }
     return '清單';
   }
 
@@ -167,17 +227,163 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     const ws = format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd');
     const we = format(endOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd');
     switch (list) {
-      case 'today':       return this.tasks.filter(t => t.date === today && t.status !== 'completed').length;
-      case 'urgent':      return this.tasks.filter(t => t.isUrgent && t.status !== 'completed').length;
-      case 'unscheduled': return this.tasks.filter(t => !t.date && t.status !== 'completed').length;
-      case 'inbox':       return this.tasks.filter(t => t.status !== 'completed').length;
-      case 'week':        return this.tasks.filter(t => t.date && t.date >= ws && t.date <= we && t.status !== 'completed').length;
-      case 'completed':   return this.tasks.filter(t => t.status === 'completed').length;
+      case 'today':         return this.tasks.filter(t => t.date === today && t.status !== 'completed').length;
+      case 'urgent':        return this.tasks.filter(t => t.isUrgent && t.status !== 'completed').length;
+      case 'unscheduled':   return this.tasks.filter(t => !t.date && t.status !== 'completed').length;
+      case 'inbox':         return this.tasks.filter(t => t.status !== 'completed').length;
+      case 'week':          return this.tasks.filter(t => t.date && t.date >= ws && t.date <= we && t.status !== 'completed').length;
+      case 'completed':     return this.tasks.filter(t => t.status === 'completed').length;
+      case 'selected-date': return this.tasksForDate(this.selectedDateStr).length;
     }
+    return 0;
   }
 
   categoryCount(catId: string): number {
     return this.tasks.filter(t => t.categoryId === catId && t.status !== 'completed').length;
+  }
+
+  userCount(userId: string): number {
+    return this.tasks.filter(t => t.createdBy === userId && t.status !== 'completed').length;
+  }
+
+  /** All tasks (including completed) for a given dateStr, sorted by startTime then order. */
+  tasksForDate(dateStr: string): Task[] {
+    return this.tasks
+      .filter(t => t.date === dateStr)
+      .sort((a, b) => {
+        const at = a.startTime ?? '99:99';
+        const bt = b.startTime ?? '99:99';
+        if (at !== bt) return at < bt ? -1 : 1;
+        return (a.order ?? 0) - (b.order ?? 0);
+      });
+  }
+
+  // ---------- User color (creator marker) ----------
+  userColor(userId: string | undefined): { bar: string; avatar: string; text: string } | null {
+    if (!userId) return null;
+    const idx = this.workspaceUsers.findIndex(u => u.id === userId);
+    if (idx < 0) return null;
+    return USER_COLORS[idx % USER_COLORS.length];
+  }
+
+  userName(userId: string | undefined): string {
+    if (!userId) return '';
+    return this.workspaceUsers.find(u => u.id === userId)?.name ?? '';
+  }
+
+  userInitial(userId: string | undefined): string {
+    const name = this.userName(userId);
+    return name ? name[0] : '?';
+  }
+
+  // ---------- Lunar / solar term helpers ----------
+  /**
+   * Returns a short string suitable for showing under the gregorian date in
+   * a calendar cell:
+   *   - if the day is a 節氣 (e.g. 立春), returns the term name
+   *   - else if it's lunar 初一, returns the lunar month name (e.g. 正月)
+   *   - else returns the lunar date (初二, 廿三, …)
+   * Also returns whether this is a solar term so the caller can colour it.
+   */
+  lunarLabelFor(dateStr: string): { label: string; isSolarTerm: boolean } {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    try {
+      const lunar = getLunar(y, m, d);
+      if (lunar.solarTerm) return { label: lunar.solarTerm, isSolarTerm: true };
+      if (lunar.lunarDate === 1) {
+        const monthChars = ['正', '二', '三', '四', '五', '六', '七', '八', '九', '十', '冬', '腊'];
+        return { label: `${monthChars[lunar.lunarMonth - 1]}月`, isSolarTerm: false };
+      }
+      return { label: this.formatLunarDay(lunar.lunarDate), isSolarTerm: false };
+    } catch {
+      return { label: '', isSolarTerm: false };
+    }
+  }
+
+  private formatLunarDay(day: number): string {
+    const nums = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
+    if (day <= 10) return `初${nums[day - 1]}`;
+    if (day < 20) return `十${nums[day - 11]}`;
+    if (day === 20) return '二十';
+    if (day < 30) return `廿${nums[day - 21]}`;
+    if (day === 30) return '三十';
+    return '';
+  }
+
+  // ---------- Create form helpers ----------
+  blankCreateForm(): NewTaskForm {
+    return {
+      title: '',
+      date: this.selectedDateStr,
+      startTime: null,
+      endTime: null,
+      isUrgent: false,
+      tags: [],
+      reminderOffset: null,
+      description: '',
+    };
+  }
+
+  openCreateForm(prefill?: Partial<NewTaskForm>) {
+    this.createForm = { ...this.blankCreateForm(), ...prefill };
+    this.createFormTagInput = '';
+    this.showCreateForm = true;
+  }
+
+  closeCreateForm() {
+    this.showCreateForm = false;
+  }
+
+  addCreateFormTag() {
+    const t = this.createFormTagInput.trim();
+    if (!t || this.createForm.tags.includes(t)) { this.createFormTagInput = ''; return; }
+    this.createForm.tags = [...this.createForm.tags, t];
+    this.createFormTagInput = '';
+  }
+  removeCreateFormTag(tag: string) {
+    this.createForm.tags = this.createForm.tags.filter(x => x !== tag);
+  }
+
+  async submitCreateForm() {
+    const title = this.createForm.title.trim();
+    if (!title || !this.currentWorkspace || !this.currentUser) return;
+    const maxOrder = this.tasks.reduce((m, t) => Math.max(m, t.order ?? 0), 0);
+    const id = await this.taskService.addTask({
+      workspaceId: this.currentWorkspace.id,
+      title,
+      description: this.createForm.description || undefined,
+      date: this.createForm.date,
+      startTime: this.createForm.startTime,
+      endTime: this.createForm.endTime,
+      tags: this.createForm.tags,
+      isUrgent: this.createForm.isUrgent,
+      createdBy: this.currentUser.id,
+      status: 'pending',
+      reminderOffset: this.createForm.reminderOffset,
+      order: maxOrder + 1,
+      categoryId: this.createForm.categoryId,
+    } as any);
+    this.showCreateForm = false;
+    setTimeout(() => { this.selectedTaskId = id; this.inspectorMode = 'edit'; this.showInspector = true; }, 200);
+  }
+
+  // ---------- Selected-task tag mutations (inspector edit pane) ----------
+  selectedTaskTagInput = '';
+  addSelectedTaskTag() {
+    if (!this.selectedTask) return;
+    const t = this.selectedTaskTagInput.trim();
+    if (!t) return;
+    const tags = [...(this.selectedTask.tags ?? [])];
+    if (tags.includes(t)) { this.selectedTaskTagInput = ''; return; }
+    tags.push(t);
+    this.selectedTask.tags = tags;
+    this.selectedTaskTagInput = '';
+    this.saveSelectedTask();
+  }
+  removeSelectedTaskTag(tag: string) {
+    if (!this.selectedTask) return;
+    this.selectedTask.tags = (this.selectedTask.tags ?? []).filter(x => x !== tag);
+    this.saveSelectedTask();
   }
 
   // ---------- Lifecycle ----------
@@ -205,6 +411,13 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     });
 
     this.userService.currentUser$.pipe(takeUntil(this.destroy$)).subscribe(u => this.currentUser = u);
+    this.userService.getUsers().pipe(takeUntil(this.destroy$)).subscribe(users => {
+      // Filter to workspace members so colors don't drift between workspaces.
+      const memberIds = new Set(this.currentWorkspace?.users ?? []);
+      const filtered = memberIds.size > 0 ? users.filter(u => memberIds.has(u.id)) : users;
+      // Stable ordering by id so colors don't shuffle between renders.
+      this.workspaceUsers = [...filtered].sort((a, b) => a.id.localeCompare(b.id));
+    });
 
     this.buildCalendar();
     this.buildWeek();
@@ -273,12 +486,15 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     let d = gridStart;
     while (d <= gridEnd) {
       const dateStr = format(d, 'yyyy-MM-dd');
+      const lunar = this.lunarLabelFor(dateStr);
       days.push({
         dateStr,
         dayNum: d.getDate(),
         isCurrentMonth: isSameMonth(d, this.currentDate),
         isToday: dateStr === todayStr,
         tasks: this.tasks.filter(t => t.date === dateStr).sort((a, b) => (a.startTime ?? '99:99').localeCompare(b.startTime ?? '99:99')),
+        lunarLabel: lunar.label,
+        isSolarTerm: lunar.isSolarTerm,
       });
       d = addDays(d, 1);
     }
@@ -313,6 +529,7 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
           height: Math.max(24, ((endMin - startMin) / 60) * HOUR_PX),
         };
       });
+      const lunar = this.lunarLabelFor(dateStr);
       result.push({
         dateStr,
         dayNum: d.getDate(),
@@ -321,6 +538,8 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
         tasks: dayTasks,
         allDay,
         timedBlocks,
+        lunarLabel: lunar.label,
+        isSolarTerm: lunar.isSolarTerm,
       });
     }
     this.weekDays = result;
@@ -354,22 +573,40 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
 
   selectDate(dateStr: string) {
     this.selectedDateStr = dateStr;
+    // Day Pane on the right always reflects the most recently selected date.
+    this.inspectorMode = 'day';
+    this.selectedTaskId = null;
+    this.showInspector = true;
   }
 
   // ---------- Selection ----------
   selectTask(taskId: string) {
     this.selectedTaskId = taskId;
+    this.inspectorMode = 'edit';
     this.showInspector = true;
+  }
+
+  backToDayPane() {
+    this.inspectorMode = 'day';
+    this.selectedTaskId = null;
   }
 
   selectSmartList(list: SmartList) {
     this.selectedList = list;
     this.selectedTaskId = null;
+    this.inspectorMode = 'day';
   }
 
   selectCategoryList(cat: Category) {
     this.selectedList = { kind: 'category', id: cat.id };
     this.selectedTaskId = null;
+    this.inspectorMode = 'day';
+  }
+
+  selectUserList(user: User) {
+    this.selectedList = { kind: 'user', id: user.id };
+    this.selectedTaskId = null;
+    this.inspectorMode = 'day';
   }
 
   isSelectedList(list: SmartList): boolean {
@@ -378,6 +615,10 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
 
   isSelectedCategory(catId: string): boolean {
     return typeof this.selectedList === 'object' && this.selectedList.kind === 'category' && this.selectedList.id === catId;
+  }
+
+  isSelectedUser(userId: string): boolean {
+    return typeof this.selectedList === 'object' && this.selectedList.kind === 'user' && this.selectedList.id === userId;
   }
 
   // ---------- Task mutations ----------
@@ -407,27 +648,26 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     this.quickAddTitle = '';
   }
 
-  /** Top-right "+" button — opens form pre-filled with selected date. */
-  async openCreateForSelectedDate() {
-    await this.createInline(this.selectedDateStr, null);
+  /** Top-right "+" button — opens inline form pre-filled with selected date. */
+  openCreateForSelectedDate() {
+    this.openCreateForm({ date: this.selectedDateStr });
   }
 
   /** Double-click on a calendar day cell. */
-  async openCreateForDate(dateStr: string) {
+  openCreateForDate(dateStr: string) {
     this.selectedDateStr = dateStr;
-    await this.createInline(dateStr, null);
+    this.openCreateForm({ date: dateStr });
   }
 
   /** Double-click on an hour cell in week view. */
-  async openCreateForDateTime(dateStr: string, hour: number) {
+  openCreateForDateTime(dateStr: string, hour: number) {
     this.selectedDateStr = dateStr;
     const hh = hour.toString().padStart(2, '0');
-    await this.createInline(dateStr, `${hh}:00`);
+    this.openCreateForm({ date: dateStr, startTime: `${hh}:00` });
   }
 
   /**
-   * Inline create: prompt for title, then add task with given date / startTime.
-   * Keeps Pro mode lightweight — the heavy modal stays in classic /main.
+   * Legacy createInline retained as a thin wrapper for any old call sites.
    */
   private async createInline(dateStr: string | null, startTime: string | null) {
     if (!this.currentWorkspace || !this.currentUser) return;
@@ -448,7 +688,7 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
       order: maxOrder + 1,
     } as any);
     // Select the newly created task once it propagates via the live query.
-    setTimeout(() => { this.selectedTaskId = id; this.showInspector = true; }, 200);
+    setTimeout(() => { this.selectedTaskId = id; this.inspectorMode = 'edit'; this.showInspector = true; }, 200);
   }
 
   async deleteTask(task: Task) {

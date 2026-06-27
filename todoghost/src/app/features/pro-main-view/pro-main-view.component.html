@@ -129,6 +129,19 @@
         </button>
       </section>
 
+      <section class="pro-sidebar__section" *ngIf="workspaceUsers.length > 1">
+        <h4 class="pro-sidebar__heading">建立者</h4>
+        <button *ngFor="let u of workspaceUsers" class="pro-nav" [class.is-active]="isSelectedUser(u.id)" (click)="selectUserList(u)">
+          <span class="pro-nav__icon"
+                [style.background]="userColor(u.id)?.avatar"
+                [style.color]="userColor(u.id)?.text">
+            <span style="font-size: 11px; font-weight: 800;">{{ userInitial(u.id) }}</span>
+          </span>
+          <span class="pro-nav__label">{{ u.name }}</span>
+          <span class="pro-nav__count">{{ userCount(u.id) }}</span>
+        </button>
+      </section>
+
       <div class="pro-sidebar__footer">
         <div class="pro-user" *ngIf="currentUser">
           <span class="pro-user__avatar">{{ (currentUser.name || '?')[0] }}</span>
@@ -165,15 +178,18 @@
                  (cdkDropListDropped)="dropOnDate($event, d.dateStr)">
               <div class="pro-day__head">
                 <span class="pro-day__num">{{ d.dayNum }}</span>
+                <span *ngIf="d.lunarLabel" class="pro-day__lunar" [class.is-solar-term]="d.isSolarTerm">{{ d.lunarLabel }}</span>
                 <span *ngIf="d.tasks.length > 0" class="pro-day__badge">{{ d.tasks.length }}</span>
               </div>
               <div class="pro-day__tasks">
                 <ng-container *ngFor="let t of d.tasks; let i = index">
                   <div *ngIf="i < 4"
-                       cdkDrag [cdkDragData]="t"                       class="pro-day__task"
+                       cdkDrag [cdkDragData]="t"
+                       class="pro-day__task"
                        [class.is-urgent]="t.isUrgent && t.status !== 'completed'"
                        [class.is-done]="t.status === 'completed'"
                        [class.is-selected]="selectedTaskId === t.id"
+                       [style.--user-bar]="userColor(t.createdBy)?.bar"
                        (click)="selectTask(t.id); $event.stopPropagation()">
                     <span *ngIf="t.startTime" class="pro-day__time tabular-nums">{{ t.startTime }}</span>
                     <span class="pro-day__title">{{ t.title }}</span>
@@ -208,10 +224,12 @@
                  (click)="selectDate(d.dateStr)"
                  (dblclick)="openCreateForDate(d.dateStr)">
               <div *ngFor="let t of d.allDay"
-                   cdkDrag [cdkDragData]="t"                   class="pro-week__chip"
+                   cdkDrag [cdkDragData]="t"
+                   class="pro-week__chip"
                    [class.is-urgent]="t.isUrgent && t.status !== 'completed'"
                    [class.is-done]="t.status === 'completed'"
                    [class.is-selected]="selectedTaskId === t.id"
+                   [style.--user-bar]="userColor(t.createdBy)?.bar"
                    (click)="selectTask(t.id); $event.stopPropagation()">
                 {{ t.title }}
               </div>
@@ -227,12 +245,14 @@
               <div *ngFor="let h of dayHours" class="pro-week__hour-cell"
                    (dblclick)="openCreateForDateTime(d.dateStr, h)"></div>
               <div *ngFor="let block of d.timedBlocks"
-                   cdkDrag [cdkDragData]="block.task"                   class="pro-week__event"
+                   cdkDrag [cdkDragData]="block.task"
+                   class="pro-week__event"
                    [class.is-urgent]="block.task.isUrgent && block.task.status !== 'completed'"
                    [class.is-done]="block.task.status === 'completed'"
                    [class.is-selected]="selectedTaskId === block.task.id"
                    [style.top.px]="block.top"
                    [style.height.px]="block.height"
+                   [style.--user-bar]="userColor(block.task.createdBy)?.bar"
                    (click)="selectTask(block.task.id); $event.stopPropagation()">
                 <div class="pro-week__event-title">{{ block.task.title }}</div>
                 <div class="pro-week__event-time tabular-nums" *ngIf="block.task.startTime">
@@ -318,11 +338,13 @@
              [cdkDropListData]="listPaneTasks"
              (cdkDropListDropped)="reorderInList($event)">
           <div *ngFor="let t of listPaneTasks"
-               cdkDrag [cdkDragData]="t"               class="pro-row"
+               cdkDrag [cdkDragData]="t"
+               class="pro-row"
                [class.pro-row--big]="big"
                [class.is-selected]="selectedTaskId === t.id"
                [class.is-urgent]="t.isUrgent && t.status !== 'completed'"
                [class.is-done]="t.status === 'completed'"
+               [style.--user-bar]="userColor(t.createdBy)?.bar"
                (click)="selectTask(t.id)">
             <button class="pro-row__check" (click)="toggleCompletion(t); $event.stopPropagation()" [class.is-checked]="t.status === 'completed'">
               <span *ngIf="t.status === 'completed'" class="material-icons" style="font-size: 14px;">check</span>
@@ -361,35 +383,218 @@
 
     <!-- Right: Inspector -->
     <aside *ngIf="showInspector" class="pro-inspector pro-glass">
-      <div *ngIf="!selectedTask" class="pro-inspector__empty">
-        <span class="material-icons" style="font-size: 36px;">touch_app</span>
-        <p>選一個代辦來編輯</p>
-        <p class="pro-inspector__hint">在中央區或月曆裡點任一項目</p>
-      </div>
 
-      <div *ngIf="selectedTask as t" class="pro-inspector__body ios-scroll">
-        <div class="pro-inspector__head">
-          <button class="pro-check" (click)="toggleCompletion(t)" [class.is-checked]="t.status === 'completed'" title="完成">
-            <span *ngIf="t.status === 'completed'" class="material-icons" style="font-size: 14px;">check</span>
+      <!-- =========== Day Pane (default): list of tasks for selectedDateStr =========== -->
+      <ng-container *ngIf="inspectorMode === 'day'">
+        <header class="pro-inspector__pane-head">
+          <div class="pro-inspector__pane-title">
+            <span class="material-icons" style="font-size: 18px; color: #7a6850;">event</span>
+            <div class="pro-inspector__pane-date">
+              <div class="pro-inspector__pane-datemain">{{ selectedDateStr }}</div>
+              <div class="pro-inspector__pane-lunar" *ngIf="lunarLabelFor(selectedDateStr) as lu">
+                <span [class.is-solar-term]="lu.isSolarTerm">{{ lu.label }}</span>
+              </div>
+            </div>
+          </div>
+          <button class="pro-iconbtn" title="新增到這天" (click)="openCreateForm({ date: selectedDateStr })">
+            <span class="material-icons" style="font-size: 20px;">add</span>
           </button>
-          <input class="pro-inspector__title"
-                 [(ngModel)]="t.title"
-                 (change)="saveSelectedTask()"
-                 placeholder="代辦標題"
-                 [class.is-done]="t.status === 'completed'"
-                 [class.is-urgent]="t.isUrgent && t.status !== 'completed'">
-        </div>
+        </header>
 
-        <div class="pro-field-row">
-          <span class="pro-field-row__label">
-            <span class="material-icons pro-field-row__icon" style="font-size: 16px; color: #7a6850;">check_circle</span>
-            已完成
-          </span>
-          <label class="ios-toggle">
-            <input type="checkbox" [checked]="t.status === 'completed'" (change)="toggleCompletion(t)">
-            <span class="slider"></span>
-          </label>
+        <div class="pro-inspector__body ios-scroll pro-daypane">
+          <ng-container *ngIf="tasksForDate(selectedDateStr) as items">
+            <div *ngIf="items.length === 0" class="pro-empty">
+              <span class="material-icons" style="font-size: 32px;">event_available</span>
+              <p>這天沒有代辦</p>
+              <p class="pro-empty__hint">點右上 + 新增到這天</p>
+            </div>
+            <button *ngFor="let t of items"
+                    class="pro-daypane__row"
+                    [class.is-urgent]="t.isUrgent && t.status !== 'completed'"
+                    [class.is-done]="t.status === 'completed'"
+                    [style.--user-bar]="userColor(t.createdBy)?.bar"
+                    (click)="selectTask(t.id)">
+              <button class="pro-check" (click)="toggleCompletion(t); $event.stopPropagation()" [class.is-checked]="t.status === 'completed'">
+                <span *ngIf="t.status === 'completed'" class="material-icons" style="font-size: 14px;">check</span>
+              </button>
+              <div class="pro-daypane__main">
+                <div class="pro-daypane__title">
+                  <ng-container *ngIf="categoryFor(t.categoryId) as cat">
+                    <span *ngIf="cat.icon && !isEmoji(cat.icon)" class="material-icons pro-row__catico">{{ cat.icon }}</span>
+                    <span *ngIf="cat.icon && isEmoji(cat.icon)" class="pro-row__catico">{{ cat.icon }}</span>
+                  </ng-container>
+                  <span class="pro-row__titletext">{{ t.title }}</span>
+                  <span *ngIf="t.isUrgent" class="material-icons pro-row__urg">priority_high</span>
+                </div>
+                <div class="pro-daypane__meta" *ngIf="t.startTime || t.tags?.length || t.createdBy">
+                  <span *ngIf="t.startTime" class="tabular-nums">{{ t.startTime }}<span *ngIf="t.endTime"> - {{ t.endTime }}</span></span>
+                  <span *ngFor="let tag of (t.tags || [])" class="pro-daypane__tag">#{{ tag }}</span>
+                  <span *ngIf="t.createdBy && workspaceUsers.length > 1"
+                        class="pro-daypane__by"
+                        [style.background]="userColor(t.createdBy)?.avatar"
+                        [style.color]="userColor(t.createdBy)?.text">
+                    {{ userName(t.createdBy) }}
+                  </span>
+                </div>
+              </div>
+              <span class="material-icons pro-daypane__chevron">chevron_right</span>
+            </button>
+          </ng-container>
         </div>
+      </ng-container>
+
+      <!-- =========== Edit Pane: detail editor for selectedTask =========== -->
+      <ng-container *ngIf="inspectorMode === 'edit' && selectedTask as t">
+        <header class="pro-inspector__pane-head">
+          <button class="pro-iconbtn" title="返回當天列表" (click)="backToDayPane()">
+            <span class="material-icons" style="font-size: 20px;">chevron_left</span>
+          </button>
+          <div class="pro-inspector__pane-title pro-inspector__pane-title--center">
+            <span style="font-size: 13px; font-weight: 600; color: #7a6850;">編輯</span>
+          </div>
+          <button class="pro-iconbtn" title="刪除" (click)="deleteTask(t)">
+            <span class="material-icons" style="font-size: 20px; color: #dc2626;">delete</span>
+          </button>
+        </header>
+
+        <div class="pro-inspector__body ios-scroll">
+          <div class="pro-inspector__head pro-inspector__head--noborder">
+            <input class="pro-inspector__title"
+                   [(ngModel)]="t.title"
+                   (change)="saveSelectedTask()"
+                   placeholder="代辦標題"
+                   [class.is-done]="t.status === 'completed'"
+                   [class.is-urgent]="t.isUrgent && t.status !== 'completed'">
+          </div>
+
+          <div class="pro-field-row">
+            <span class="pro-field-row__label">
+              <span class="material-icons pro-field-row__icon" style="font-size: 16px; color: #7a6850;">check_circle</span>
+              已完成
+            </span>
+            <label class="ios-toggle">
+              <input type="checkbox" [checked]="t.status === 'completed'" (change)="toggleCompletion(t)">
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="pro-field-row">
+            <span class="pro-field-row__label">
+              <span class="material-icons pro-field-row__icon" style="font-size: 16px; color: #ef4444;">priority_high</span>
+              緊急
+            </span>
+            <label class="ios-toggle">
+              <input type="checkbox" [(ngModel)]="t.isUrgent" (change)="saveSelectedTask()">
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="pro-field-card">
+            <div class="pro-field">
+              <span class="pro-field__label">日期</span>
+              <input type="date" [(ngModel)]="t.date" (change)="saveSelectedTask()">
+            </div>
+            <div class="pro-field">
+              <span class="pro-field__label">開始</span>
+              <input type="time" [(ngModel)]="t.startTime" (change)="saveSelectedTask()">
+            </div>
+            <div class="pro-field">
+              <span class="pro-field__label">結束</span>
+              <input type="time" [(ngModel)]="t.endTime" (change)="saveSelectedTask()" [disabled]="!t.startTime">
+            </div>
+          </div>
+
+          <!-- Category as visual chip grid (shows icon) -->
+          <div class="pro-field-block">
+            <span class="pro-field__label">分類</span>
+            <div class="pro-cat-grid">
+              <button class="pro-cat-chip" [class.is-active]="!t.categoryId" (click)="t.categoryId = undefined; saveSelectedTask()">
+                <span class="material-icons" style="font-size: 14px;">block</span>
+                無分類
+              </button>
+              <button *ngFor="let c of categories" class="pro-cat-chip"
+                      [class.is-active]="t.categoryId === c.id"
+                      (click)="t.categoryId = c.id; saveSelectedTask()">
+                <span *ngIf="c.icon && !isEmoji(c.icon)" class="material-icons" style="font-size: 14px;">{{ c.icon }}</span>
+                <span *ngIf="c.icon && isEmoji(c.icon)" style="font-size: 14px;">{{ c.icon }}</span>
+                {{ c.name }}
+              </button>
+            </div>
+          </div>
+
+          <div class="pro-field-card">
+            <div class="pro-field">
+              <span class="pro-field__label">提醒</span>
+              <select [(ngModel)]="t.reminderOffset" (change)="saveSelectedTask()" [disabled]="!t.startTime">
+                <option [ngValue]="null">不提醒</option>
+                <option [ngValue]="15">提前 15 分鐘</option>
+                <option [ngValue]="30">提前 30 分鐘</option>
+                <option [ngValue]="60">提前 1 小時</option>
+                <option [ngValue]="1440">提前 1 天</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Tags -->
+          <div class="pro-field-block">
+            <span class="pro-field__label">標籤</span>
+            <div class="pro-tags">
+              <span *ngFor="let tag of (t.tags || [])" class="pro-tag-chip">
+                #{{ tag }}
+                <button class="pro-tag-chip__x" (click)="removeSelectedTaskTag(tag)">&times;</button>
+              </span>
+              <input class="pro-tags__input"
+                     [(ngModel)]="selectedTaskTagInput"
+                     (keydown.enter)="addSelectedTaskTag()"
+                     placeholder="新增標籤 Enter">
+            </div>
+          </div>
+
+          <div class="pro-field-block">
+            <span class="pro-field__label">詳細內容</span>
+            <textarea class="ios-scroll"
+                      [(ngModel)]="t.description"
+                      (change)="saveSelectedTask()"
+                      rows="6"
+                      placeholder="輸入備註、細節、相關連結…"></textarea>
+          </div>
+
+          <div *ngIf="t.createdBy && workspaceUsers.length > 1" class="pro-creator">
+            建立者：
+            <span class="pro-creator__chip"
+                  [style.background]="userColor(t.createdBy)?.avatar"
+                  [style.color]="userColor(t.createdBy)?.text">
+              <span class="pro-creator__dot" [style.background]="userColor(t.createdBy)?.bar"></span>
+              {{ userName(t.createdBy) }}
+            </span>
+          </div>
+        </div>
+      </ng-container>
+    </aside>
+
+    <!-- =========== Pro inline create form (slide-in panel) =========== -->
+    <div *ngIf="showCreateForm" class="pro-createform-scrim" (click)="closeCreateForm()"></div>
+    <aside *ngIf="showCreateForm" class="pro-createform pro-glass">
+      <header class="pro-inspector__pane-head">
+        <button class="pro-iconbtn" (click)="closeCreateForm()" title="取消">
+          <span class="material-icons" style="font-size: 20px;">close</span>
+        </button>
+        <div class="pro-inspector__pane-title pro-inspector__pane-title--center">
+          <span style="font-size: 14px; font-weight: 700; color: #2a1f10;">新增代辦</span>
+        </div>
+        <button class="pro-add pro-add--small"
+                [disabled]="!createForm.title.trim()"
+                (click)="submitCreateForm()">
+          <span class="material-icons" style="font-size: 16px;">check</span>
+          儲存
+        </button>
+      </header>
+      <div class="pro-inspector__body ios-scroll">
+        <input class="pro-inspector__title"
+               [(ngModel)]="createForm.title"
+               placeholder="代辦標題"
+               autofocus
+               [class.is-urgent]="createForm.isUrgent">
 
         <div class="pro-field-row">
           <span class="pro-field-row__label">
@@ -397,7 +602,7 @@
             緊急
           </span>
           <label class="ios-toggle">
-            <input type="checkbox" [(ngModel)]="t.isUrgent" (change)="saveSelectedTask()">
+            <input type="checkbox" [(ngModel)]="createForm.isUrgent">
             <span class="slider"></span>
           </label>
         </div>
@@ -405,29 +610,39 @@
         <div class="pro-field-card">
           <div class="pro-field">
             <span class="pro-field__label">日期</span>
-            <input type="date" [(ngModel)]="t.date" (change)="saveSelectedTask()">
+            <input type="date" [(ngModel)]="createForm.date">
           </div>
           <div class="pro-field">
             <span class="pro-field__label">開始</span>
-            <input type="time" [(ngModel)]="t.startTime" (change)="saveSelectedTask()">
+            <input type="time" [(ngModel)]="createForm.startTime">
           </div>
           <div class="pro-field">
             <span class="pro-field__label">結束</span>
-            <input type="time" [(ngModel)]="t.endTime" (change)="saveSelectedTask()" [disabled]="!t.startTime">
+            <input type="time" [(ngModel)]="createForm.endTime" [disabled]="!createForm.startTime">
+          </div>
+        </div>
+
+        <div class="pro-field-block">
+          <span class="pro-field__label">分類</span>
+          <div class="pro-cat-grid">
+            <button class="pro-cat-chip" [class.is-active]="!createForm.categoryId" (click)="createForm.categoryId = undefined">
+              <span class="material-icons" style="font-size: 14px;">block</span>
+              無分類
+            </button>
+            <button *ngFor="let c of categories" class="pro-cat-chip"
+                    [class.is-active]="createForm.categoryId === c.id"
+                    (click)="createForm.categoryId = c.id">
+              <span *ngIf="c.icon && !isEmoji(c.icon)" class="material-icons" style="font-size: 14px;">{{ c.icon }}</span>
+              <span *ngIf="c.icon && isEmoji(c.icon)" style="font-size: 14px;">{{ c.icon }}</span>
+              {{ c.name }}
+            </button>
           </div>
         </div>
 
         <div class="pro-field-card">
           <div class="pro-field">
-            <span class="pro-field__label">分類</span>
-            <select [(ngModel)]="t.categoryId" (change)="saveSelectedTask()">
-              <option [ngValue]="undefined">無分類</option>
-              <option *ngFor="let c of categories" [ngValue]="c.id">{{ c.name }}</option>
-            </select>
-          </div>
-          <div class="pro-field">
             <span class="pro-field__label">提醒</span>
-            <select [(ngModel)]="t.reminderOffset" (change)="saveSelectedTask()" [disabled]="!t.startTime">
+            <select [(ngModel)]="createForm.reminderOffset" [disabled]="!createForm.startTime">
               <option [ngValue]="null">不提醒</option>
               <option [ngValue]="15">提前 15 分鐘</option>
               <option [ngValue]="30">提前 30 分鐘</option>
@@ -438,19 +653,25 @@
         </div>
 
         <div class="pro-field-block">
-          <span class="pro-field__label">詳細內容</span>
-          <textarea class="ios-scroll"
-                    [(ngModel)]="t.description"
-                    (change)="saveSelectedTask()"
-                    rows="6"
-                    placeholder="輸入備註、細節、相關連結…"></textarea>
+          <span class="pro-field__label">標籤</span>
+          <div class="pro-tags">
+            <span *ngFor="let tag of createForm.tags" class="pro-tag-chip">
+              #{{ tag }}
+              <button class="pro-tag-chip__x" (click)="removeCreateFormTag(tag)">&times;</button>
+            </span>
+            <input class="pro-tags__input"
+                   [(ngModel)]="createFormTagInput"
+                   (keydown.enter)="addCreateFormTag()"
+                   placeholder="新增標籤 Enter">
+          </div>
         </div>
 
-        <div class="pro-actions">
-          <button class="pro-btn pro-btn--danger" (click)="deleteTask(t)">
-            <span class="material-icons" style="font-size: 16px;">delete</span>
-            刪除
-          </button>
+        <div class="pro-field-block">
+          <span class="pro-field__label">詳細內容</span>
+          <textarea class="ios-scroll"
+                    [(ngModel)]="createForm.description"
+                    rows="5"
+                    placeholder="輸入備註、細節、相關連結…"></textarea>
         </div>
       </div>
     </aside>
