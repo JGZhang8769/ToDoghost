@@ -17,7 +17,7 @@ import { SvgIconComponent } from '../../core/svg-icon/svg-icon.component';
 type LayoutMode = 'calendar-first' | 'list-first';
 type CalGrain = 'month' | 'week';
 type SmartList = 'inbox' | 'today' | 'week' | 'urgent' | 'unscheduled' | 'completed' | 'selected-date';
-type SelectedList = SmartList | { kind: 'category'; id: string } | { kind: 'user'; id: string };
+type SelectedList = SmartList | { kind: 'category'; id: string } | { kind: 'category-none' } | { kind: 'user'; id: string };
 type InspectorMode = 'day' | 'edit' | 'create';
 
 interface CalendarDay {
@@ -30,6 +30,16 @@ interface CalendarDay {
   isSolarTerm: boolean;      // true if lunarLabel is a 節氣
 }
 
+interface TimedBlock {
+  task: Task;
+  top: number;
+  height: number;
+  /** column index (0-based) within the overlap group */
+  col: number;
+  /** total columns in this overlap group — determines width */
+  totalCols: number;
+}
+
 interface WeekDay {
   dateStr: string;
   dayNum: number;
@@ -37,7 +47,7 @@ interface WeekDay {
   isToday: boolean;
   tasks: Task[];
   allDay: Task[];
-  timedBlocks: { task: Task; top: number; height: number }[];
+  timedBlocks: TimedBlock[];
   lunarLabel: string;
   isSolarTerm: boolean;
 }
@@ -189,6 +199,8 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     } else if (typeof this.selectedList === 'object' && this.selectedList.kind === 'category') {
       const catId = this.selectedList.id;
       filtered = this.tasks.filter(t => t.categoryId === catId && t.status !== 'completed');
+    } else if (typeof this.selectedList === 'object' && this.selectedList.kind === 'category-none') {
+      filtered = this.tasks.filter(t => !t.categoryId && t.status !== 'completed');
     } else if (typeof this.selectedList === 'object' && this.selectedList.kind === 'user') {
       const userId = this.selectedList.id;
       filtered = this.tasks.filter(t => t.createdBy === userId && t.status !== 'completed');
@@ -228,6 +240,9 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     if (this.selectedList === 'inbox') return '收件匣';
     if (typeof this.selectedList === 'object' && this.selectedList.kind === 'category') {
       return this.categories.find(c => c.id === (this.selectedList as any).id)?.name ?? '分類';
+    }
+    if (typeof this.selectedList === 'object' && this.selectedList.kind === 'category-none') {
+      return '無分類';
     }
     if (typeof this.selectedList === 'object' && this.selectedList.kind === 'user') {
       return this.workspaceUsers.find(u => u.id === (this.selectedList as any).id)?.name ?? '建立者';
@@ -554,21 +569,7 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
       const dayTasks = this.tasks.filter(t => t.date === dateStr);
       const allDay = dayTasks.filter(t => !t.startTime);
       const timed = dayTasks.filter(t => t.startTime);
-      const timedBlocks = timed.map(t => {
-        const [sh, sm] = (t.startTime ?? '0:00').split(':').map(Number);
-        const startMin = sh * 60 + sm;
-        let endMin = startMin + 30;
-        if (t.endTime) {
-          const [eh, em] = t.endTime.split(':').map(Number);
-          endMin = eh * 60 + em;
-          if (endMin <= startMin) endMin = startMin + 30;
-        }
-        return {
-          task: t,
-          top: (startMin / 60) * HOUR_PX,
-          height: Math.max(24, ((endMin - startMin) / 60) * HOUR_PX),
-        };
-      });
+      const timedBlocks = this.layoutTimedBlocks(timed);
       const lunar = this.lunarLabelFor(dateStr);
       result.push({
         dateStr,
@@ -584,6 +585,107 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     }
     this.weekDays = result;
     this.currentWeekStr = `${format(start, 'M/d')} – ${format(end, 'M/d')}`;
+  }
+
+  /**
+   * Lay out overlapping timed events side-by-side, like Google / iOS Calendar.
+   *
+   * Algorithm (classic interval-graph column packing):
+   *   1. Convert each task to a [startMin, endMin] block with at least
+   *      15 minutes of height so user can grab it.
+   *   2. Sort by startMin asc, then by endMin desc (longer events on the
+   *      left for stable order).
+   *   3. Walk events in order. For each event, assign it to the lowest
+   *      column index whose previous occupant ended ≤ this event's start.
+   *      If none, open a new column.
+   *   4. Group events that transitively overlap (i.e. share a column
+   *      neighbor). For each group, set every member's `totalCols` to the
+   *      group's max column count, so widths within a group are consistent
+   *      and aligned.
+   *
+   * Output is positioned with col / totalCols which the template multiplies
+   * into left / width percentages, so a 3-way overlap shows three equal
+   * columns spanning the day.
+   */
+  private layoutTimedBlocks(tasks: Task[]): TimedBlock[] {
+    if (tasks.length === 0) return [];
+
+    interface Block {
+      task: Task;
+      startMin: number;
+      endMin: number;
+      col: number;
+      groupId: number;
+    }
+
+    const blocks: Block[] = tasks.map(t => {
+      const [sh, sm] = (t.startTime ?? '0:00').split(':').map(Number);
+      const startMin = sh * 60 + sm;
+      let endMin = startMin + 30;
+      if (t.endTime) {
+        const [eh, em] = t.endTime.split(':').map(Number);
+        endMin = eh * 60 + em;
+        if (endMin <= startMin) endMin = startMin + 30;
+      }
+      return { task: t, startMin, endMin, col: -1, groupId: -1 };
+    });
+
+    blocks.sort((a, b) => {
+      if (a.startMin !== b.startMin) return a.startMin - b.startMin;
+      return b.endMin - a.endMin;
+    });
+
+    // Pack into columns. `columnEnd[i]` is the end time of whatever sits at column i.
+    const columnEnd: number[] = [];
+    for (const b of blocks) {
+      let placed = false;
+      for (let i = 0; i < columnEnd.length; i++) {
+        if (columnEnd[i] <= b.startMin) {
+          b.col = i;
+          columnEnd[i] = b.endMin;
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        b.col = columnEnd.length;
+        columnEnd.push(b.endMin);
+      }
+    }
+
+    // Compute connected overlap groups so adjacent events share a width.
+    // Two events are in the same group iff there exists a chain
+    // a → b → c where each consecutive pair overlaps.
+    let nextGroupId = 0;
+    const active: Block[] = []; // blocks whose endMin > current cursor
+    for (const b of blocks) {
+      // Drop blocks that no longer overlap with the cursor.
+      for (let i = active.length - 1; i >= 0; i--) {
+        if (active[i].endMin <= b.startMin) active.splice(i, 1);
+      }
+      if (active.length === 0) {
+        b.groupId = nextGroupId++;
+      } else {
+        // Inherit the group of any active neighbor (they're already in
+        // the same group by transitivity).
+        b.groupId = active[0].groupId;
+      }
+      active.push(b);
+    }
+
+    // For each group, find max column count = total tracks the group needs.
+    const groupTotal = new Map<number, number>();
+    for (const b of blocks) {
+      groupTotal.set(b.groupId, Math.max(groupTotal.get(b.groupId) ?? 0, b.col + 1));
+    }
+
+    return blocks.map(b => ({
+      task: b.task,
+      top: (b.startMin / 60) * HOUR_PX,
+      height: Math.max(24, ((b.endMin - b.startMin) / 60) * HOUR_PX),
+      col: b.col,
+      totalCols: groupTotal.get(b.groupId) ?? 1,
+    }));
   }
 
   updateNowLine() {
@@ -652,6 +754,12 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     this.inspectorMode = 'day';
   }
 
+  selectNoCategoryList() {
+    this.selectedList = { kind: 'category-none' };
+    this.selectedTaskId = null;
+    this.inspectorMode = 'day';
+  }
+
   selectUserList(user: User) {
     this.selectedList = { kind: 'user', id: user.id };
     this.selectedTaskId = null;
@@ -664,6 +772,14 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
 
   isSelectedCategory(catId: string): boolean {
     return typeof this.selectedList === 'object' && this.selectedList.kind === 'category' && this.selectedList.id === catId;
+  }
+
+  isSelectedNoCategory(): boolean {
+    return typeof this.selectedList === 'object' && this.selectedList.kind === 'category-none';
+  }
+
+  noCategoryCount(): number {
+    return this.tasks.filter(t => !t.categoryId && t.status !== 'completed').length;
   }
 
   isSelectedUser(userId: string): boolean {

@@ -1285,8 +1285,8 @@
 .pro-week__hour-cell:hover { background: rgba(120, 100, 80, 0.04); }
 .pro-week__event {
     position: absolute;
-    left: 3px;
-    right: 3px;
+    /* left + width are set inline based on overlap column packing —
+       see layoutTimedBlocks() in pro-main-view.component.ts. */
     background: rgba(196, 177, 144, 0.6);
     border-left: 3px solid #b5a78a;
     border-radius: 6px;
@@ -1294,10 +1294,15 @@
     overflow: hidden;
     color: #2a1f10;
     cursor: pointer;
-    transition: all 0.12s ease;
+    transition: background 0.12s ease, transform 0.12s ease, box-shadow 0.12s ease;
     z-index: 2;
+    margin-left: 1px; /* small gutter so columns don't visually touch */
 }
-.pro-week__event:hover { background: rgba(196, 177, 144, 0.8); transform: translateY(-1px); box-shadow: 0 2px 6px rgba(60, 40, 20, 0.15); }
+.pro-week__event:hover {
+    background: rgba(196, 177, 144, 0.85);
+    box-shadow: 0 2px 8px rgba(60, 40, 20, 0.2);
+    z-index: 3; /* lift hovered event above its neighbors */
+}
 .pro-week__event.is-urgent {
     background: rgba(239, 68, 68, 0.2);
     border-left-color: #ef4444;
