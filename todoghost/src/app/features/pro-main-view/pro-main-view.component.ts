@@ -259,10 +259,30 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     return this.tasks.filter(t => t.createdBy === userId && t.status !== 'completed').length;
   }
 
+  /**
+   * Global filter derived from the active sidebar selection (category or user).
+   * Calendar / week views and the day-pane all apply this so the visualisation
+   * stays in sync with the sidebar — selecting "生活" means EVERYTHING on
+   * screen narrows to 生活, not just the bottom list.
+   *
+   * Smart lists like 今日/本週/緊急 are not narrowed here; they are time- or
+   * priority-defined and would over-constrain the calendar (e.g. selecting
+   * "今日" shouldn't hide tomorrow's tasks from the month view).
+   */
+  passesGlobalFilter(task: Task): boolean {
+    const sel = this.selectedList as any;
+    if (typeof sel === 'object' && sel !== null) {
+      if (sel.kind === 'category') return task.categoryId === sel.id;
+      if (sel.kind === 'category-none') return !task.categoryId;
+      if (sel.kind === 'user') return task.createdBy === sel.id;
+    }
+    return true;
+  }
+
   /** All tasks (including completed) for a given dateStr, sorted by startTime then order. */
   tasksForDate(dateStr: string): Task[] {
     return this.tasks
-      .filter(t => t.date === dateStr)
+      .filter(t => t.date === dateStr && this.passesGlobalFilter(t))
       .sort((a, b) => {
         const at = a.startTime ?? '99:99';
         const bt = b.startTime ?? '99:99';
@@ -532,7 +552,7 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
         dayNum: d.getDate(),
         isCurrentMonth: isSameMonth(d, this.currentDate),
         isToday: dateStr === todayStr,
-        tasks: this.tasks.filter(t => t.date === dateStr).sort((a, b) => (a.startTime ?? '99:99').localeCompare(b.startTime ?? '99:99')),
+        tasks: this.tasks.filter(t => t.date === dateStr && this.passesGlobalFilter(t)).sort((a, b) => (a.startTime ?? '99:99').localeCompare(b.startTime ?? '99:99')),
         lunarLabel: lunar.label,
         isSolarTerm: lunar.isSolarTerm,
       });
@@ -551,7 +571,7 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     for (let i = 0; i < 7; i++) {
       const d = addDays(start, i);
       const dateStr = format(d, 'yyyy-MM-dd');
-      const dayTasks = this.tasks.filter(t => t.date === dateStr);
+      const dayTasks = this.tasks.filter(t => t.date === dateStr && this.passesGlobalFilter(t));
       const allDay = dayTasks.filter(t => !t.startTime);
       const timed = dayTasks.filter(t => t.startTime);
       const timedBlocks = timed.map(t => {
@@ -641,21 +661,28 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     if (list === 'today' || list === 'week') {
       this.currentDate = new Date();
       this.selectedDateStr = format(new Date(), 'yyyy-MM-dd');
-      this.buildCalendar();
-      this.buildWeek();
     }
+    // Always rebuild calendar/week because passesGlobalFilter() returns to
+    // pass-through when a smart list is active, broadening what the views show.
+    this.buildCalendar();
+    this.buildWeek();
   }
 
   selectCategoryList(cat: Category) {
     this.selectedList = { kind: 'category', id: cat.id };
     this.selectedTaskId = null;
     this.inspectorMode = 'day';
+    // Calendar / week views narrow to this category's tasks.
+    this.buildCalendar();
+    this.buildWeek();
   }
 
   selectUserList(user: User) {
     this.selectedList = { kind: 'user', id: user.id };
     this.selectedTaskId = null;
     this.inspectorMode = 'day';
+    this.buildCalendar();
+    this.buildWeek();
   }
 
   isSelectedList(list: SmartList): boolean {

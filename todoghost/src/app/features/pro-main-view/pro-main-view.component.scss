@@ -1614,3 +1614,21 @@
 .cdk-drag-placeholder {
     opacity: 0.25 !important;
 }
+
+/* Category icon inside calendar / week pills — kept small so the title still
+   gets most of the horizontal room. */
+.pro-day__catico,
+.pro-week__chip-ico,
+.pro-week__event-ico {
+    font-size: 12px !important;
+    line-height: 1;
+    opacity: 0.75;
+    flex-shrink: 0;
+    margin-right: 2px;
+    vertical-align: -1px;
+}
+.pro-week__event-title {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
