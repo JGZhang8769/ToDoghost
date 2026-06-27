@@ -194,20 +194,23 @@
 
           <div *ngIf="appleViewStyle !== 'list'" class="grid grid-cols-7 gap-1 flex-1 relative">
             <div *ngFor="let d of calendarDays"
-                 class="bg-white rounded-lg flex flex-col items-center relative overflow-hidden"
+                 class="bg-white rounded-lg flex flex-col items-stretch relative overflow-hidden"
                  [class.p-1]="appleViewStyle !== 'stack'"
                  [class.p-0]="appleViewStyle === 'stack'"
                  [class.min-h-[60px]]="appleViewStyle === 'compact' || appleViewStyle === 'stack'"
-                 [class.min-h-[100px]]="appleViewStyle === 'detailed'"
+                 [class.min-h-[110px]]="appleViewStyle === 'detailed'"
                  [class.opacity-50]="!d.isCurrentMonth"
                  [class.border-2]="d.dateStr === selectedDateStr"
                  [class.border-milktea-400]="d.dateStr === selectedDateStr"
-                 (click)="selectDate(d.dateStr); appleViewStyle !== 'detailed' && openScheduledDrawer(d.dateStr, d.tasks)"
+                 (click)="selectDate(d.dateStr); openScheduledDrawer(d.dateStr, d.tasks)"
                  cdkDropList
                  [cdkDropListData]="d.tasks"
                  (cdkDropListDropped)="dropToDate($event, d.dateStr)">
 
-              <div class="text-sm w-full text-center" [class.font-bold]="d.isToday" [class.text-milktea-600]="d.isToday" [class.bg-milktea-100]="appleViewStyle === 'stack' && d.isToday" [class.py-1]="appleViewStyle === 'stack'">{{ d.dayNum }}</div>
+              <div class="text-sm w-full text-center shrink-0" [class.font-bold]="d.isToday" [class.text-milktea-600]="d.isToday" [class.bg-milktea-100]="appleViewStyle === 'stack' && d.isToday" [class.py-1]="appleViewStyle === 'stack'">
+                <span *ngIf="d.isToday && appleViewStyle === 'detailed'" class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-red-500 text-white text-[11px] font-bold">{{ d.dayNum }}</span>
+                <span *ngIf="!(d.isToday && appleViewStyle === 'detailed')">{{ d.dayNum }}</span>
+              </div>
 
               <!-- Compact Style (Dots) -->
               <div *ngIf="appleViewStyle === 'compact'" class="flex gap-0.5 mt-1 flex-wrap justify-center px-1 w-full">
@@ -223,18 +226,33 @@
                   <div *ngIf="d.tasks.length > 3" class="text-[8px] text-milktea-500 text-center font-bold">...+{{ d.tasks.length - 3 }}</div>
               </div>
 
-              <!-- Detailed Style (Text) -->
-              <div *ngIf="appleViewStyle === 'detailed'" class="w-full flex flex-col gap-1 px-1 mt-1 pb-1">
+              <!-- Detailed Style: two-line task pills (time on top, title with line-clamp-2) -->
+              <div *ngIf="appleViewStyle === 'detailed'" class="w-full flex-1 flex flex-col gap-0.5 px-0.5 mt-1 pb-0.5 min-h-0">
                   <ng-container *ngFor="let t of d.tasks; let i = index">
-                      <div *ngIf="i < 4" class="text-[9px] truncate leading-tight w-full p-0.5 rounded cursor-pointer" [class.bg-red-100]="t.isUrgent" [class.text-red-700]="t.isUrgent" [class.bg-milktea-100]="!t.isUrgent" [class.text-milktea-800]="!t.isUrgent" [class.opacity-50]="t.status === 'completed'" (click)="editTask(t); $event.stopPropagation()">
-<ng-container *ngIf="getCategoryForForm(t.categoryId) as cat">
-                                     <span *ngIf="cat.icon && !isEmoji(cat.icon)" class="material-icons text-[14px] text-milktea-500 shrink-0">{{ cat.icon }}</span>
-                                     <span *ngIf="cat.icon && isEmoji(cat.icon)" class="text-[14px] shrink-0">{{ cat.icon }}</span>
-                                 </ng-container>
-                          <span class="font-bold" *ngIf="t.startTime">{{t.startTime}} </span><span class="font-bold" *ngIf="t.endTime"> - {{t.endTime}} </span>{{t.title}}
+                      <div *ngIf="i < 3"
+                           class="w-full rounded px-1 py-0.5 cursor-pointer leading-tight overflow-hidden"
+                           [class.bg-red-50]="t.isUrgent && t.status !== 'completed'"
+                           [class.bg-milktea-100]="!t.isUrgent && t.status !== 'completed'"
+                           [class.bg-milktea-50]="t.status === 'completed'"
+                           [class.opacity-50]="t.status === 'completed'"
+                           (click)="editTask(t); $event.stopPropagation()">
+                          <div *ngIf="t.startTime" class="text-[8px] font-medium tabular-nums"
+                               [class.text-red-500]="t.isUrgent && t.status !== 'completed'"
+                               [class.text-milktea-500]="!t.isUrgent || t.status === 'completed'">
+                              {{ t.startTime }}<span *ngIf="t.endTime"> - {{ t.endTime }}</span>
+                          </div>
+                          <div class="text-[10px] font-bold apple-line-clamp-2"
+                               [class.text-red-600]="t.isUrgent && t.status !== 'completed'"
+                               [class.text-milktea-800]="!t.isUrgent && t.status !== 'completed'"
+                               [class.text-milktea-500]="t.status === 'completed'"
+                               [class.line-through]="t.status === 'completed'">
+                              <ng-container *ngIf="getCategoryForForm(t.categoryId) as cat">
+                                  <span *ngIf="cat.icon && isEmoji(cat.icon)" class="text-[10px] mr-0.5">{{ cat.icon }}</span>
+                              </ng-container>{{ t.title }}
+                          </div>
                       </div>
                   </ng-container>
-                  <div *ngIf="d.tasks.length > 4" class="text-[9px] text-milktea-500 text-center cursor-pointer font-bold" (click)="openScheduledDrawer(d.dateStr, d.tasks); $event.stopPropagation()">...+{{ d.tasks.length - 4 }}</div>
+                  <div *ngIf="d.tasks.length > 3" class="text-[9px] text-milktea-500 text-center cursor-pointer font-bold mt-0.5" (click)="openScheduledDrawer(d.dateStr, d.tasks); $event.stopPropagation()">...+{{ d.tasks.length - 3 }}</div>
               </div>
 
             </div>

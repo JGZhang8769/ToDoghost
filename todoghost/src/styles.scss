@@ -30,6 +30,14 @@ body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
 /* Hide the original card while dragging, show only preview */
 .cdk-drag-placeholder { opacity: 0 !important; }
 
+/* Apple month detailed view: 2-line task title clamp */
+.apple-line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: break-word;
+}
 /* iOS-style auto-hiding scrollbar — visible only during scroll/hover */
 .ios-scroll {
     scrollbar-width: thin;
