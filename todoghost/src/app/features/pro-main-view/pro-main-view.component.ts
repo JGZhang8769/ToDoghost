@@ -1202,7 +1202,7 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     return this.categories.find(c => c.id === catId);
   }
 
-  backToClassic() {
-    this.router.navigate(['/main']);
+  backToWorkspaces() {
+    this.router.navigate(['/workspaces']);
   }
 }

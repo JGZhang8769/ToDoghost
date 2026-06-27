@@ -13,112 +13,412 @@ import { ConfigService } from '../../core/services/config.service';
   standalone: true,
   imports: [CommonModule, FormsModule, SvgIconComponent],
   template: `
-    <div class="min-h-screen bg-milktea-50 flex flex-col items-center justify-center p-6">
-      <h1 class="text-3xl font-bold text-milktea-900 mb-8">誰正在觀看？</h1>
+    <div class="login-shell">
+      <div class="login-bg" aria-hidden="true"></div>
 
-      <div *ngIf="isLoadingUsers" class="flex flex-col items-center justify-center py-12">
-         <svg class="animate-spin h-8 w-8 text-milktea-600 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-         <span class="text-milktea-600 font-bold">載入中...</span>
-      </div>
+      <div class="login-content">
+        <header class="login-head">
+          <app-svg-icon name="logo_main" width="56px" height="56px"></app-svg-icon>
+          <h1 class="login-title">誰正在觀看？</h1>
+          <p class="login-sub">選擇你的個人檔案以繼續</p>
+        </header>
 
-      <div *ngIf="!isLoadingUsers" class="flex flex-wrap gap-6 justify-center max-w-md">
-        <div *ngFor="let user of users"
-             class="flex flex-col items-center gap-3 cursor-pointer group"
-             (click)="openLoginOptions(user)">
-          <div class="w-24 h-24 rounded-2xl bg-white shadow-sm border-2 border-transparent group-hover:border-milktea-400 group-hover:-translate-y-1 transition-all flex items-center justify-center overflow-hidden p-2">
-             <app-svg-icon [name]="user.avatar" width="100%" height="100%"></app-svg-icon>
-          </div>
-          <span class="text-milktea-800 font-medium group-hover:text-milktea-900">{{ user.name }}</span>
+        <div *ngIf="isLoadingUsers" class="login-loading">
+          <div class="login-spinner"></div>
+          <span>載入中…</span>
         </div>
 
-        <div class="flex flex-col items-center gap-3 cursor-pointer group" (click)="showNewUserForm = true">
-          <div class="w-24 h-24 rounded-2xl bg-white shadow-sm border-2 border-transparent group-hover:border-milktea-400 group-hover:-translate-y-1 transition-all flex items-center justify-center text-milktea-300 text-4xl">
-             +
-          </div>
-          <span class="text-milktea-800 font-medium group-hover:text-milktea-900">新增用戶</span>
+        <div *ngIf="!isLoadingUsers" class="login-grid">
+          <button *ngFor="let user of users"
+                  type="button"
+                  class="login-card"
+                  (click)="openLoginOptions(user)">
+            <span class="login-card__face">
+              <app-svg-icon [name]="user.avatar" width="100%" height="100%"></app-svg-icon>
+            </span>
+            <span class="login-card__name">{{ user.name }}</span>
+          </button>
+
+          <button type="button" class="login-card login-card--add" (click)="showNewUserForm = true">
+            <span class="login-card__face login-card__face--add">
+              <span class="material-icons" style="font-size: 32px;">add</span>
+            </span>
+            <span class="login-card__name">新增用戶</span>
+          </button>
         </div>
       </div>
 
       <!-- Login Options Modal -->
-      <div *ngIf="showLoginOptionsModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-        <div class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-xl flex flex-col items-center">
-          <div class="w-16 h-16 rounded-2xl bg-milktea-50 overflow-hidden p-2 mb-4">
+      <div *ngIf="showLoginOptionsModal" class="login-scrim" (click)="closeLoginOptions()">
+        <div class="login-modal" (click)="$event.stopPropagation()">
+          <div class="login-modal__face">
             <app-svg-icon [name]="selectedUser?.avatar || ''" width="100%" height="100%"></app-svg-icon>
           </div>
-          <h2 class="text-xl font-bold text-milktea-900 mb-2">登入選項</h2>
-          <p class="text-milktea-600 text-sm mb-6">選擇登入 {{ selectedUser?.name }} 的方式</p>
+          <h2 class="login-modal__title">登入選項</h2>
+          <p class="login-modal__sub">選擇登入 {{ selectedUser?.name }} 的方式</p>
 
-          <div class="flex flex-col gap-3 w-full">
+          <div class="login-modal__actions">
             <button *ngIf="isWebAuthnSupported"
-                    class="w-full py-4 rounded-xl bg-milktea-600 text-white font-bold disabled:opacity-50 flex justify-center items-center gap-2"
+                    type="button"
+                    class="login-btn login-btn--primary"
                     [disabled]="isAuthenticating"
                     (click)="triggerWebAuthn()">
-              <svg *ngIf="isAuthenticating" class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+              <span *ngIf="isAuthenticating" class="login-spinner login-spinner--sm"></span>
               {{ hasCredential ? 'Face ID 登入' : '綁定 Face ID 登入' }}
             </button>
-            <button class="w-full py-4 rounded-xl bg-milktea-100 text-milktea-800 font-bold"
-                    (click)="switchToPin()">
+            <button type="button" class="login-btn login-btn--ghost" (click)="switchToPin()">
               PIN 碼登入
             </button>
           </div>
 
-          <div class="w-full mt-4 flex justify-center">
-             <button class="text-milktea-500 font-medium py-2 px-4 hover:text-milktea-700"
-                     (click)="closeLoginOptions()">
-                取消
-             </button>
-          </div>
+          <button type="button" class="login-modal__cancel" (click)="closeLoginOptions()">取消</button>
         </div>
       </div>
 
       <!-- PIN Code Modal -->
-      <div *ngIf="showPinModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-        <div class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-xl flex flex-col items-center">
-          <div class="w-16 h-16 rounded-2xl bg-milktea-50 overflow-hidden p-2 mb-4">
+      <div *ngIf="showPinModal" class="login-scrim" (click)="cancelPinModal()">
+        <div class="login-modal" (click)="$event.stopPropagation()">
+          <div class="login-modal__face">
             <app-svg-icon [name]="selectedUser?.avatar || ''" width="100%" height="100%"></app-svg-icon>
           </div>
-          <h2 class="text-xl font-bold text-milktea-900 mb-2">輸入 PIN 碼</h2>
-          <p class="text-milktea-600 text-sm mb-6">歡迎回來，{{ selectedUser?.name }}</p>
+          <h2 class="login-modal__title">輸入 PIN 碼</h2>
+          <p class="login-modal__sub">歡迎回來，{{ selectedUser?.name }}</p>
 
           <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4"
-                 [(ngModel)]="pinInput" placeholder="4位數密碼"
-                 class="w-full text-center tracking-[0.5em] text-2xl font-bold bg-milktea-50 border border-milktea-200 rounded-xl px-4 py-4 mb-4 focus:outline-none focus:border-milktea-400 transition-colors"
+                 [(ngModel)]="pinInput" placeholder="4 位數密碼"
+                 class="login-pin"
                  (keyup.enter)="verifyPin()">
 
-          <div *ngIf="pinError" class="text-red-500 text-sm mb-4">{{ pinError }}</div>
+          <div *ngIf="pinError" class="login-error">{{ pinError }}</div>
 
-          <div class="flex gap-3 w-full mt-2">
-            <button class="flex-1 py-3 rounded-xl bg-milktea-100 text-milktea-800 font-bold" (click)="cancelPinModal()">取消</button>
-            <button class="flex-1 py-3 rounded-xl bg-milktea-600 text-white font-bold disabled:opacity-50" [disabled]="pinInput.length < 4" (click)="verifyPin()">登入</button>
+          <div class="login-modal__pair">
+            <button type="button" class="login-btn login-btn--ghost" (click)="cancelPinModal()">取消</button>
+            <button type="button" class="login-btn login-btn--primary"
+                    [disabled]="pinInput.length < 4"
+                    (click)="verifyPin()">登入</button>
           </div>
         </div>
       </div>
 
       <!-- New User Modal -->
-      <div *ngIf="showNewUserForm" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-        <div class="bg-white rounded-3xl p-6 w-full max-w-sm shadow-xl">
-          <h2 class="text-xl font-bold text-milktea-900 mb-4">新增用戶</h2>
-          <input [(ngModel)]="newUserName" placeholder="輸入名稱" class="w-full bg-milktea-50 border border-milktea-200 rounded-xl px-4 py-3 mb-4 focus:outline-none focus:border-milktea-400 transition-colors">
-          <div class="flex flex-wrap gap-2 mb-6 justify-center max-h-48 overflow-y-auto">
+      <div *ngIf="showNewUserForm" class="login-scrim" (click)="showNewUserForm = false">
+        <div class="login-modal" (click)="$event.stopPropagation()">
+          <h2 class="login-modal__title">新增用戶</h2>
+          <input [(ngModel)]="newUserName" placeholder="輸入名稱" class="login-input">
+          <div class="login-iconpicker">
             <button *ngFor="let icon of availableIcons"
-                    class="w-12 h-12 rounded-xl border-2 p-1 shrink-0"
-                    [class.border-milktea-400]="newUserIcon === icon"
-                    [class.border-transparent]="newUserIcon !== icon"
+                    type="button"
+                    class="login-iconpicker__cell"
+                    [class.is-active]="newUserIcon === icon"
                     (click)="newUserIcon = icon">
               <app-svg-icon [name]="icon" width="100%" height="100%"></app-svg-icon>
             </button>
           </div>
-          <div class="flex gap-3">
-            <button class="flex-1 py-3 rounded-xl bg-milktea-100 text-milktea-800 font-bold" (click)="showNewUserForm = false">取消</button>
-            <button class="flex-1 py-3 rounded-xl bg-milktea-600 text-white font-bold disabled:opacity-50 flex justify-center items-center gap-2" [disabled]="!newUserName.trim() || isSaving" (click)="createUser()">
-              <svg *ngIf="isSaving" class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+          <div class="login-modal__pair">
+            <button type="button" class="login-btn login-btn--ghost" (click)="showNewUserForm = false">取消</button>
+            <button type="button" class="login-btn login-btn--primary"
+                    [disabled]="!newUserName.trim() || isSaving"
+                    (click)="createUser()">
+              <span *ngIf="isSaving" class="login-spinner login-spinner--sm"></span>
               確定
             </button>
           </div>
         </div>
       </div>
     </div>
-  `
+  `,
+  styles: [`
+    :host { display: block; height: 100%; }
+
+    .login-shell {
+      position: relative;
+      min-height: 100%;
+      display: flex;
+      flex-direction: column;
+      box-sizing: border-box;
+      color: #2a1f10;
+      padding:
+        max(24px, env(safe-area-inset-top))
+        max(20px, env(safe-area-inset-right))
+        max(24px, env(safe-area-inset-bottom))
+        max(20px, env(safe-area-inset-left));
+    }
+
+    .login-bg {
+      position: absolute; inset: 0; z-index: 0; pointer-events: none;
+      background:
+        radial-gradient(120% 80% at 0% 0%, #f4e9d3 0%, transparent 60%),
+        radial-gradient(100% 80% at 100% 100%, #f0dccc 0%, transparent 60%),
+        linear-gradient(170deg, #f8f2e4 0%, #efe5d2 60%, #f3e5d6 100%);
+    }
+
+    .login-content {
+      position: relative;
+      z-index: 1;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 32px;
+      max-width: 720px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .login-head {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    .login-title {
+      margin: 4px 0 0;
+      font-size: 28px;
+      font-weight: 800;
+      color: #2a1f10;
+      letter-spacing: -0.02em;
+    }
+    .login-sub {
+      margin: 0;
+      font-size: 14px;
+      color: #7a6850;
+    }
+
+    .login-loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      color: #7a6850;
+      font-weight: 600;
+    }
+
+    .login-spinner {
+      width: 28px;
+      height: 28px;
+      border: 3px solid rgba(120, 100, 80, 0.18);
+      border-top-color: #b58535;
+      border-radius: 50%;
+      animation: login-spin 0.8s linear infinite;
+    }
+    .login-spinner--sm {
+      width: 16px;
+      height: 16px;
+      border-width: 2px;
+    }
+    @keyframes login-spin { to { transform: rotate(360deg); } }
+
+    /* Netflix-style avatar grid */
+    .login-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      justify-content: center;
+      max-width: 560px;
+    }
+    .login-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      background: transparent;
+      border: 0;
+      padding: 0;
+      cursor: pointer;
+      font: inherit;
+      color: inherit;
+    }
+    .login-card__face {
+      width: 96px;
+      height: 96px;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.75);
+      backdrop-filter: blur(16px) saturate(160%);
+      -webkit-backdrop-filter: blur(16px) saturate(160%);
+      border: 2px solid transparent;
+      box-shadow: 0 6px 18px -8px rgba(60, 40, 20, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px;
+      transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+    .login-card:hover .login-card__face {
+      transform: translateY(-4px);
+      border-color: rgba(212, 166, 74, 0.7);
+      box-shadow: 0 12px 24px -10px rgba(180, 120, 40, 0.35);
+    }
+    .login-card:active .login-card__face { transform: scale(0.97); }
+    .login-card__face--add {
+      color: #a3917a;
+      background: rgba(255, 255, 255, 0.45);
+      border: 2px dashed rgba(120, 100, 80, 0.3);
+    }
+    .login-card__name {
+      font-size: 14px;
+      font-weight: 600;
+      color: #4a3a22;
+    }
+
+    /* Modals */
+    .login-scrim {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      background: rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      animation: login-fade 0.18s ease;
+    }
+    @keyframes login-fade { from { opacity: 0; } to { opacity: 1; } }
+    .login-modal {
+      background: rgba(255, 255, 255, 0.97);
+      backdrop-filter: blur(28px) saturate(160%);
+      -webkit-backdrop-filter: blur(28px) saturate(160%);
+      border-radius: 20px;
+      width: 320px;
+      max-width: calc(100vw - 32px);
+      padding: 22px 20px 18px;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 12px;
+      box-shadow: 0 24px 56px rgba(60, 40, 20, 0.25);
+    }
+    .login-modal__face {
+      width: 64px;
+      height: 64px;
+      border-radius: 16px;
+      background: rgba(244, 233, 211, 0.7);
+      padding: 6px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .login-modal__title {
+      margin: 4px 0 0;
+      font-size: 18px;
+      font-weight: 700;
+      color: #2a1f10;
+      text-align: center;
+    }
+    .login-modal__sub {
+      margin: 0 0 6px;
+      font-size: 13px;
+      color: #7a6850;
+      text-align: center;
+    }
+    .login-modal__actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .login-modal__pair {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .login-modal__cancel {
+      align-self: center;
+      background: transparent;
+      border: 0;
+      color: #7a6850;
+      font-size: 14px;
+      font-weight: 500;
+      padding: 6px 12px;
+      cursor: pointer;
+    }
+    .login-modal__cancel:active { color: #4a3a22; }
+
+    .login-btn {
+      padding: 12px 14px;
+      border: 0;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .login-btn--primary {
+      background: linear-gradient(135deg, #d4a64a, #b58535);
+      color: #fff;
+      box-shadow: 0 2px 6px rgba(180, 120, 40, 0.3);
+    }
+    .login-btn--primary:disabled {
+      background: rgba(120, 100, 80, 0.18);
+      color: #a3917a;
+      box-shadow: none;
+      cursor: not-allowed;
+    }
+    .login-btn--ghost {
+      background: rgba(120, 100, 80, 0.1);
+      color: #4a3a22;
+    }
+    .login-btn--ghost:active { background: rgba(120, 100, 80, 0.22); }
+
+    .login-input,
+    .login-pin {
+      padding: 12px 14px;
+      background: rgba(244, 233, 211, 0.5);
+      border: 1px solid rgba(120, 100, 80, 0.18);
+      border-radius: 12px;
+      font-size: 15px;
+      color: #2a1f10;
+      outline: 0;
+      font-family: inherit;
+    }
+    .login-input:focus,
+    .login-pin:focus {
+      border-color: rgba(180, 120, 40, 0.55);
+      box-shadow: 0 0 0 3px rgba(212, 166, 74, 0.18);
+    }
+    .login-pin {
+      text-align: center;
+      letter-spacing: 0.5em;
+      font-size: 22px;
+      font-weight: 700;
+    }
+    .login-error {
+      color: #dc2626;
+      font-size: 13px;
+      text-align: center;
+    }
+
+    .login-iconpicker {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: center;
+      max-height: 184px;
+      overflow-y: auto;
+      padding: 4px;
+      background: rgba(244, 233, 211, 0.4);
+      border-radius: 12px;
+    }
+    .login-iconpicker__cell {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      border: 2px solid transparent;
+      background: rgba(255, 255, 255, 0.7);
+      padding: 4px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .login-iconpicker__cell.is-active {
+      border-color: #b58535;
+      background: rgba(255, 255, 255, 0.95);
+    }
+  `]
 })
 export class LoginComponent implements OnInit {
   private userService = inject(UserService);
@@ -153,7 +453,6 @@ export class LoginComponent implements OnInit {
   ngOnInit() {
     this.isWebAuthnSupported = this.webAuthnService.isWebAuthnSupported();
 
-    // Subscribe to feature flag
     this.configService.getLoginAuthFeatureFlag().subscribe(valid => {
       this.isLoginAuthRequired = valid;
     });

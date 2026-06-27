@@ -302,8 +302,8 @@ export class ProMobileViewComponent implements OnInit, OnDestroy {
     this.router.navigate(['/pro/new'], { queryParams: { date: this.selectedDateStr() } });
   }
 
-  backToClassic() {
-    this.router.navigate(['/main']);
+  backToWorkspaces() {
+    this.router.navigate(['/workspaces']);
   }
 
   // ----- Quick add -----
