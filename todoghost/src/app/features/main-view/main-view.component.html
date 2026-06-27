@@ -800,20 +800,20 @@
                      class="w-full text-lg font-bold bg-transparent border-0 border-b-2 border-milktea-200 focus:border-milktea-500 outline-none pb-2 placeholder-milktea-300"
                      [class.text-red-500]="formTask.isUrgent"
                      [class.text-milktea-900]="!formTask.isUrgent">
-              <label *ngIf="editingTask?.id" class="flex items-center justify-between mt-3 cursor-pointer">
-                <span class="text-sm text-milktea-700 flex items-center gap-1.5">
+              <label *ngIf="editingTask?.id" class="flex items-center justify-between mt-3 cursor-pointer min-h-[32px]">
+                <span class="text-sm font-medium text-milktea-700 flex items-center gap-2 leading-none">
                   <span class="material-icons text-milktea-500" style="font-size: 18px;">check_circle</span>
-                  標記為已完成
+                  已完成
                 </span>
                 <span class="ios-toggle">
                   <input type="checkbox" [checked]="formTask.status === 'completed'" (change)="formTask.status = formTask.status === 'completed' ? 'pending' : 'completed'">
                   <span class="slider"></span>
                 </span>
               </label>
-              <label class="flex items-center justify-between mt-3 cursor-pointer">
-                <span class="text-sm text-milktea-700 flex items-center gap-1.5">
+              <label class="flex items-center justify-between mt-3 cursor-pointer min-h-[32px]">
+                <span class="text-sm font-medium text-milktea-700 flex items-center gap-2 leading-none">
                   <span class="material-icons text-red-500" style="font-size: 18px;">priority_high</span>
-                  標記為緊急
+                  緊急
                 </span>
                 <span class="ios-toggle">
                   <input type="checkbox" [(ngModel)]="formTask.isUrgent">
@@ -933,7 +933,7 @@
               <div class="flex items-center justify-between mb-2">
                 <label class="text-sm text-milktea-700 flex items-center gap-1.5">
                   <span class="material-icons text-milktea-500" style="font-size: 18px;">notes</span>
-                  詳細內容 <span class="text-milktea-400 text-xs">（選填）</span>
+                  詳細內容
                 </label>
                 <button type="button"
                         class="text-milktea-500 hover:text-milktea-700 active:scale-95 transition-transform p-1 -mr-1"

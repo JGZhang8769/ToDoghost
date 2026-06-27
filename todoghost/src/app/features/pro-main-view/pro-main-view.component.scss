@@ -150,6 +150,11 @@
     color: #7a6850;
     cursor: pointer;
     transition: all 0.15s ease;
+    background: transparent;
+    border: 0;
+    line-height: 1;
+    font-family: inherit;
+    white-space: nowrap;
 }
 .pro-segment__btn.is-active {
     background: #fff;
@@ -158,7 +163,29 @@
 }
 .pro-segment__btn:not(.is-active):hover {
     color: #2a1f10;
+    background: rgba(255, 255, 255, 0.4);
 }
+
+/* Top-right "+" Add button */
+.pro-add {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 7px 14px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #d4a64a, #b58535);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    border: 0;
+    box-shadow: 0 2px 6px rgba(180, 120, 40, 0.3);
+    transition: all 0.15s ease;
+    font-family: inherit;
+    white-space: nowrap;
+}
+.pro-add:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(180, 120, 40, 0.4); }
+.pro-add:active { transform: translateY(0); }
 
 .pro-iconbtn {
     display: inline-flex;
@@ -587,10 +614,12 @@
 }
 .pro-row--big { padding: 11px 14px; }
 
-.pro-row__check {
+/* Unified checkbox circle used by list rows AND inspector */
+.pro-row__check,
+.pro-check {
     flex-shrink: 0;
-    width: 20px;
-    height: 20px;
+    width: 22px;
+    height: 22px;
     border-radius: 50%;
     border: 2px solid rgba(120, 100, 80, 0.4);
     background: transparent;
@@ -600,8 +629,10 @@
     justify-content: center;
     color: #fff;
     transition: all 0.15s ease;
+    padding: 0;
 }
-.pro-row__check.is-checked {
+.pro-row__check.is-checked,
+.pro-check.is-checked {
     background: #7a6850;
     border-color: #7a6850;
 }
@@ -811,6 +842,215 @@
     background: rgba(239, 68, 68, 0.18);
 }
 
+/* ---------- Week view (iOS Calendar style: 7 cols + 24h timeline) ---------- */
+.pro-week {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: 0;
+    overflow: hidden;
+}
+.pro-week > .pro-calendar__header { padding: 14px 16px 0; flex-shrink: 0; }
+.pro-week__dayheader {
+    display: grid;
+    grid-template-columns: 56px repeat(7, 1fr);
+    border-bottom: 1px solid rgba(120, 100, 80, 0.12);
+    padding: 8px 8px 8px 0;
+    flex-shrink: 0;
+}
+.pro-week__dayheader--mini {
+    grid-template-columns: repeat(7, 1fr);
+    padding: 6px;
+    gap: 4px;
+    border: 0;
+}
+.pro-week__hourgutter {
+    font-size: 10px;
+    color: #a3917a;
+    text-align: right;
+    padding-right: 6px;
+}
+.pro-week__day {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    border-radius: 8px;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    color: #4a3a22;
+    transition: background 0.15s ease;
+    position: relative;
+}
+.pro-week__day:hover { background: rgba(120, 100, 80, 0.06); }
+.pro-week__day.is-selected { background: rgba(120, 100, 80, 0.14); }
+.pro-week__dayname {
+    font-size: 11px;
+    font-weight: 700;
+    color: #a3917a;
+    letter-spacing: 0.05em;
+}
+.pro-week__daynum {
+    font-size: 16px;
+    font-weight: 700;
+    color: #2a1f10;
+    margin-top: 2px;
+}
+.pro-week__day.is-today .pro-week__daynum {
+    width: 26px; height: 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: #ef4444;
+    color: #fff;
+    font-size: 13px;
+}
+.pro-week__allday {
+    display: grid;
+    grid-template-columns: 56px repeat(7, 1fr);
+    border-bottom: 1px solid rgba(120, 100, 80, 0.12);
+    padding: 4px 8px 4px 0;
+    min-height: 36px;
+    flex-shrink: 0;
+    align-items: stretch;
+}
+.pro-week__allday-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 2px 3px;
+    border-left: 1px solid rgba(120, 100, 80, 0.06);
+    min-height: 30px;
+}
+.pro-week__chip {
+    background: rgba(196, 177, 144, 0.4);
+    color: #4a3a22;
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 500;
+}
+.pro-week__chip.is-urgent { background: rgba(239, 68, 68, 0.18); color: #b91c1c; font-weight: 600; }
+.pro-week__chip.is-done { opacity: 0.5; text-decoration: line-through; }
+.pro-week__chip.is-selected { box-shadow: 0 0 0 1px rgba(60, 40, 20, 0.4); }
+.pro-week__grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 56px repeat(7, 1fr);
+    overflow-y: auto;
+    min-height: 0;
+    position: relative;
+}
+.pro-week__hours {
+    display: flex;
+    flex-direction: column;
+}
+.pro-week__hour-label {
+    height: 48px;
+    font-size: 10px;
+    color: #a3917a;
+    text-align: right;
+    padding: 2px 6px 0 0;
+    border-top: 1px solid transparent;
+}
+.pro-week__hour-label:first-child { color: transparent; } /* no 0:00 label clutter */
+.pro-week__col {
+    position: relative;
+    border-left: 1px solid rgba(120, 100, 80, 0.08);
+    min-width: 0;
+}
+.pro-week__col.is-today { background: rgba(255, 220, 180, 0.08); }
+.pro-week__hour-cell {
+    height: 48px;
+    border-top: 1px solid rgba(120, 100, 80, 0.07);
+}
+.pro-week__hour-cell:hover { background: rgba(120, 100, 80, 0.04); }
+.pro-week__event {
+    position: absolute;
+    left: 3px;
+    right: 3px;
+    background: rgba(196, 177, 144, 0.6);
+    border-left: 3px solid #b5a78a;
+    border-radius: 6px;
+    padding: 3px 6px;
+    overflow: hidden;
+    color: #2a1f10;
+    cursor: pointer;
+    transition: all 0.12s ease;
+    z-index: 2;
+}
+.pro-week__event:hover { background: rgba(196, 177, 144, 0.8); transform: translateY(-1px); box-shadow: 0 2px 6px rgba(60, 40, 20, 0.15); }
+.pro-week__event.is-urgent {
+    background: rgba(239, 68, 68, 0.2);
+    border-left-color: #ef4444;
+    color: #b91c1c;
+}
+.pro-week__event.is-done { opacity: 0.5; }
+.pro-week__event.is-selected { box-shadow: 0 0 0 2px rgba(60, 40, 20, 0.5); z-index: 3; }
+.pro-week__event-title { font-size: 12px; font-weight: 600; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pro-week__event-title.is-done { text-decoration: line-through; }
+.pro-week__event-time { font-size: 10px; opacity: 0.75; margin-top: 1px; }
+.pro-week__now {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: #ef4444;
+    z-index: 4;
+    pointer-events: none;
+}
+.pro-week__now::before {
+    content: "";
+    position: absolute;
+    left: -4px;
+    top: -3px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #ef4444;
+}
+
+/* Drag preview shared */
+.pro-drag-preview {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-radius: 12px;
+    box-shadow: 0 10px 28px rgba(60, 40, 20, 0.2), 0 0 0 1px rgba(120, 100, 80, 0.15);
+    font-size: 13px;
+    font-weight: 600;
+    color: #2a1f10;
+    max-width: 280px;
+}
+.pro-drag-preview .material-icons { color: #a3917a; font-size: 18px; }
+
+/* Reorder placeholder = subtle dashed slot */
+::ng-deep .pro-listpane__rows .cdk-drag-placeholder {
+    opacity: 0.2;
+    background: rgba(120, 100, 80, 0.15);
+    border: 2px dashed rgba(120, 100, 80, 0.3);
+    border-radius: 12px;
+}
+
+/* Row title text shouldn't collapse */
+.pro-row__titletext { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+
+/* List-first layout reverses rows */
+.pro-center__split--list-first {
+    grid-template-rows: 1.4fr 1fr;
+}
+
 /* ---------- Responsive: collapse to single column on small screens ---------- */
 @media (max-width: 900px) {
     .pro-grid {
@@ -822,4 +1062,5 @@
     .pro-inspector { max-height: 60vh; }
     .pro-topbar__search { display: none; }
     .pro-segment__btn { padding: 5px 8px; font-size: 11px; }
+    .pro-add span:not(.material-icons) { display: none; }
 }
