@@ -15,7 +15,10 @@
     <button class="pro-iconbtn"
             [title]="sidebarCollapsed ? '展開側邊欄' : '收起側邊欄'"
             (click)="toggleSidebar()">
-      <span class="material-icons" style="font-size: 20px;">{{ sidebarCollapsed ? 'menu_open' : 'menu' }}</span>
+      <!-- icon points "into" what the click will do:
+           - collapsed → show plain menu (= "open me")
+           - expanded → show menu_open with the chevron (= "close me") -->
+      <span class="material-icons" style="font-size: 20px;">{{ sidebarCollapsed ? 'menu' : 'menu_open' }}</span>
     </button>
     <div class="pro-topbar__brand">
       <app-svg-icon name="logo_main" width="22px" height="22px"></app-svg-icon>

@@ -1,0 +1,160 @@
+<div class="pmt-shell">
+  <div class="pmt-bg" aria-hidden="true">
+    <div class="pmt-bg__blob"></div>
+  </div>
+
+  <!-- Nav bar -->
+  <header class="pmt-nav">
+    <button class="pmt-back" (click)="back()">
+      <span class="material-icons" style="font-size: 22px;">chevron_left</span>
+      <span>返回</span>
+    </button>
+    <span class="pmt-title">{{ isCreating() ? '新增代辦' : '編輯代辦' }}</span>
+    <button class="pmt-save" [disabled]="!title().trim()" (click)="save()">儲存</button>
+  </header>
+
+  <!-- Body -->
+  <main class="pmt-body ios-scroll">
+    <!-- Title big input -->
+    <div class="pmt-title-input">
+      <input class="pmt-title-input__field"
+             [value]="title()"
+             (input)="title.set($any($event.target).value)"
+             placeholder="代辦標題"
+             [class.is-urgent]="isUrgent()"
+             autofocus>
+    </div>
+
+    <!-- Status group -->
+    <div class="pmt-card">
+      <label class="pmt-row" *ngIf="!isCreating()">
+        <span class="pmt-row__label">
+          <span class="material-icons" style="font-size: 18px; color: #7a6850;">check_circle</span>
+          已完成
+        </span>
+        <span class="pmt-toggle">
+          <input type="checkbox" [checked]="isCompleted()" (change)="isCompleted.set($any($event.target).checked)">
+          <span class="pmt-toggle__slider"></span>
+        </span>
+      </label>
+      <label class="pmt-row">
+        <span class="pmt-row__label">
+          <span class="material-icons" style="font-size: 18px; color: #ef4444;">priority_high</span>
+          緊急
+        </span>
+        <span class="pmt-toggle">
+          <input type="checkbox" [checked]="isUrgent()" (change)="isUrgent.set($any($event.target).checked)">
+          <span class="pmt-toggle__slider"></span>
+        </span>
+      </label>
+    </div>
+
+    <!-- Schedule group -->
+    <div class="pmt-card">
+      <label class="pmt-row">
+        <span class="pmt-row__label">日期</span>
+        <input type="date"
+               [value]="date()"
+               (input)="date.set($any($event.target).value || null)"
+               class="pmt-input">
+      </label>
+      <label class="pmt-row">
+        <span class="pmt-row__label">開始</span>
+        <input type="time"
+               [value]="startTime()"
+               (input)="startTime.set($any($event.target).value || null)"
+               class="pmt-input">
+      </label>
+      <label class="pmt-row">
+        <span class="pmt-row__label">結束</span>
+        <input type="time"
+               [value]="endTime()"
+               (input)="endTime.set($any($event.target).value || null)"
+               class="pmt-input"
+               [disabled]="!startTime()">
+      </label>
+    </div>
+
+    <!-- Category chips -->
+    <div class="pmt-block">
+      <span class="pmt-block__label">分類</span>
+      <div class="pmt-cats">
+        <button class="pmt-cat"
+                [class.is-active]="!categoryId()"
+                (click)="setCategory(null)">
+          <span class="material-icons" style="font-size: 14px;">block</span>
+          無分類
+        </button>
+        <button *ngFor="let c of categories" class="pmt-cat"
+                [class.is-active]="categoryId() === c.id"
+                (click)="setCategory(c.id)">
+          <span *ngIf="c.icon && !isEmoji(c.icon)" class="material-icons" style="font-size: 14px;">{{ c.icon }}</span>
+          <span *ngIf="c.icon && isEmoji(c.icon)" style="font-size: 14px;">{{ c.icon }}</span>
+          {{ c.name }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Reminder -->
+    <div class="pmt-card">
+      <label class="pmt-row">
+        <span class="pmt-row__label">提醒</span>
+        <select class="pmt-input"
+                [value]="reminderOffset()"
+                (change)="reminderOffset.set($any($event.target).value === 'null' ? null : +$any($event.target).value)"
+                [disabled]="!startTime()">
+          <option [value]="'null'">不提醒</option>
+          <option [value]="15">提前 15 分鐘</option>
+          <option [value]="30">提前 30 分鐘</option>
+          <option [value]="60">提前 1 小時</option>
+          <option [value]="1440">提前 1 天</option>
+        </select>
+      </label>
+    </div>
+
+    <!-- Tags -->
+    <div class="pmt-block">
+      <span class="pmt-block__label">標籤</span>
+      <div class="pmt-tags">
+        <span *ngFor="let tag of tags()" class="pmt-tag">
+          #{{ tag }}
+          <button class="pmt-tag__x" (click)="removeTag(tag)">&times;</button>
+        </span>
+        <input class="pmt-tags__input"
+               [(ngModel)]="tagInput"
+               (keydown.enter)="addTag()"
+               placeholder="新增標籤 Enter">
+      </div>
+    </div>
+
+    <!-- Description -->
+    <div class="pmt-block">
+      <span class="pmt-block__label">詳細內容</span>
+      <textarea class="pmt-textarea ios-scroll"
+                [value]="description()"
+                (input)="description.set($any($event.target).value)"
+                rows="6"
+                placeholder="輸入備註、細節、相關連結…"></textarea>
+    </div>
+
+    <!-- Delete action (only when editing) -->
+    <button *ngIf="!isCreating()" class="pmt-delete" (click)="requestDelete()">
+      <span class="material-icons" style="font-size: 18px;">delete</span>
+      刪除代辦
+    </button>
+  </main>
+
+  <!-- Delete confirm dialog -->
+  <div *ngIf="showDeleteConfirm()" class="pmt-confirm-scrim" (click)="cancelDelete()">
+    <div class="pmt-confirm" (click)="$event.stopPropagation()">
+      <div class="pmt-confirm__head">
+        <h3>刪除代辦</h3>
+        <p>確定要刪除「{{ title() }}」嗎？此操作無法復原。</p>
+      </div>
+      <div class="pmt-confirm__actions">
+        <button class="pmt-confirm__btn pmt-confirm__btn--cancel" (click)="cancelDelete()">取消</button>
+        <button class="pmt-confirm__btn pmt-confirm__btn--danger" (click)="confirmDelete()">刪除</button>
+      </div>
+    </div>
+  </div>
+</div>
