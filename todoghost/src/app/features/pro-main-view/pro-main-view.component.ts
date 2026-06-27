@@ -18,7 +18,7 @@ type LayoutMode = 'calendar-first' | 'list-first';
 type CalGrain = 'month' | 'week';
 type SmartList = 'inbox' | 'today' | 'week' | 'urgent' | 'unscheduled' | 'completed' | 'selected-date';
 type SelectedList = SmartList | { kind: 'category'; id: string } | { kind: 'user'; id: string };
-type InspectorMode = 'day' | 'edit';
+type InspectorMode = 'day' | 'edit' | 'create';
 
 interface CalendarDay {
   dateStr: string;
@@ -285,13 +285,32 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
    *   - else returns the lunar date (初二, 廿三, …)
    * Also returns whether this is a solar term so the caller can colour it.
    */
+  /**
+   * The chinese-lunar-calendar library ships simplified Chinese strings
+   * (e.g. 立春, 芒种, 处暑). Map the 24 solar terms to their traditional
+   * forms used in Taiwan/HK so the UI is consistent with the rest of
+   * the app's zh-TW copy.
+   */
+  private static readonly SOLAR_TERM_TW: Record<string, string> = {
+    '立春': '立春', '雨水': '雨水', '惊蛰': '驚蟄', '春分': '春分',
+    '清明': '清明', '谷雨': '穀雨', '立夏': '立夏', '小满': '小滿',
+    '芒种': '芒種', '夏至': '夏至', '小暑': '小暑', '大暑': '大暑',
+    '立秋': '立秋', '处暑': '處暑', '白露': '白露', '秋分': '秋分',
+    '寒露': '寒露', '霜降': '霜降', '立冬': '立冬', '小雪': '小雪',
+    '大雪': '大雪', '冬至': '冬至', '小寒': '小寒', '大寒': '大寒',
+  };
+
   lunarLabelFor(dateStr: string): { label: string; isSolarTerm: boolean } {
     const [y, m, d] = dateStr.split('-').map(Number);
     try {
       const lunar = getLunar(y, m, d);
-      if (lunar.solarTerm) return { label: lunar.solarTerm, isSolarTerm: true };
+      if (lunar.solarTerm) {
+        const tw = ProMainViewComponent.SOLAR_TERM_TW[lunar.solarTerm] ?? lunar.solarTerm;
+        return { label: tw, isSolarTerm: true };
+      }
       if (lunar.lunarDate === 1) {
-        const monthChars = ['正', '二', '三', '四', '五', '六', '七', '八', '九', '十', '冬', '腊'];
+        // '腊' (simplified) → '臘' (traditional)
+        const monthChars = ['正', '二', '三', '四', '五', '六', '七', '八', '九', '十', '冬', '臘'];
         return { label: `${monthChars[lunar.lunarMonth - 1]}月`, isSolarTerm: false };
       }
       return { label: this.formatLunarDay(lunar.lunarDate), isSolarTerm: false };
@@ -327,11 +346,17 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
   openCreateForm(prefill?: Partial<NewTaskForm>) {
     this.createForm = { ...this.blankCreateForm(), ...prefill };
     this.createFormTagInput = '';
-    this.showCreateForm = true;
+    // Show the form inline in the inspector pane (same surface as edit),
+    // not as a separate right-side slide-in panel.
+    this.selectedTaskId = null;
+    this.inspectorMode = 'create';
+    this.showInspector = true;
+    this.showCreateForm = false; // keep legacy panel hidden
   }
 
   closeCreateForm() {
     this.showCreateForm = false;
+    this.inspectorMode = 'day';
   }
 
   addCreateFormTag() {
@@ -714,18 +739,49 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
   }
 
   // ---------- Drag & drop ----------
+  // Whether the user is currently dragging a task somewhere in Pro mode.
+  // Used to highlight valid drop targets (calendar cells, unscheduled zone)
+  // so users have a clear visual hint that they can reschedule by dragging.
+  isDraggingTask = false;
+  // dateStr that just received a drop — used to pulse the cell as success feedback.
+  recentlyDroppedDate: string | null = null;
+  private pulseTimer: any;
+
+  onTaskDragStarted() {
+    this.isDraggingTask = true;
+  }
+
+  onTaskDragEnded() {
+    // CDK fires dragEnded after drop, so leave the flag for one tick to
+    // let the drop handler highlight first, then clear it.
+    setTimeout(() => { this.isDraggingTask = false; }, 50);
+  }
+
   async dropOnDate(event: CdkDragDrop<any>, dateStr: string | null) {
     const task: Task = event.item.data;
     if (!task) return;
     if (task.date !== dateStr) {
       await this.taskService.updateTask(task.id, { date: dateStr });
+      // Pulse the destination cell briefly so the user sees confirmation.
+      this.recentlyDroppedDate = dateStr;
+      if (this.pulseTimer) clearTimeout(this.pulseTimer);
+      this.pulseTimer = setTimeout(() => { this.recentlyDroppedDate = null; }, 600);
     }
   }
 
   /**
+   * Drop on the sidebar "未排程" smart-list — unschedules the task.
+   */
+  async dropToUnscheduled(event: CdkDragDrop<any>) {
+    const task: Task = event.item.data;
+    if (!task || task.date === null) return;
+    await this.taskService.updateTask(task.id, { date: null });
+  }
+
+  /**
    * Reorder within the list pane — only reorders the visual array shown.
-   * To actually persist order we'd need to write back into Firestore which
-   * we avoid here to keep the drop a no-op for unrelated containers.
+   * Cross-container drops fall through to the matching cdkDropListDropped
+   * handler on the target container (e.g. calendar cell, unscheduled zone).
    */
   reorderInList(event: CdkDragDrop<Task[]>) {
     if (event.previousContainer !== event.container) return; // only same-list reorder

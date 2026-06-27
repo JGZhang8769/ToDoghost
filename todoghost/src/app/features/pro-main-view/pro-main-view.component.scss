@@ -1338,3 +1338,53 @@
     .pro-segment__btn { padding: 5px 8px; font-size: 11px; }
     .pro-add span:not(.material-icons) { display: none; }
 }
+
+/* ---------- Drag feedback: visible drop zones while a task is in flight ---------- */
+/* When .pro-dragging is on the shell (set while a task is being dragged),
+   every valid drop target lights up so the user immediately knows where
+   they can release. The cell under the cursor gets a stronger highlight
+   via CDK's .cdk-drop-list-receiving / .cdk-drop-list-dragging classes. */
+.pro-dragging .pro-day {
+    background: rgba(255, 255, 255, 0.85);
+    box-shadow: inset 0 0 0 1px rgba(120, 100, 80, 0.18);
+}
+.pro-dragging .pro-day.cdk-drop-list-receiving,
+.pro-dragging .pro-day.cdk-drop-list-dragging {
+    background: rgba(212, 166, 74, 0.18);
+    box-shadow: inset 0 0 0 2px rgba(212, 166, 74, 0.7);
+    transform: scale(1.02);
+}
+.pro-dragging .pro-week__allday-cell.cdk-drop-list-receiving {
+    background: rgba(212, 166, 74, 0.18);
+    box-shadow: inset 0 0 0 2px rgba(212, 166, 74, 0.7);
+}
+.pro-dragging .pro-listpane__rows {
+    background: rgba(212, 166, 74, 0.04);
+    border-radius: 12px;
+}
+.pro-dragging .pro-listpane__rows.cdk-drop-list-receiving {
+    background: rgba(212, 166, 74, 0.12);
+    box-shadow: inset 0 0 0 2px rgba(212, 166, 74, 0.5);
+}
+
+/* Sidebar 未排程 drop zone */
+.pro-nav-wrap {
+    border-radius: 10px;
+    transition: all 0.15s ease;
+    margin: 0;
+}
+.pro-dragging .pro-nav-wrap {
+    background: rgba(196, 181, 253, 0.18);
+}
+.pro-dragging .pro-nav-wrap.cdk-drop-list-receiving {
+    background: rgba(139, 92, 246, 0.3);
+    box-shadow: inset 0 0 0 2px rgba(139, 92, 246, 0.6);
+}
+
+/* Drag preview / placeholder polish */
+.cdk-drag-preview {
+    cursor: grabbing !important;
+}
+.cdk-drag-placeholder {
+    opacity: 0.25 !important;
+}
