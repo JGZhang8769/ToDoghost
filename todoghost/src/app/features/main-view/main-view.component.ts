@@ -992,6 +992,10 @@ onTouchEnd(e: any, taskId: string) {
     this.router.navigate(['/settings']);
   }
 
+  goToPro() {
+    this.router.navigate(['/pro']);
+  }
+
   logout() {
     this.userService.logout();
   }
