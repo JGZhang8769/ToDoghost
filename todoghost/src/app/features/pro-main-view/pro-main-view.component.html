@@ -12,6 +12,11 @@
     <button class="pro-iconbtn" title="返回經典版" (click)="backToClassic()">
       <span class="material-icons" style="font-size: 20px;">arrow_back</span>
     </button>
+    <button class="pro-iconbtn"
+            [title]="sidebarCollapsed ? '展開側邊欄' : '收起側邊欄'"
+            (click)="toggleSidebar()">
+      <span class="material-icons" style="font-size: 20px;">{{ sidebarCollapsed ? 'menu_open' : 'menu' }}</span>
+    </button>
     <div class="pro-topbar__brand">
       <app-svg-icon name="logo_main" width="22px" height="22px"></app-svg-icon>
       <span class="pro-topbar__title">{{ currentWorkspace?.name || 'ToDoghost Pro' }}</span>
@@ -72,23 +77,9 @@
   <main class="pro-grid"
         [style.grid-template-columns]="gridTemplateColumns">
 
-    <!-- Single toggle button anchored at the top-left of the main grid.
-         When expanded, it's a small chevron at the sidebar's top-right
-         corner (click to collapse). When collapsed, a floating glass
-         button shows in the same approximate area to expand again. -->
-    <button *ngIf="sidebarCollapsed" class="pro-sidebar__expand" (click)="toggleSidebar()" title="展開側邊欄">
-      <span class="material-icons" style="font-size: 18px;">menu</span>
-    </button>
-
-    <!-- Left: Sidebar (hidden entirely when collapsed) -->
+    <!-- Left: Sidebar (hidden entirely when collapsed; toggle lives in the
+         topbar next to 返回 so users always know where to find it). -->
     <aside *ngIf="!sidebarCollapsed" class="pro-sidebar pro-glass">
-      <!-- Collapse toggle: anchored at the *bottom-right* of the sidebar
-           so it doesn't overlap the floating expand button's position when
-           re-expanded. -->
-      <button class="pro-sidebar__collapse" (click)="toggleSidebar()" title="收起側邊欄">
-        <span class="material-icons" style="font-size: 18px;">chevron_left</span>
-      </button>
-
       <section class="pro-sidebar__section">
         <h4 class="pro-sidebar__heading">清單</h4>
         <button class="pro-nav" [class.is-active]="isSelectedList('inbox')" (click)="selectSmartList('inbox')">
