@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { DragDropModule, CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
 import { Subject, takeUntil } from 'rxjs';
-import { addDays, addMonths, endOfMonth, endOfWeek, format, isSameMonth, startOfMonth, startOfWeek, subMonths } from 'date-fns';
+import { addDays, addMonths, addWeeks, endOfMonth, endOfWeek, format, isSameMonth, startOfMonth, startOfWeek, subMonths, subWeeks } from 'date-fns';
 
 import { TaskService, Task } from '../../core/services/task.service';
 import { CategoryService, Category } from '../../core/services/category.service';
@@ -13,8 +13,21 @@ import { UserService, User } from '../../core/services/user.service';
 import { SvgIconComponent } from '../../core/svg-icon/svg-icon.component';
 
 type LayoutMode = 'calendar-first' | 'list-first';
-type MainView = 'month' | 'week' | 'day' | 'inbox';
+type CalGrain = 'month' | 'week';
 type SmartList = 'inbox' | 'today' | 'week' | 'urgent' | 'unscheduled' | 'completed';
+type SelectedList = SmartList | { kind: 'category'; id: string };
+
+interface WeekDay {
+  dateStr: string;
+  dayNum: number;
+  dayName: string;
+  isToday: boolean;
+  tasks: Task[];
+  allDay: Task[];
+  timedBlocks: { task: Task; top: number; height: number }[];
+}
+
+const HOUR_PX = 48; // visible height per hour in week timeline
 
 @Component({
   selector: 'app-pro-main-view',
@@ -32,16 +45,18 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
 
   private destroy$ = new Subject<void>();
 
-  // Layout
+  // Layout state
   layoutMode: LayoutMode = 'calendar-first';
-  leftWidth = 240;          // px
-  rightWidth = 380;         // px
+  calGrain: CalGrain = 'month';
+  leftWidth = 240;
+  rightWidth = 380;
   readonly LEFT_MIN = 200;
   readonly LEFT_MAX = 360;
   readonly RIGHT_MIN = 320;
   readonly RIGHT_MAX = 520;
+  showInspector = true;
 
-  // Drag splitter state
+  // Splitter drag state
   splitter: null | 'left' | 'right' = null;
   splitterStartX = 0;
   splitterStartWidth = 0;
@@ -53,39 +68,51 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
   categories: Category[] = [];
 
   // View state
-  mainView: MainView = 'month';
-  selectedList: SmartList | { kind: 'category'; id: string } = 'today';
+  selectedList: SelectedList = 'today';
   currentDate = new Date();
   selectedDateStr = format(new Date(), 'yyyy-MM-dd');
 
-  // Selection + inspector
+  // Selection & inspector
   selectedTaskId: string | null = null;
   get selectedTask(): Task | null {
-    if (!this.selectedTaskId) return null;
-    return this.tasks.find(t => t.id === this.selectedTaskId) ?? null;
+    return this.selectedTaskId ? this.tasks.find(t => t.id === this.selectedTaskId) ?? null : null;
   }
 
   // Quick add
   quickAddTitle = '';
-  showInspector = true;
-
-  // Search
   searchQuery = '';
 
-  // Calendar grid
+  // Calendar data
   calendarDays: { dateStr: string; dayNum: number; isCurrentMonth: boolean; isToday: boolean; tasks: Task[] }[] = [];
+  weekDays: WeekDay[] = [];
   currentMonthStr = '';
+  currentWeekStr = '';
+  dayHours = Array.from({ length: 24 }, (_, i) => i);
+  nowLineTop = 0;
 
-  // Derived: tasks shown in middle list pane based on selectedList
+  private nowTimer: any;
+
+  // Form modal — Pro reuses a thin wrapper around create
+  showQuickForm = false;
+  quickFormDate: string | null = null;
+  quickFormStartTime: string | null = null;
+
+  // ---------- Smart list ----------
+  get quickAddTargetDate(): string | null {
+    if (this.selectedList === 'unscheduled') return null;
+    return this.selectedDateStr;
+  }
+
   get listPaneTasks(): Task[] {
     let filtered: Task[];
     const today = format(new Date(), 'yyyy-MM-dd');
+    const weekStart = format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd');
+    const weekEnd = format(endOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd');
+
     if (this.selectedList === 'today') {
       filtered = this.tasks.filter(t => t.date === today && t.status !== 'completed');
     } else if (this.selectedList === 'week') {
-      const start = format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd');
-      const end = format(endOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd');
-      filtered = this.tasks.filter(t => t.date && t.date >= start && t.date <= end && t.status !== 'completed');
+      filtered = this.tasks.filter(t => t.date && t.date >= weekStart && t.date <= weekEnd && t.status !== 'completed');
     } else if (this.selectedList === 'urgent') {
       filtered = this.tasks.filter(t => t.isUrgent && t.status !== 'completed');
     } else if (this.selectedList === 'unscheduled') {
@@ -111,11 +138,13 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     }
 
     return filtered.sort((a, b) => {
-      // urgent first, then by date asc, then by order
       if (a.isUrgent !== b.isUrgent) return a.isUrgent ? -1 : 1;
-      if (a.date && b.date && a.date !== b.date) return a.date < b.date ? -1 : 1;
-      if (!a.date && b.date) return 1;
-      if (a.date && !b.date) return -1;
+      const aDate = a.date ?? '9999-99-99';
+      const bDate = b.date ?? '9999-99-99';
+      if (aDate !== bDate) return aDate < bDate ? -1 : 1;
+      const aTime = a.startTime ?? '99:99';
+      const bTime = b.startTime ?? '99:99';
+      if (aTime !== bTime) return aTime < bTime ? -1 : 1;
       return (a.order ?? 0) - (b.order ?? 0);
     });
   }
@@ -128,72 +157,82 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     if (this.selectedList === 'completed') return '已完成';
     if (this.selectedList === 'inbox') return '收件匣';
     if (typeof this.selectedList === 'object' && this.selectedList.kind === 'category') {
-      return this.categories.find(c => c.id === this.selectedList && (this.selectedList as any).id)?.name
-          ?? this.categories.find(c => typeof this.selectedList === 'object' && c.id === this.selectedList.id)?.name
-          ?? '分類';
+      return this.categories.find(c => c.id === (this.selectedList as any).id)?.name ?? '分類';
     }
     return '清單';
   }
 
   smartListCount(list: SmartList): number {
     const today = format(new Date(), 'yyyy-MM-dd');
-    if (list === 'today') return this.tasks.filter(t => t.date === today && t.status !== 'completed').length;
-    if (list === 'urgent') return this.tasks.filter(t => t.isUrgent && t.status !== 'completed').length;
-    if (list === 'unscheduled') return this.tasks.filter(t => !t.date && t.status !== 'completed').length;
-    if (list === 'inbox') return this.tasks.filter(t => t.status !== 'completed').length;
-    if (list === 'week') {
-      const start = format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd');
-      const end = format(endOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd');
-      return this.tasks.filter(t => t.date && t.date >= start && t.date <= end && t.status !== 'completed').length;
+    const ws = format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd');
+    const we = format(endOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd');
+    switch (list) {
+      case 'today':       return this.tasks.filter(t => t.date === today && t.status !== 'completed').length;
+      case 'urgent':      return this.tasks.filter(t => t.isUrgent && t.status !== 'completed').length;
+      case 'unscheduled': return this.tasks.filter(t => !t.date && t.status !== 'completed').length;
+      case 'inbox':       return this.tasks.filter(t => t.status !== 'completed').length;
+      case 'week':        return this.tasks.filter(t => t.date && t.date >= ws && t.date <= we && t.status !== 'completed').length;
+      case 'completed':   return this.tasks.filter(t => t.status === 'completed').length;
     }
-    if (list === 'completed') return this.tasks.filter(t => t.status === 'completed').length;
-    return 0;
   }
 
   categoryCount(catId: string): number {
     return this.tasks.filter(t => t.categoryId === catId && t.status !== 'completed').length;
   }
 
+  // ---------- Lifecycle ----------
   ngOnInit() {
-    // Restore layout pref
     const savedLayout = localStorage.getItem('pro:layoutMode') as LayoutMode | null;
     if (savedLayout === 'calendar-first' || savedLayout === 'list-first') this.layoutMode = savedLayout;
+    const savedGrain = localStorage.getItem('pro:calGrain') as CalGrain | null;
+    if (savedGrain === 'month' || savedGrain === 'week') this.calGrain = savedGrain;
     const lw = parseInt(localStorage.getItem('pro:leftWidth') ?? '', 10);
     const rw = parseInt(localStorage.getItem('pro:rightWidth') ?? '', 10);
     if (!Number.isNaN(lw)) this.leftWidth = Math.min(this.LEFT_MAX, Math.max(this.LEFT_MIN, lw));
     if (!Number.isNaN(rw)) this.rightWidth = Math.min(this.RIGHT_MAX, Math.max(this.RIGHT_MIN, rw));
 
     this.workspaceService.currentWorkspace$.pipe(takeUntil(this.destroy$)).subscribe(ws => {
-      if (!ws) {
-        this.router.navigate(['/workspaces']);
-        return;
-      }
+      if (!ws) { this.router.navigate(['/workspaces']); return; }
       this.currentWorkspace = ws;
       this.taskService.getTasks(ws.id).pipe(takeUntil(this.destroy$)).subscribe(tasks => {
         this.tasks = tasks;
         this.buildCalendar();
+        this.buildWeek();
       });
       this.categoryService.getCategories(ws.id).pipe(takeUntil(this.destroy$)).subscribe(cats => {
         this.categories = cats.sort((a, b) => a.order - b.order);
       });
     });
 
-    this.userService.currentUser$.pipe(takeUntil(this.destroy$)).subscribe(u => {
-      this.currentUser = u;
-    });
+    this.userService.currentUser$.pipe(takeUntil(this.destroy$)).subscribe(u => this.currentUser = u);
 
     this.buildCalendar();
+    this.buildWeek();
+    this.updateNowLine();
+    this.nowTimer = setInterval(() => this.updateNowLine(), 60_000);
   }
 
   ngOnDestroy() {
     this.destroy$.next();
     this.destroy$.complete();
+    if (this.nowTimer) clearInterval(this.nowTimer);
   }
 
-  // === Layout ===
-  toggleLayout() {
-    this.layoutMode = this.layoutMode === 'calendar-first' ? 'list-first' : 'calendar-first';
-    localStorage.setItem('pro:layoutMode', this.layoutMode);
+  // ---------- Layout ----------
+  setLayout(mode: LayoutMode) {
+    if (this.layoutMode === mode) return;
+    this.layoutMode = mode;
+    localStorage.setItem('pro:layoutMode', mode);
+  }
+
+  setGrain(grain: CalGrain) {
+    if (this.calGrain === grain) return;
+    this.calGrain = grain;
+    localStorage.setItem('pro:calGrain', grain);
+  }
+
+  toggleInspector() {
+    this.showInspector = !this.showInspector;
   }
 
   startSplitter(side: 'left' | 'right', e: MouseEvent) {
@@ -223,11 +262,7 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     }
   }
 
-  toggleInspector() {
-    this.showInspector = !this.showInspector;
-  }
-
-  // === Calendar ===
+  // ---------- Calendar build ----------
   buildCalendar() {
     const monthStart = startOfMonth(this.currentDate);
     const monthEnd = endOfMonth(this.currentDate);
@@ -251,42 +286,115 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     this.currentMonthStr = format(this.currentDate, 'yyyy 年 M 月');
   }
 
-  prevMonth() { this.currentDate = subMonths(this.currentDate, 1); this.buildCalendar(); }
-  nextMonth() { this.currentDate = addMonths(this.currentDate, 1); this.buildCalendar(); }
-  goToToday() { this.currentDate = new Date(); this.selectedDateStr = format(new Date(), 'yyyy-MM-dd'); this.buildCalendar(); }
+  buildWeek() {
+    const start = startOfWeek(this.currentDate, { weekStartsOn: 1 });
+    const end = endOfWeek(this.currentDate, { weekStartsOn: 1 });
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    const dayNames = ['一', '二', '三', '四', '五', '六', '日'];
+    const result: WeekDay[] = [];
+    for (let i = 0; i < 7; i++) {
+      const d = addDays(start, i);
+      const dateStr = format(d, 'yyyy-MM-dd');
+      const dayTasks = this.tasks.filter(t => t.date === dateStr);
+      const allDay = dayTasks.filter(t => !t.startTime);
+      const timed = dayTasks.filter(t => t.startTime);
+      const timedBlocks = timed.map(t => {
+        const [sh, sm] = (t.startTime ?? '0:00').split(':').map(Number);
+        const startMin = sh * 60 + sm;
+        let endMin = startMin + 30;
+        if (t.endTime) {
+          const [eh, em] = t.endTime.split(':').map(Number);
+          endMin = eh * 60 + em;
+          if (endMin <= startMin) endMin = startMin + 30;
+        }
+        return {
+          task: t,
+          top: (startMin / 60) * HOUR_PX,
+          height: Math.max(24, ((endMin - startMin) / 60) * HOUR_PX),
+        };
+      });
+      result.push({
+        dateStr,
+        dayNum: d.getDate(),
+        dayName: dayNames[i],
+        isToday: dateStr === todayStr,
+        tasks: dayTasks,
+        allDay,
+        timedBlocks,
+      });
+    }
+    this.weekDays = result;
+    this.currentWeekStr = `${format(start, 'M/d')} – ${format(end, 'M/d')}`;
+  }
+
+  updateNowLine() {
+    const now = new Date();
+    this.nowLineTop = ((now.getHours() * 60 + now.getMinutes()) / 60) * HOUR_PX;
+  }
+
+  // ---------- Navigation ----------
+  prevPeriod() {
+    this.currentDate = this.calGrain === 'month' ? subMonths(this.currentDate, 1) : subWeeks(this.currentDate, 1);
+    this.buildCalendar();
+    this.buildWeek();
+  }
+
+  nextPeriod() {
+    this.currentDate = this.calGrain === 'month' ? addMonths(this.currentDate, 1) : addWeeks(this.currentDate, 1);
+    this.buildCalendar();
+    this.buildWeek();
+  }
+
+  goToToday() {
+    this.currentDate = new Date();
+    this.selectedDateStr = format(new Date(), 'yyyy-MM-dd');
+    this.buildCalendar();
+    this.buildWeek();
+  }
 
   selectDate(dateStr: string) {
     this.selectedDateStr = dateStr;
   }
 
-  // === Selection ===
+  // ---------- Selection ----------
   selectTask(taskId: string) {
     this.selectedTaskId = taskId;
     this.showInspector = true;
   }
 
-  // === Task mutations ===
+  selectSmartList(list: SmartList) {
+    this.selectedList = list;
+    this.selectedTaskId = null;
+  }
+
+  selectCategoryList(cat: Category) {
+    this.selectedList = { kind: 'category', id: cat.id };
+    this.selectedTaskId = null;
+  }
+
+  isSelectedList(list: SmartList): boolean {
+    return this.selectedList === list;
+  }
+
+  isSelectedCategory(catId: string): boolean {
+    return typeof this.selectedList === 'object' && this.selectedList.kind === 'category' && this.selectedList.id === catId;
+  }
+
+  // ---------- Task mutations ----------
   async toggleCompletion(task: Task) {
     const next = task.status === 'completed' ? 'pending' : 'completed';
     await this.taskService.updateTask(task.id, { status: next });
   }
 
-  async toggleUrgent(task: Task) {
-    await this.taskService.updateTask(task.id, { isUrgent: !task.isUrgent });
-  }
-
   async quickAdd() {
     const title = this.quickAddTitle.trim();
     if (!title || !this.currentWorkspace || !this.currentUser) return;
-    const today = format(new Date(), 'yyyy-MM-dd');
-    const date = this.selectedList === 'today' ? today
-               : this.selectedList === 'unscheduled' ? null
-               : today;
+    const targetDate = this.quickAddTargetDate;
     const maxOrder = this.tasks.reduce((m, t) => Math.max(m, t.order ?? 0), 0);
     await this.taskService.addTask({
       workspaceId: this.currentWorkspace.id,
       title,
-      date,
+      date: targetDate,
       startTime: null,
       endTime: null,
       tags: [],
@@ -297,6 +405,50 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
       order: maxOrder + 1,
     } as any);
     this.quickAddTitle = '';
+  }
+
+  /** Top-right "+" button — opens form pre-filled with selected date. */
+  async openCreateForSelectedDate() {
+    await this.createInline(this.selectedDateStr, null);
+  }
+
+  /** Double-click on a calendar day cell. */
+  async openCreateForDate(dateStr: string) {
+    this.selectedDateStr = dateStr;
+    await this.createInline(dateStr, null);
+  }
+
+  /** Double-click on an hour cell in week view. */
+  async openCreateForDateTime(dateStr: string, hour: number) {
+    this.selectedDateStr = dateStr;
+    const hh = hour.toString().padStart(2, '0');
+    await this.createInline(dateStr, `${hh}:00`);
+  }
+
+  /**
+   * Inline create: prompt for title, then add task with given date / startTime.
+   * Keeps Pro mode lightweight — the heavy modal stays in classic /main.
+   */
+  private async createInline(dateStr: string | null, startTime: string | null) {
+    if (!this.currentWorkspace || !this.currentUser) return;
+    const title = window.prompt(`新增到 ${dateStr ?? '無日期'}${startTime ? ' ' + startTime : ''}`, '');
+    if (!title || !title.trim()) return;
+    const maxOrder = this.tasks.reduce((m, t) => Math.max(m, t.order ?? 0), 0);
+    const id = await this.taskService.addTask({
+      workspaceId: this.currentWorkspace.id,
+      title: title.trim(),
+      date: dateStr,
+      startTime,
+      endTime: null,
+      tags: [],
+      isUrgent: false,
+      createdBy: this.currentUser.id,
+      status: 'pending',
+      reminderOffset: null,
+      order: maxOrder + 1,
+    } as any);
+    // Select the newly created task once it propagates via the live query.
+    setTimeout(() => { this.selectedTaskId = id; this.showInspector = true; }, 200);
   }
 
   async deleteTask(task: Task) {
@@ -321,7 +473,7 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     });
   }
 
-  // === Drag & drop: drop a task onto a calendar cell or list pane row ===
+  // ---------- Drag & drop ----------
   async dropOnDate(event: CdkDragDrop<any>, dateStr: string | null) {
     const task: Task = event.item.data;
     if (!task) return;
@@ -330,10 +482,25 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     }
   }
 
-  // === Helpers ===
+  /**
+   * Reorder within the list pane — only reorders the visual array shown.
+   * To actually persist order we'd need to write back into Firestore which
+   * we avoid here to keep the drop a no-op for unrelated containers.
+   */
+  reorderInList(event: CdkDragDrop<Task[]>) {
+    if (event.previousContainer !== event.container) return; // only same-list reorder
+    if (event.previousIndex === event.currentIndex) return;
+    // Persist new order index by rewriting order field on swapped items.
+    const items = [...this.listPaneTasks];
+    moveItemInArray(items, event.previousIndex, event.currentIndex);
+    items.forEach((t, i) => {
+      this.taskService.updateTask(t.id, { order: i + 1 } as any);
+    });
+  }
+
+  // ---------- Helpers ----------
   isEmoji(str: string): boolean {
     if (!str) return false;
-    // Quick heuristic: emoji code points are mostly > 0x1F000 or in the misc symbol range.
     return /\p{Extended_Pictographic}/u.test(str);
   }
 
@@ -343,23 +510,5 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
 
   backToClassic() {
     this.router.navigate(['/main']);
-  }
-
-  selectSmartList(list: SmartList) {
-    this.selectedList = list;
-    this.selectedTaskId = null;
-  }
-
-  selectCategoryList(cat: Category) {
-    this.selectedList = { kind: 'category', id: cat.id };
-    this.selectedTaskId = null;
-  }
-
-  isSelectedList(list: SmartList): boolean {
-    return this.selectedList === list;
-  }
-
-  isSelectedCategory(catId: string): boolean {
-    return typeof this.selectedList === 'object' && this.selectedList.kind === 'category' && this.selectedList.id === catId;
   }
 }
