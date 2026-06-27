@@ -567,27 +567,41 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
   }
 
   /**
-   * Compute the CSS grid-template-columns string based on the three layout
-   * toggles (sidebar collapsed / inspector shown / inspector position).
-   * Always 5 tracks at most: [sidebar] [splitter] [center] [splitter] [inspector]
-   * — when sidebar is collapsed it becomes a 48px rail; when inspector is
-   * hidden the last 2 tracks are dropped.
+   * Compute the grid-template-columns string.
+   * Track order in the grid follows DOM declaration order; what each track
+   * represents is controlled by the [style.order] applied to each column.
+   *
+   * Visual layouts:
+   *   inspectorPosition === 'right'  → [sidebar | center | inspector]
+   *   inspectorPosition === 'middle' → [sidebar | inspector | center]
+   *
+   * IMPORTANT: when the user swaps to 'middle', the *widths* swap too —
+   * the inspector keeps its narrow column, the center keeps its wide one.
+   * That means track 3 (after sidebar + splitter) is always the *narrower*
+   * inspector column when in middle layout, and track 5 is the wider
+   * center column. CSS order on each child does the visual swap.
    */
   get gridTemplateColumns(): string {
-    const sb = this.sidebarCollapsed ? '48px' : `${this.leftWidth}px`;
-    if (!this.showInspector) {
-      return `${sb} 6px 1fr`;
+    if (this.sidebarCollapsed) {
+      // No sidebar / left splitter at all; floating expand button replaces it.
+      if (!this.showInspector) return '1fr';
+      return this.inspectorPosition === 'middle'
+        ? `${this.rightWidth}px 6px 1fr`
+        : `1fr 6px ${this.rightWidth}px`;
     }
-    // visual order is handled by CSS `order` so the column widths stay in
-    // declaration order regardless of inspectorPosition.
-    return `${sb} 6px 1fr 6px ${this.rightWidth}px`;
+    const sb = `${this.leftWidth}px`;
+    if (!this.showInspector) return `${sb} 6px 1fr`;
+    return this.inspectorPosition === 'middle'
+      ? `${sb} 6px ${this.rightWidth}px 6px 1fr`
+      : `${sb} 6px 1fr 6px ${this.rightWidth}px`;
   }
 
-  /** Column order tweak: when Inspector sits in the middle, swap CSS orders. */
+  /** Center column order: pinned to its track regardless of inspectorPosition. */
+  get centerOrder(): number { return this.inspectorPosition === 'middle' ? 4 : 2; }
+  /** Inspector column order: sits where the other one doesn't. */
   get inspectorOrder(): number { return this.inspectorPosition === 'middle' ? 2 : 4; }
-  get centerOrder(): number    { return this.inspectorPosition === 'middle' ? 4 : 2; }
-  /** The splitter between center and inspector needs to follow whichever is on the right. */
-  get splitterRightOrder(): number { return this.inspectorPosition === 'middle' ? 3 : 3; }
+  /** Splitter between center and inspector — sits next to whichever is in middle slot. */
+  get splitterRightOrder(): number { return 3; }
 
   startSplitter(side: 'left' | 'right', e: MouseEvent) {
     this.splitter = side;

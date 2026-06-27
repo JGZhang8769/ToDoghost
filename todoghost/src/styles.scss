@@ -62,12 +62,17 @@ body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
     .ios-drawer.is-persistent > div:first-child {
         cursor: default !important;
     }
-    /* When the unscheduled body was hidden because drawerOpen=false on
-       mobile, force it visible on desktop. */
-    .ios-drawer.is-persistent .invisible,
-    .ios-drawer.is-persistent .hidden {
+    /* The mobile flow toggles [class.hidden] / [class.invisible] on the
+       inner scroll container when drawerOpen is false. On desktop the
+       drawer is always open, so neutralise both so the body stays scrollable. */
+    .ios-drawer.is-persistent #unassigned-list,
+    .ios-drawer.is-persistent .reminder-list {
         visibility: visible !important;
-        display: block !important;
+        display: flex !important;
+        flex-direction: column;
+        overflow-y: auto !important;
+        flex: 1 1 auto !important;
+        min-height: 0 !important;
     }
 
     /* Leave room under the calendar so its last row isn't covered by the
@@ -75,6 +80,7 @@ body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
        main-view.component.html (id="main-group"). */
     #main-group {
         padding-bottom: 32vh !important;
+        overflow-y: auto !important;
     }
 }
 /* Apple month detailed view: 2-line task title clamp */

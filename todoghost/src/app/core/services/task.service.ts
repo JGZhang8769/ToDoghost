@@ -38,8 +38,14 @@ export class TaskService {
 
   async addTask(taskData: Omit<Task, 'id'>) {
     const tasksRef = collection(this.firestore, 'tasks');
+    // Firestore rejects undefined values — strip them before send so callers
+    // can pass categoryId/description/etc as undefined for "not set".
+    const cleaned: Record<string, any> = {};
+    for (const [k, v] of Object.entries(taskData)) {
+      if (v !== undefined) cleaned[k] = v;
+    }
     const enrichedData = {
-      ...taskData,
+      ...cleaned,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     };
