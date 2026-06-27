@@ -41,13 +41,18 @@
     flex: 1;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    padding: 16px 18px 16px;
+    /* Top padding respects iOS safe-area (notch / Dynamic Island) since the
+       page no longer has a separate topbar to do that for us. */
+    padding:
+        max(16px, env(safe-area-inset-top))
+        18px
+        16px;
     display: flex;
     flex-direction: column;
     gap: 18px;
 }
 
-/* ---------- Headline date ---------- */
+/* ---------- Headline date + workspace/user cluster ---------- */
 .pmob-home__head {
     display: flex;
     align-items: flex-end;
@@ -57,6 +62,73 @@
     flex: 1;
     min-width: 0;
 }
+
+/* Right side of the headline row: workspace + user info + logout.
+   Stacks the text on the right (so it visually aligns with the date),
+   with the logout icon sitting next to it. */
+.pmob-home__who {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    max-width: 50%;
+    min-width: 0;
+}
+.pmob-home__whotext {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    min-width: 0;
+    line-height: 1.15;
+}
+.pmob-home__wsname {
+    font-size: 13px;
+    font-weight: 700;
+    color: #2a1f10;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.pmob-home__user {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: #7a6850;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.pmob-home__avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #c8b599, #8f7d62);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 800;
+    flex-shrink: 0;
+}
+.pmob-home__exit {
+    width: 34px;
+    height: 34px;
+    border: 0;
+    border-radius: 10px;
+    background: rgba(120, 100, 80, 0.1);
+    color: #4a3a22;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+.pmob-home__exit:active { background: rgba(120, 100, 80, 0.22); }
 .pmob-home__date-main {
     font-size: 30px;
     font-weight: 800;
@@ -85,81 +157,6 @@
     border-radius: 999px;
     margin-left: 4px;
 }
-/* ---------- Sticky topbar (logo + workspace + user + exit) ---------- */
-.pmob-topbar {
-    position: relative;
-    z-index: 6;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    /* Top padding respects iOS safe-area (notch / Dynamic Island). Without
-       this, on iPhone 12 / 15 Pro the logo and workspace name get tucked
-       under the camera notch and the topbar feels "cut". */
-    padding: max(8px, env(safe-area-inset-top)) 14px 8px;
-    background: rgba(255, 255, 255, 0.78);
-    backdrop-filter: blur(16px) saturate(160%);
-    -webkit-backdrop-filter: blur(16px) saturate(160%);
-    border-bottom: 1px solid rgba(120, 100, 80, 0.08);
-    flex-shrink: 0;
-}
-.pmob-topbar__logo {
-    display: inline-flex;
-    flex-shrink: 0;
-}
-.pmob-topbar__ws {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-    line-height: 1.15;
-}
-.pmob-topbar__wsname {
-    font-size: 14px;
-    font-weight: 700;
-    color: #2a1f10;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-.pmob-topbar__user {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 11px;
-    color: #7a6850;
-    margin-top: 2px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-.pmob-topbar__avatar {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #c8b599, #8f7d62);
-    color: #fff;
-    font-size: 10px;
-    font-weight: 800;
-    flex-shrink: 0;
-}
-.pmob-topbar__exit {
-    width: 36px;
-    height: 36px;
-    border: 0;
-    border-radius: 10px;
-    background: transparent;
-    color: #7a6850;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    flex-shrink: 0;
-}
-.pmob-topbar__exit:active { background: rgba(120, 100, 80, 0.12); }
-
 /* ---------- Week strip ---------- */
 .pmob-week-strip {
     display: grid;
@@ -368,12 +365,18 @@
     justify-content: space-between;
     padding: 14px 16px 12px;
     aspect-ratio: 1.5 / 1;
-    border: 0;
+    border: 1px solid rgba(255, 255, 255, 0.6);
     border-radius: 18px;
-    color: #fff;
+    /* Default card surface uses the same glass treatment as other Pro
+       sections; per-variant rules below add a subtle khaki tint so the
+       four cards still feel distinct without the previous saturated look. */
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    color: #2a1f10;
     cursor: pointer;
     overflow: hidden;
-    box-shadow: 0 4px 14px -4px rgba(60, 40, 20, 0.18);
+    box-shadow: 0 4px 14px -8px rgba(60, 40, 20, 0.16);
     text-align: left;
 }
 .pmob-card:active { transform: scale(0.98); transition: transform 0.08s ease; }
@@ -384,8 +387,8 @@
     width: 34px;
     height: 34px;
     border-radius: 10px;
-    background: rgba(255, 255, 255, 0.25);
-    color: #fff;
+    background: rgba(120, 100, 80, 0.14);
+    color: #4a3a22;
 }
 .pmob-card__count {
     font-size: 30px;
@@ -394,17 +397,44 @@
     font-variant-numeric: tabular-nums;
     align-self: flex-start;
     margin-top: 4px;
+    color: #2a1f10;
 }
 .pmob-card__label {
     font-size: 14px;
     font-weight: 600;
-    opacity: 0.92;
+    color: #4a3a22;
 }
 
-.pmob-card--today      { background: linear-gradient(135deg, #fbbf24, #f59e0b); }
-.pmob-card--week       { background: linear-gradient(135deg, #60a5fa, #3b82f6); }
-.pmob-card--urgent     { background: linear-gradient(135deg, #f87171, #ef4444); }
-.pmob-card--unscheduled{ background: linear-gradient(135deg, #c4b5fd, #8b5cf6); }
+/* Per-card subtle khaki/gold tints — kept low-saturation so they read as
+   "warm paper" rather than the bold gradients of the previous design. */
+.pmob-card--today {
+    background: linear-gradient(135deg, rgba(255, 250, 235, 0.85), rgba(245, 230, 200, 0.75));
+}
+.pmob-card--today .pmob-card__icon {
+    background: rgba(212, 166, 74, 0.22);
+    color: #8a5e1a;
+}
+.pmob-card--week {
+    background: linear-gradient(135deg, rgba(248, 240, 222, 0.85), rgba(232, 218, 192, 0.75));
+}
+.pmob-card--week .pmob-card__icon {
+    background: rgba(150, 130, 90, 0.18);
+    color: #5a4520;
+}
+.pmob-card--urgent {
+    background: linear-gradient(135deg, rgba(245, 225, 200, 0.85), rgba(225, 195, 165, 0.78));
+}
+.pmob-card--urgent .pmob-card__icon {
+    background: rgba(180, 90, 60, 0.18);
+    color: #a14a2a;
+}
+.pmob-card--unscheduled {
+    background: linear-gradient(135deg, rgba(240, 232, 215, 0.85), rgba(220, 208, 188, 0.75));
+}
+.pmob-card--unscheduled .pmob-card__icon {
+    background: rgba(120, 100, 80, 0.18);
+    color: #5a4a30;
+}
 
 /* ---------- Grouped sections (categories, etc.) ---------- */
 .pmob-group {

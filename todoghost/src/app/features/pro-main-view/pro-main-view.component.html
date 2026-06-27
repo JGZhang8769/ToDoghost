@@ -9,9 +9,6 @@
 
   <!-- Top bar -->
   <header class="pro-topbar">
-    <button class="pro-iconbtn" title="返回選擇空間" (click)="backToWorkspaces()">
-      <span class="material-icons" style="font-size: 20px;">arrow_back</span>
-    </button>
     <button class="pro-iconbtn"
             [title]="sidebarCollapsed ? '展開側邊欄' : '收起側邊欄'"
             (click)="toggleSidebar()">
@@ -81,7 +78,7 @@
         [style.grid-template-columns]="gridTemplateColumns">
 
     <!-- Left: Sidebar (hidden entirely when collapsed; toggle lives in the
-         topbar next to 返回 so users always know where to find it). -->
+         topbar at the top-left so users always know where to find it). -->
     <aside *ngIf="!sidebarCollapsed" class="pro-sidebar pro-glass">
       <section class="pro-sidebar__section">
         <h4 class="pro-sidebar__heading">清單</h4>
@@ -200,6 +197,12 @@
         <div class="pro-user" *ngIf="currentUser">
           <span class="pro-user__avatar">{{ (currentUser.name || '?')[0] }}</span>
           <span class="pro-user__name">{{ currentUser.name }}</span>
+          <button class="pro-user__exit"
+                  (click)="backToWorkspaces()"
+                  title="返回選擇空間"
+                  aria-label="返回選擇空間">
+            <span class="material-icons" style="font-size: 18px;">logout</span>
+          </button>
         </div>
       </div>
     </aside>
