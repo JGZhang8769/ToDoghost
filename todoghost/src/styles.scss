@@ -64,15 +64,19 @@ body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
     }
     /* The mobile flow toggles [class.hidden] / [class.invisible] on the
        inner scroll container when drawerOpen is false. On desktop the
-       drawer is always open, so neutralise both so the body stays scrollable. */
+       drawer is always open, so neutralise both so the body stays scrollable.
+       The element is a flex child (flex-1) of the drawer; force display
+       back to block to keep task-row stacking, restore overflow:auto, and
+       constrain max-height so it never overflows the drawer's 32vh shell. */
     .ios-drawer.is-persistent #unassigned-list,
+    .ios-drawer.is-persistent #scheduled-list,
     .ios-drawer.is-persistent .reminder-list {
         visibility: visible !important;
-        display: flex !important;
-        flex-direction: column;
+        display: block !important;
         overflow-y: auto !important;
-        flex: 1 1 auto !important;
         min-height: 0 !important;
+        /* drawer shell is 32vh, drawer header takes 60px → leave the rest. */
+        max-height: calc(32vh - 60px) !important;
     }
 
     /* Leave room under the calendar so its last row isn't covered by the

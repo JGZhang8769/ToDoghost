@@ -244,16 +244,19 @@
     min-height: 0;
     position: relative;
 }
-/* Top-right collapse button inside the sidebar itself. */
+/* Collapse button: bottom-right of the sidebar. Putting it at the bottom
+   avoids overlap with the floating expand button (which sits at top-left
+   of the same area when the sidebar is hidden), so users don't accidentally
+   re-expand right after collapsing. */
 .pro-sidebar__collapse {
     position: absolute;
-    top: 6px;
-    right: 6px;
-    width: 26px;
-    height: 26px;
+    bottom: 12px;
+    right: 12px;
+    width: 28px;
+    height: 28px;
     border: 0;
-    border-radius: 6px;
-    background: rgba(120, 100, 80, 0.08);
+    border-radius: 8px;
+    background: rgba(120, 100, 80, 0.1);
     color: #7a6850;
     cursor: pointer;
     display: inline-flex;
@@ -263,12 +266,13 @@
     z-index: 2;
 }
 .pro-sidebar__collapse:hover {
-    background: rgba(120, 100, 80, 0.15);
+    background: rgba(120, 100, 80, 0.18);
     color: #2a1f10;
 }
 
 /* Floating expand button shown when the sidebar is fully collapsed.
-   Sits at top-left of the main grid area, glass-styled to match. */
+   Pinned to the top-left of the main grid area in a position that no
+   sidebar-internal control occupies, so the user knows where to find it. */
 .pro-sidebar__expand {
     position: absolute;
     top: 20px;
@@ -277,7 +281,7 @@
     height: 36px;
     border: 1px solid rgba(255, 255, 255, 0.7);
     border-radius: 10px;
-    background: rgba(255, 255, 255, 0.6);
+    background: rgba(255, 255, 255, 0.7);
     backdrop-filter: blur(20px) saturate(150%);
     -webkit-backdrop-filter: blur(20px) saturate(150%);
     color: #4a3a22;
