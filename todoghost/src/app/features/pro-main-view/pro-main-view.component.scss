@@ -842,6 +842,280 @@
     background: rgba(239, 68, 68, 0.18);
 }
 
+/* ---------- Lunar / solar term tag on day cells ---------- */
+.pro-day__lunar {
+    font-size: 10px;
+    color: #a3917a;
+    font-weight: 500;
+    margin-left: auto;
+    padding: 0 4px;
+}
+.pro-day__lunar.is-solar-term {
+    color: #16a34a;
+    font-weight: 700;
+}
+
+/* ---------- User color bar on task cards ---------- */
+.pro-day__task,
+.pro-week__chip,
+.pro-week__event,
+.pro-row,
+.pro-daypane__row {
+    position: relative;
+}
+.pro-day__task::before,
+.pro-week__chip::before,
+.pro-row::before,
+.pro-daypane__row::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 4px; bottom: 4px;
+    width: 3px;
+    border-radius: 2px;
+    background: var(--user-bar, transparent);
+    pointer-events: none;
+}
+/* week timeline event already has a left-border accent — use it as the user bar */
+.pro-week__event {
+    border-left: 3px solid var(--user-bar, #b5a78a);
+}
+.pro-week__event.is-urgent { border-left-color: var(--user-bar, #ef4444); }
+.pro-day__task { padding-left: 8px; }
+.pro-week__chip { padding-left: 9px; }
+.pro-row { padding-left: 13px; }
+
+/* ---------- Inline create form (slide-in panel) ---------- */
+.pro-createform-scrim {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.25);
+    z-index: 90;
+    animation: pro-fade 0.2s ease;
+}
+.pro-createform {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 420px;
+    max-width: 100vw;
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(28px) saturate(160%);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+    border-left: 1px solid rgba(255, 255, 255, 0.7);
+    box-shadow: -16px 0 40px rgba(60, 40, 20, 0.18);
+    z-index: 91;
+    display: flex;
+    flex-direction: column;
+    border-radius: 0;
+    animation: pro-slide 0.25s cubic-bezier(0.32, 0.72, 0, 1);
+}
+@keyframes pro-slide { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@keyframes pro-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.pro-add--small {
+    padding: 5px 10px;
+    font-size: 12px;
+}
+.pro-add:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* ---------- Inspector double-pane ---------- */
+.pro-inspector__pane-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(120, 100, 80, 0.1);
+    flex-shrink: 0;
+    min-height: 52px;
+}
+.pro-inspector__pane-title {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+.pro-inspector__pane-title--center { justify-content: center; }
+.pro-inspector__pane-date { display: flex; flex-direction: column; min-width: 0; }
+.pro-inspector__pane-datemain {
+    font-size: 14px;
+    font-weight: 700;
+    color: #2a1f10;
+    font-variant-numeric: tabular-nums;
+}
+.pro-inspector__pane-lunar {
+    font-size: 11px;
+    color: #a3917a;
+}
+.pro-inspector__pane-lunar .is-solar-term { color: #16a34a; font-weight: 600; }
+
+.pro-inspector__head--noborder {
+    border-bottom: 0;
+    padding-bottom: 4px;
+    margin-bottom: 12px;
+}
+
+/* Day Pane: list of clickable task rows */
+.pro-daypane {
+    padding: 8px 8px 20px;
+}
+.pro-daypane__row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px 10px 14px;
+    border-radius: 12px;
+    background: transparent;
+    border: 0;
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.12s ease;
+    font-family: inherit;
+}
+.pro-daypane__row + .pro-daypane__row { margin-top: 2px; }
+.pro-daypane__row:hover { background: rgba(255, 255, 255, 0.65); }
+.pro-daypane__row.is-done { opacity: 0.55; }
+.pro-daypane__main { flex: 1; min-width: 0; }
+.pro-daypane__title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #2a1f10;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    overflow: hidden;
+}
+.pro-daypane__row.is-urgent .pro-daypane__title { color: #dc2626; }
+.pro-daypane__row.is-done .pro-daypane__title { text-decoration: line-through; color: #a3917a; }
+.pro-daypane__meta {
+    font-size: 11px;
+    color: #a3917a;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 3px;
+    flex-wrap: wrap;
+}
+.pro-daypane__tag {
+    color: #7a6850;
+    font-weight: 500;
+}
+.pro-daypane__by {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 999px;
+}
+.pro-daypane__chevron {
+    color: #c4b59a;
+    font-size: 18px;
+    flex-shrink: 0;
+}
+
+/* Category picker grid (chips) */
+.pro-cat-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 4px;
+}
+.pro-cat-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(120, 100, 80, 0.2);
+    background: rgba(255, 255, 255, 0.6);
+    color: #4a3a22;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-family: inherit;
+}
+.pro-cat-chip:hover { background: #fff; }
+.pro-cat-chip.is-active {
+    background: #2a1f10;
+    color: #fff;
+    border-color: #2a1f10;
+}
+
+/* Tag input row */
+.pro-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    padding: 8px 10px;
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(120, 100, 80, 0.15);
+    border-radius: 12px;
+    min-height: 42px;
+}
+.pro-tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(196, 177, 144, 0.4);
+    color: #4a3a22;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 999px;
+}
+.pro-tag-chip__x {
+    background: transparent;
+    border: 0;
+    color: #a3917a;
+    font-size: 14px;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+.pro-tag-chip__x:hover { color: #ef4444; }
+.pro-tags__input {
+    flex: 1;
+    min-width: 120px;
+    background: transparent;
+    border: 0;
+    outline: 0;
+    font-size: 13px;
+    color: #2a1f10;
+}
+
+/* Creator indicator at bottom of edit pane */
+.pro-creator {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(120, 100, 80, 0.1);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #7a6850;
+}
+.pro-creator__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+}
+.pro-creator__dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+}
+
 /* ---------- Week view (iOS Calendar style: 7 cols + 24h timeline) ---------- */
 .pro-week {
     display: flex;

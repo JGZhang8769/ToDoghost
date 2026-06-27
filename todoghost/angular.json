@@ -24,6 +24,9 @@
               "zone.js"
             ],
             "tsConfig": "tsconfig.app.json",
+            "allowedCommonJsDependencies": [
+              "chinese-lunar-calendar"
+            ],
             "inlineStyleLanguage": "scss",
             "assets": [
               "src/firebase-messaging-sw.js",
@@ -48,8 +51,8 @@
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "16kB",
-                  "maximumError": "32kB"
+                  "maximumWarning": "32kB",
+                  "maximumError": "48kB"
                 }
               ],
               "outputHashing": "all",
