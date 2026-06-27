@@ -581,17 +581,26 @@
         <span class="text-2xl text-white">🗑️</span>
       </div>
 
-      <!-- Bottom Drawer handle & Backdrop -->
-      <div *ngIf="drawerOpen" class="fixed inset-0 bg-black/20 z-30 transition-opacity" (click)="drawerOpen = false"></div>
-      <div class="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md rounded-t-3xl shadow-[0_-4px_15px_rgba(0,0,0,0.1)] border border-milktea-200/50 z-40 max-w-3xl mx-auto flex flex-col max-h-[50vh] min-h-[50vh] ios-drawer"
+      <!-- Bottom Drawer handle & Backdrop (backdrop hidden on desktop since
+           the drawer is persistent and shouldn't dim the page). -->
+      <div *ngIf="drawerOpen" class="fixed inset-0 bg-black/20 z-30 transition-opacity lg:hidden" (click)="drawerOpen = false"></div>
+      <div class="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md rounded-t-3xl shadow-[0_-4px_15px_rgba(0,0,0,0.1)] border border-milktea-200/50 z-40 max-w-3xl mx-auto flex flex-col max-h-[50vh] min-h-[50vh] ios-drawer is-persistent"
            [class.is-dragging]="drawerDrag.dragging && drawerDrag.target === 'unassigned'"
            [style.transform]="drawerTransform('unassigned')">
         <div class="h-[60px] shrink-0 flex items-center justify-center cursor-grab active:cursor-grabbing relative touch-none select-none"
              (click)="!suppressNextDrawerClick() && (drawerOpen = !drawerOpen)"
              (touchstart)="startDrawerDrag('unassigned', $event)"
              (mousedown)="startDrawerDrag('unassigned', $event)">
-          <div class="w-12 h-1.5 bg-milktea-300 rounded-full mb-1"></div>
-          <span class="absolute right-6 bg-milktea-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">未排程 ({{ unassignedTasks.length }})</span>
+          <div class="w-12 h-1.5 bg-milktea-300 rounded-full mb-1 lg:hidden"></div>
+          <span class="absolute left-6 font-bold text-milktea-900 hidden lg:inline">未排程</span>
+          <span class="absolute right-16 bg-milktea-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">{{ unassignedTasks.length }}</span>
+          <button class="absolute right-4 w-8 h-8 rounded-full bg-milktea-700 hover:bg-milktea-800 text-white flex items-center justify-center shadow-sm active:scale-95 transition-all"
+                  title="新增未排程代辦"
+                  (mousedown)="$event.stopPropagation()"
+                  (touchstart)="$event.stopPropagation()"
+                  (click)="$event.stopPropagation(); openCreateForUnassigned()">
+            <span class="material-icons" style="font-size: 18px;">add</span>
+          </button>
         </div>
 
         <div class="flex-1 overflow-y-auto ios-scroll px-3 pt-3 pb-8 overflow-x-hidden reminder-list" [class.invisible]="!drawerOpen" [class.hidden]="!drawerOpen"
@@ -668,8 +677,17 @@
              (touchstart)="startDrawerDrag('scheduled', $event)"
              (mousedown)="startDrawerDrag('scheduled', $event)">
           <span class="font-bold text-milktea-900">{{ scheduledDrawerDate }} 排程</span>
-          <div class="w-12 h-1.5 bg-milktea-300 rounded-full absolute left-1/2 -translate-x-1/2 top-2"></div>
-          <span class="bg-milktea-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">{{ scheduledDrawerTasks.length }}</span>
+          <div class="w-12 h-1.5 bg-milktea-300 rounded-full absolute left-1/2 -translate-x-1/2 top-2 lg:hidden"></div>
+          <div class="flex items-center gap-2">
+            <span class="bg-milktea-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">{{ scheduledDrawerTasks.length }}</span>
+            <button class="w-8 h-8 rounded-full bg-milktea-700 hover:bg-milktea-800 text-white flex items-center justify-center shadow-sm active:scale-95 transition-all"
+                    title="新增到 {{ scheduledDrawerDate }}"
+                    (mousedown)="$event.stopPropagation()"
+                    (touchstart)="$event.stopPropagation()"
+                    (click)="$event.stopPropagation(); openCreateForDate(scheduledDrawerDate)">
+              <span class="material-icons" style="font-size: 18px;">add</span>
+            </button>
+          </div>
         </div>
 
         <div class="flex-1 overflow-y-auto ios-scroll px-3 pt-3 pb-6 overflow-x-hidden reminder-list"

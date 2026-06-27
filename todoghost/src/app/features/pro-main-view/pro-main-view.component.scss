@@ -242,6 +242,37 @@
     overflow: hidden;
     padding: 12px;
     min-height: 0;
+    position: relative;
+}
+.pro-sidebar.is-collapsed {
+    padding: 4px;
+    /* Just a thin glass rail with the toggle button — no nav rows. */
+}
+.pro-sidebar__collapse {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 26px;
+    height: 26px;
+    border: 0;
+    border-radius: 6px;
+    background: rgba(120, 100, 80, 0.08);
+    color: #7a6850;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease, color 0.15s ease;
+    z-index: 2;
+}
+.pro-sidebar__collapse:hover {
+    background: rgba(120, 100, 80, 0.15);
+    color: #2a1f10;
+}
+.pro-sidebar.is-collapsed .pro-sidebar__collapse {
+    /* When collapsed, the button is centered horizontally in the slim rail. */
+    position: static;
+    margin: 0 auto;
 }
 .pro-sidebar__section {
     margin-bottom: 16px;
