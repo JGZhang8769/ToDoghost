@@ -72,15 +72,18 @@
   <main class="pro-grid"
         [style.grid-template-columns]="gridTemplateColumns">
 
-    <!-- Left: Sidebar -->
-    <aside class="pro-sidebar pro-glass" [class.is-collapsed]="sidebarCollapsed" [style.order]="1">
-      <!-- Collapse / expand toggle, pinned top-right of the sidebar. -->
-      <button class="pro-sidebar__collapse" (click)="toggleSidebar()"
-              [title]="sidebarCollapsed ? '展開側邊欄' : '收起側邊欄'">
-        <span class="material-icons" style="font-size: 18px;">{{ sidebarCollapsed ? 'chevron_right' : 'chevron_left' }}</span>
+    <!-- Floating expand button: only visible when sidebar is collapsed. -->
+    <button *ngIf="sidebarCollapsed" class="pro-sidebar__expand" (click)="toggleSidebar()" title="展開側邊欄">
+      <span class="material-icons" style="font-size: 18px;">menu</span>
+    </button>
+
+    <!-- Left: Sidebar (hidden entirely when collapsed) -->
+    <aside *ngIf="!sidebarCollapsed" class="pro-sidebar pro-glass" [style.order]="1">
+      <!-- Collapse toggle, pinned top-right of the sidebar. -->
+      <button class="pro-sidebar__collapse" (click)="toggleSidebar()" title="收起側邊欄">
+        <span class="material-icons" style="font-size: 18px;">chevron_left</span>
       </button>
 
-      <ng-container *ngIf="!sidebarCollapsed">
       <section class="pro-sidebar__section">
         <h4 class="pro-sidebar__heading">清單</h4>
         <button class="pro-nav" [class.is-active]="isSelectedList('inbox')" (click)="selectSmartList('inbox')">
@@ -200,7 +203,6 @@
           <span class="pro-user__name">{{ currentUser.name }}</span>
         </div>
       </div>
-      </ng-container>
     </aside>
 
     <!-- Left splitter (hidden when sidebar is collapsed — there's nothing to resize) -->

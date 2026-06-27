@@ -244,10 +244,7 @@
     min-height: 0;
     position: relative;
 }
-.pro-sidebar.is-collapsed {
-    padding: 4px;
-    /* Just a thin glass rail with the toggle button — no nav rows. */
-}
+/* Top-right collapse button inside the sidebar itself. */
 .pro-sidebar__collapse {
     position: absolute;
     top: 6px;
@@ -269,10 +266,33 @@
     background: rgba(120, 100, 80, 0.15);
     color: #2a1f10;
 }
-.pro-sidebar.is-collapsed .pro-sidebar__collapse {
-    /* When collapsed, the button is centered horizontally in the slim rail. */
-    position: static;
-    margin: 0 auto;
+
+/* Floating expand button shown when the sidebar is fully collapsed.
+   Sits at top-left of the main grid area, glass-styled to match. */
+.pro-sidebar__expand {
+    position: absolute;
+    top: 20px;
+    left: 16px;
+    width: 36px;
+    height: 36px;
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(20px) saturate(150%);
+    -webkit-backdrop-filter: blur(20px) saturate(150%);
+    color: #4a3a22;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    box-shadow: 0 4px 12px rgba(60, 40, 20, 0.12);
+    transition: all 0.15s ease;
+}
+.pro-sidebar__expand:hover {
+    background: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(60, 40, 20, 0.18);
 }
 .pro-sidebar__section {
     margin-bottom: 16px;
