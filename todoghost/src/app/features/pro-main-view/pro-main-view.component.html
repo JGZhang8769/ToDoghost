@@ -238,7 +238,7 @@
             <div *ngFor="let d of weekDays" class="pro-week__allday-cell"
                  cdkDropList
                  [cdkDropListData]="d.allDay"
-                 (cdkDropListDropped)="dropOnDate($event, d.dateStr)"
+                 (cdkDropListDropped)="dropOnAllDay($event, d.dateStr)"
                  (click)="selectDate(d.dateStr)"
                  (dblclick)="openCreateForDate(d.dateStr)">
               <div *ngFor="let t of d.allDay"
@@ -262,7 +262,7 @@
                  [class.is-today]="d.isToday"
                  cdkDropList
                  [cdkDropListData]="d.timedBlocks"
-                 (cdkDropListDropped)="dropOnDate($event, d.dateStr)">
+                 (cdkDropListDropped)="dropOnWeekColumn($event, d.dateStr)">
               <div *ngFor="let h of dayHours" class="pro-week__hour-cell"
                    (dblclick)="openCreateForDateTime(d.dateStr, h)"></div>
               <div *ngFor="let block of d.timedBlocks"

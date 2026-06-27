@@ -837,16 +837,97 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     setTimeout(() => { this.isDraggingTask = false; }, 50);
   }
 
+  /**
+   * Patch the in-memory tasks array immediately so the UI updates the moment
+   * the drop happens, without waiting for the Firestore round-trip. The
+   * Firestore subscription will overwrite this with the canonical version
+   * a few hundred ms later — usually identical.
+   *
+   * Without this, CDK keeps the dragged element in its source DOM position
+   * and the live query takes ~200ms to refresh, so users see the item
+   * "stuck" at the bottom of the unscheduled list or hour column briefly.
+   */
+  private patchLocalTask(taskId: string, patch: Partial<Task>) {
+    this.tasks = this.tasks.map(t => (t.id === taskId ? { ...t, ...patch } : t));
+    this.buildCalendar();
+    this.buildWeek();
+  }
+
   async dropOnDate(event: CdkDragDrop<any>, dateStr: string | null) {
     const task: Task = event.item.data;
     if (!task) return;
     if (task.date !== dateStr) {
+      this.patchLocalTask(task.id, { date: dateStr });
       await this.taskService.updateTask(task.id, { date: dateStr });
-      // Pulse the destination cell briefly so the user sees confirmation.
       this.recentlyDroppedDate = dateStr;
       if (this.pulseTimer) clearTimeout(this.pulseTimer);
       this.pulseTimer = setTimeout(() => { this.recentlyDroppedDate = null; }, 600);
     }
+  }
+
+  /**
+   * Drop onto the all-day row of a given date in week view.
+   * Strips startTime/endTime so the task becomes an all-day item, but keeps
+   * (or sets) the date so it lives on that specific day.
+   */
+  async dropOnAllDay(event: CdkDragDrop<any>, dateStr: string) {
+    const task: Task = event.item.data;
+    if (!task) return;
+    const patch: Partial<Task> = {
+      date: dateStr,
+      startTime: null,
+      endTime: null,
+      reminderOffset: null, // reminder anchored to startTime — strip when becoming all-day
+    };
+    this.patchLocalTask(task.id, patch);
+    await this.taskService.updateTask(task.id, patch);
+    this.recentlyDroppedDate = dateStr;
+    if (this.pulseTimer) clearTimeout(this.pulseTimer);
+    this.pulseTimer = setTimeout(() => { this.recentlyDroppedDate = null; }, 600);
+  }
+
+  /**
+   * Drop inside a week-view day column's hour grid. Reads the drop's Y
+   * coordinate relative to the column to figure out which 30-minute slot
+   * the user aimed for, then shifts the task to that day + start time while
+   * preserving the original event duration.
+   */
+  async dropOnWeekColumn(event: CdkDragDrop<any>, dateStr: string) {
+    const task: Task = event.item.data;
+    if (!task) return;
+
+    // Resolve drop Y relative to the column's top.
+    const colEl = event.container.element.nativeElement as HTMLElement;
+    const rect = colEl.getBoundingClientRect();
+    const point = (event as any).dropPoint ?? { x: 0, y: rect.top };
+    const offsetY = Math.max(0, (point.y as number) - rect.top + colEl.scrollTop);
+    const totalMinutes = (offsetY / HOUR_PX) * 60;
+    // Snap to 30-minute increments — finer than that and the user fights the grid.
+    const snappedMinutes = Math.round(totalMinutes / 30) * 30;
+    const clamped = Math.min(23 * 60 + 30, Math.max(0, snappedMinutes));
+    const startH = Math.floor(clamped / 60);
+    const startM = clamped % 60;
+    const startTime = `${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}`;
+
+    // Preserve duration if the original event had one; otherwise default to 1 hour.
+    let endTime: string | null = null;
+    if (task.startTime && task.endTime) {
+      const [oh, om] = task.startTime.split(':').map(Number);
+      const [eh, em] = task.endTime.split(':').map(Number);
+      const durMin = Math.max(15, (eh * 60 + em) - (oh * 60 + om));
+      const endMin = Math.min(24 * 60, clamped + durMin);
+      const endH = Math.floor(endMin / 60);
+      const endM = endMin % 60;
+      endTime = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+    }
+
+    const patch: Partial<Task> = { date: dateStr, startTime, endTime };
+    this.patchLocalTask(task.id, patch);
+    await this.taskService.updateTask(task.id, patch);
+
+    this.recentlyDroppedDate = dateStr;
+    if (this.pulseTimer) clearTimeout(this.pulseTimer);
+    this.pulseTimer = setTimeout(() => { this.recentlyDroppedDate = null; }, 600);
   }
 
   /**
@@ -855,6 +936,7 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
   async dropToUnscheduled(event: CdkDragDrop<any>) {
     const task: Task = event.item.data;
     if (!task || task.date === null) return;
+    this.patchLocalTask(task.id, { date: null });
     await this.taskService.updateTask(task.id, { date: null });
   }
 
