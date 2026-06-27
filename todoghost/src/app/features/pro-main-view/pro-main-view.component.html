@@ -121,6 +121,13 @@
           <span class="pro-nav__label">{{ cat.name }}</span>
           <span class="pro-nav__count">{{ categoryCount(cat.id) }}</span>
         </button>
+        <button class="pro-nav" [class.is-active]="isSelectedNoCategory()" (click)="selectNoCategoryList()" *ngIf="noCategoryCount() > 0 || categories.length > 0">
+          <span class="pro-nav__icon" style="background: linear-gradient(135deg, #e5e5e5, #a3a3a3); color: #fff;">
+            <span class="material-icons" style="font-size: 14px;">block</span>
+          </span>
+          <span class="pro-nav__label">無分類</span>
+          <span class="pro-nav__count">{{ noCategoryCount() }}</span>
+        </button>
 
         <!-- Inline new-category form -->
         <div *ngIf="showCategoryCreate" class="pro-catnew">
@@ -273,6 +280,8 @@
                    [class.is-selected]="selectedTaskId === block.task.id"
                    [style.top.px]="block.top"
                    [style.height.px]="block.height"
+                   [style.left]="(block.col * (100 / block.totalCols)) + '%'"
+                   [style.width]="'calc(' + (100 / block.totalCols) + '% - 4px)'"
                    [style.--user-bar]="userColor(block.task.createdBy)?.bar"
                    (click)="selectTask(block.task.id); $event.stopPropagation()">
                 <div class="pro-week__event-title">{{ block.task.title }}</div>
