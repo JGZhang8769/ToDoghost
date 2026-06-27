@@ -109,6 +109,13 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
   readonly RIGHT_MIN = 320;
   readonly RIGHT_MAX = 520;
   showInspector = true;
+  /** 'right' = sidebar | center | inspector (default).
+   *  'middle' = sidebar | inspector | center — swap the last two columns so
+   *  Inspector sits next to the sidebar and the calendar gets the right edge. */
+  inspectorPosition: 'right' | 'middle' = 'right';
+  /** When true, hide the sidebar and replace it with a 40px rail of icons
+   *  the user can click to expand. */
+  sidebarCollapsed = false;
 
   // Splitter drag state
   splitter: null | 'left' | 'right' = null;
@@ -493,6 +500,9 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     const rw = parseInt(localStorage.getItem('pro:rightWidth') ?? '', 10);
     if (!Number.isNaN(lw)) this.leftWidth = Math.min(this.LEFT_MAX, Math.max(this.LEFT_MIN, lw));
     if (!Number.isNaN(rw)) this.rightWidth = Math.min(this.RIGHT_MAX, Math.max(this.RIGHT_MIN, rw));
+    const savedPos = localStorage.getItem('pro:inspectorPosition');
+    if (savedPos === 'right' || savedPos === 'middle') this.inspectorPosition = savedPos;
+    this.sidebarCollapsed = localStorage.getItem('pro:sidebarCollapsed') === '1';
 
     this.workspaceService.currentWorkspace$.pipe(takeUntil(this.destroy$)).subscribe(ws => {
       if (!ws) { this.router.navigate(['/workspaces']); return; }
@@ -544,6 +554,40 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
   toggleInspector() {
     this.showInspector = !this.showInspector;
   }
+
+  setInspectorPosition(pos: 'right' | 'middle') {
+    if (this.inspectorPosition === pos) return;
+    this.inspectorPosition = pos;
+    localStorage.setItem('pro:inspectorPosition', pos);
+  }
+
+  toggleSidebar() {
+    this.sidebarCollapsed = !this.sidebarCollapsed;
+    localStorage.setItem('pro:sidebarCollapsed', this.sidebarCollapsed ? '1' : '0');
+  }
+
+  /**
+   * Compute the CSS grid-template-columns string based on the three layout
+   * toggles (sidebar collapsed / inspector shown / inspector position).
+   * Always 5 tracks at most: [sidebar] [splitter] [center] [splitter] [inspector]
+   * — when sidebar is collapsed it becomes a 48px rail; when inspector is
+   * hidden the last 2 tracks are dropped.
+   */
+  get gridTemplateColumns(): string {
+    const sb = this.sidebarCollapsed ? '48px' : `${this.leftWidth}px`;
+    if (!this.showInspector) {
+      return `${sb} 6px 1fr`;
+    }
+    // visual order is handled by CSS `order` so the column widths stay in
+    // declaration order regardless of inspectorPosition.
+    return `${sb} 6px 1fr 6px ${this.rightWidth}px`;
+  }
+
+  /** Column order tweak: when Inspector sits in the middle, swap CSS orders. */
+  get inspectorOrder(): number { return this.inspectorPosition === 'middle' ? 2 : 4; }
+  get centerOrder(): number    { return this.inspectorPosition === 'middle' ? 4 : 2; }
+  /** The splitter between center and inspector needs to follow whichever is on the right. */
+  get splitterRightOrder(): number { return this.inspectorPosition === 'middle' ? 3 : 3; }
 
   startSplitter(side: 'left' | 'right', e: MouseEvent) {
     this.splitter = side;

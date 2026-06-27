@@ -833,6 +833,26 @@ onTouchEnd(e: any, taskId: string) {
     this.showForm = true;
   }
 
+  /** Open create form for a specific date — used by the scheduled drawer's + button. */
+  openCreateForDate(dateStr: string | null) {
+    this.editingTask = null;
+    this.formTask = { date: dateStr };
+    this.formTaskTags = [];
+    this.formTaskTagInput = '';
+    this.showTimeReminder = false;
+    this.showForm = true;
+  }
+
+  /** Open create form for an unscheduled task (date = null). */
+  openCreateForUnassigned() {
+    this.editingTask = null;
+    this.formTask = { date: null };
+    this.formTaskTags = [];
+    this.formTaskTagInput = '';
+    this.showTimeReminder = false;
+    this.showForm = true;
+  }
+
   editTask(task: Task) {
     if (this.longPressTriggered) return;
     const s = this.swipeState[task.id];

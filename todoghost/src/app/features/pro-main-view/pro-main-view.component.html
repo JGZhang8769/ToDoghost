@@ -40,21 +40,47 @@
         </button>
       </div>
 
+      <!-- Inspector layout (right / middle) segmented -->
+      <div class="pro-segment" title="Inspector 位置">
+        <button type="button" class="pro-segment__btn"
+                [class.is-active]="inspectorPosition === 'right'"
+                (click)="setInspectorPosition('right')"
+                title="Inspector 在最右側 (預設)">
+          <span class="material-icons" style="font-size: 16px;">view_sidebar</span>
+        </button>
+        <button type="button" class="pro-segment__btn"
+                [class.is-active]="inspectorPosition === 'middle'"
+                (click)="setInspectorPosition('middle')"
+                title="Inspector 緊鄰側邊欄">
+          <span class="material-icons" style="font-size: 16px; transform: scaleX(-1);">view_sidebar</span>
+        </button>
+      </div>
+
       <button class="pro-add" (click)="openCreateForSelectedDate()" title="新增到 {{ selectedDateStr }}">
         <span class="material-icons" style="font-size: 18px;">add</span>
         <span>新增</span>
       </button>
-      <button class="pro-iconbtn" title="切換右側 Inspector" (click)="toggleInspector()">
+      <button class="pro-iconbtn" title="切換 Inspector 顯示" (click)="toggleInspector()">
         <span class="material-icons" style="font-size: 20px;">{{ showInspector ? 'chevron_right' : 'chevron_left' }}</span>
       </button>
     </div>
   </header>
 
-  <!-- Three-column shell -->
-  <main class="pro-grid" [style.grid-template-columns]="(leftWidth + 'px 6px 1fr ') + (showInspector ? '6px ' + rightWidth + 'px' : '')">
+  <!-- Three-column shell. The grid-template-columns string changes based on
+       whether the user collapsed the sidebar and which side the Inspector
+       sits on. Inspector "middle" means [sidebar | inspector | center]. -->
+  <main class="pro-grid"
+        [style.grid-template-columns]="gridTemplateColumns">
 
     <!-- Left: Sidebar -->
-    <aside class="pro-sidebar pro-glass">
+    <aside class="pro-sidebar pro-glass" [class.is-collapsed]="sidebarCollapsed" [style.order]="1">
+      <!-- Collapse / expand toggle, pinned top-right of the sidebar. -->
+      <button class="pro-sidebar__collapse" (click)="toggleSidebar()"
+              [title]="sidebarCollapsed ? '展開側邊欄' : '收起側邊欄'">
+        <span class="material-icons" style="font-size: 18px;">{{ sidebarCollapsed ? 'chevron_right' : 'chevron_left' }}</span>
+      </button>
+
+      <ng-container *ngIf="!sidebarCollapsed">
       <section class="pro-sidebar__section">
         <h4 class="pro-sidebar__heading">清單</h4>
         <button class="pro-nav" [class.is-active]="isSelectedList('inbox')" (click)="selectSmartList('inbox')">
@@ -174,13 +200,15 @@
           <span class="pro-user__name">{{ currentUser.name }}</span>
         </div>
       </div>
+      </ng-container>
     </aside>
 
-    <!-- Left splitter -->
-    <div class="pro-splitter" (mousedown)="startSplitter('left', $event)" title="拖曳調整側邊欄寬度"></div>
+    <!-- Left splitter (hidden when sidebar is collapsed — there's nothing to resize) -->
+    <div *ngIf="!sidebarCollapsed" class="pro-splitter" [style.order]="1.5"
+         (mousedown)="startSplitter('left', $event)" title="拖曳調整側邊欄寬度"></div>
 
     <!-- Center: main view -->
-    <section class="pro-center">
+    <section class="pro-center" [style.order]="centerOrder">
 
       <!-- ============ Calendar-first layout ============ -->
       <div *ngIf="layoutMode === 'calendar-first'" class="pro-center__split">
@@ -444,11 +472,12 @@
       </div>
     </ng-template>
 
-    <!-- Right splitter -->
-    <div *ngIf="showInspector" class="pro-splitter" (mousedown)="startSplitter('right', $event)"></div>
+    <!-- Splitter next to Inspector (its order tracks the Inspector itself). -->
+    <div *ngIf="showInspector" class="pro-splitter" [style.order]="splitterRightOrder"
+         (mousedown)="startSplitter('right', $event)"></div>
 
-    <!-- Right: Inspector -->
-    <aside *ngIf="showInspector" class="pro-inspector pro-glass">
+    <!-- Inspector — visual position controlled by inspectorOrder. -->
+    <aside *ngIf="showInspector" class="pro-inspector pro-glass" [style.order]="inspectorOrder">
 
       <!-- =========== Day Pane (default): list of tasks for selectedDateStr =========== -->
       <ng-container *ngIf="inspectorMode === 'day'">

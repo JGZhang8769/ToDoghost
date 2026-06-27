@@ -38,6 +38,45 @@ body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
 .ios-drawer.is-dragging {
     transition: none;
 }
+
+/* Desktop (≥ lg = 1024px): pin the unscheduled drawer permanently to the
+   bottom so it acts as an always-on backlog panel. The scheduled-tasks
+   drawer remains modal — it only appears when the user picks a date,
+   floating over the unscheduled drawer.
+   Mobile keeps the iOS-style swipeable behaviour for both drawers. */
+@media (min-width: 1024px) {
+    /* Tag the unscheduled drawer so we only target it (not scheduled). */
+    .ios-drawer.is-persistent {
+        transform: translateY(0) !important;
+        /* Desktop persistent drawer takes ~32vh, leaving the rest for the
+           calendar. Calendar grid shrinks to fit automatically. */
+        max-height: 32vh !important;
+        min-height: 32vh !important;
+        max-width: none !important;
+        left: 0 !important;
+        right: 0 !important;
+    }
+    /* Hide the drag handle bar on the persistent drawer. */
+    .ios-drawer.is-persistent .lg\:hidden { display: none !important; }
+    /* Handle row no longer acts as a drag toggle target. */
+    .ios-drawer.is-persistent > div:first-child {
+        cursor: default !important;
+    }
+    /* When the unscheduled body was hidden because drawerOpen=false on
+       mobile, force it visible on desktop. */
+    .ios-drawer.is-persistent .invisible,
+    .ios-drawer.is-persistent .hidden {
+        visibility: visible !important;
+        display: block !important;
+    }
+
+    /* Leave room under the calendar so its last row isn't covered by the
+       always-on drawer. Targeting the main scroll container in
+       main-view.component.html (id="main-group"). */
+    #main-group {
+        padding-bottom: 32vh !important;
+    }
+}
 /* Apple month detailed view: 2-line task title clamp */
 .apple-line-clamp-2 {
     display: -webkit-box;
