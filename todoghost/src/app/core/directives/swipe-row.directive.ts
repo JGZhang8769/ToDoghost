@@ -80,9 +80,21 @@ export class SwipeRowDirective {
       }
     }
 
+    // Only left-swipe (delete) is supported now. Drop right-swipe entirely
+    // because the row already has an explicit 「完成」 circle button —
+    // duplicating that as a swipe action just made the UI noisy and the
+    // green background leaked through the row's translucent backdrop.
+    if (dx > 0) {
+      // Rubber-band only — never let the row drift to the right.
+      const travel = dx / 5;
+      this.currentX = travel;
+      this.el.nativeElement.style.transform = `translateX(${travel}px)`;
+      if (e.cancelable) e.preventDefault();
+      return;
+    }
+
     // Rubber-band past the cap so the row never flies off.
     let travel = dx;
-    if (travel > this.maxTravel) travel = this.maxTravel + (dx - this.maxTravel) / 4;
     if (travel < -this.maxTravel) travel = -this.maxTravel + (dx + this.maxTravel) / 4;
     this.currentX = travel;
     this.el.nativeElement.style.transform = `translateX(${travel}px)`;
@@ -95,26 +107,22 @@ export class SwipeRowDirective {
     if (!this.active) return;
     this.active = false;
     const x = this.currentX;
-    if (x >= this.commitThreshold) {
-      this.commit('right');
-    } else if (x <= -this.commitThreshold) {
+    if (x <= -this.commitThreshold) {
       this.commit('left');
     } else {
       this.reset();
     }
   }
 
-  private commit(direction: 'left' | 'right') {
-    // Animate off to one side briefly, fire event, then restore. The event
-    // handler usually changes the underlying data so the row vanishes via
-    // *ngFor diff — the snap-back animation just covers any latency.
-    const target = direction === 'right' ? this.maxTravel : -this.maxTravel;
+  private commit(direction: 'left') {
+    // Animate the row off-screen then fire swipeDelete. Parent usually
+    // removes the row via *ngFor diff so the snap-back never plays — but
+    // it's there as fallback if deletion fails.
+    const target = -this.maxTravel;
     this.el.nativeElement.style.transition = 'transform 0.18s ease';
     this.el.nativeElement.style.transform = `translateX(${target}px)`;
     setTimeout(() => {
-      if (direction === 'right') this.swipeComplete.emit();
-      else this.swipeDelete.emit();
-      // Reset for cases where the parent leaves the row in place.
+      this.swipeDelete.emit();
       this.reset();
     }, 160);
   }

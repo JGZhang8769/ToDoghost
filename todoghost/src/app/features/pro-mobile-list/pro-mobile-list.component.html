@@ -20,19 +20,15 @@
     <!-- Main scope list -->
     <div class="pml-list" *ngIf="scopeTasks.length > 0">
       <div *ngFor="let t of scopeTasks" class="pml-row-wrap">
-        <!-- Background actions (visible while the foreground is swiped aside) -->
-        <div class="pml-row-bg pml-row-bg--complete">
-          <span class="material-icons" style="font-size: 18px;">check_circle</span>
-          {{ t.status === 'completed' ? '取消完成' : '完成' }}
-        </div>
+        <!-- Delete background — revealed when the row is left-swiped. -->
         <div class="pml-row-bg pml-row-bg--delete">
           <span class="material-icons" style="font-size: 18px;">delete</span>
           刪除
         </div>
-        <!-- Foreground row receives the swipe-row directive -->
+        <!-- Foreground row. Right-swipe was removed since the check circle
+             already handles completion — only left-swipe (delete) remains. -->
         <button class="pml-row"
                 appSwipeRow
-                (swipeComplete)="onSwipeComplete(t)"
                 (swipeDelete)="onSwipeDelete(t)"
                 [class.is-urgent]="t.isUrgent && t.status !== 'completed'"
                 [class.is-done]="t.status === 'completed'"
@@ -104,6 +100,7 @@
         </div>
       </div>
     </section>
+
   </main>
 
   <!-- ============ Inline scheduling dialog ============ -->

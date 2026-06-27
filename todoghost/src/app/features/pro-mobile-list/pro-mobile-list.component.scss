@@ -119,21 +119,18 @@
     color: #fff;
     pointer-events: none;
 }
-.pml-row-bg--complete {
-    left: 0;
-    justify-content: flex-start;
-    background: #22c55e;
-}
 .pml-row-bg--delete {
     right: 0;
+    width: 50%;
     justify-content: flex-end;
     background: #ef4444;
 }
 .pml-row-wrap .pml-row {
     position: relative;
     z-index: 2;
-    background: rgba(255, 255, 255, 0.85);
-    /* directive sets transform inline */
+    /* Solid white background so the delete colour underneath doesn't bleed
+       through and make the row text look washed out. */
+    background: #fff;
 }
 /* Override the original top-border because the wrap takes that role now. */
 .pml-list .pml-row + .pml-row { border-top: 0; }

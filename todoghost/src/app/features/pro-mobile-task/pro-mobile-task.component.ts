@@ -1,5 +1,5 @@
 import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CommonModule, Location } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subject, takeUntil } from 'rxjs';
@@ -36,6 +36,7 @@ export class ProMobileTaskComponent implements OnInit, OnDestroy {
   private userService = inject(UserService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
+  private location = inject(Location);
   private destroy$ = new Subject<void>();
 
   /** True when route is /pro/new — we add instead of update on save. */
@@ -136,8 +137,11 @@ export class ProMobileTaskComponent implements OnInit, OnDestroy {
   }
 
   // ---------- Save / cancel ----------
+  /** Back to wherever we came from. Using history rather than a hard-coded
+   *  '/pro' route means coming back from edit → list → home stays sane,
+   *  and matches the left-edge swipe gesture's behaviour. */
   back() {
-    this.router.navigate(['/pro']);
+    this.location.back();
   }
 
   async save() {

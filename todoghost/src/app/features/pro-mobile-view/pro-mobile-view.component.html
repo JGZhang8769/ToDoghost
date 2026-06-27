@@ -25,27 +25,59 @@
       </button>
     </header>
 
-    <!-- Week strip -->
-    <section class="pmob-week-strip">
-      <button *ngFor="let d of weekStrip()"
-              class="pmob-week-strip__day"
-              [class.is-today]="d.isToday"
-              [class.is-selected]="d.isSelected"
-              (click)="selectWeekDay(d.dateStr)">
-        <span class="pmob-week-strip__name">{{ d.dayName }}</span>
-        <span class="pmob-week-strip__num">{{ d.dayNum }}</span>
-        <span class="pmob-week-strip__dot"
-              [class.is-urgent]="d.hasUrgent"
-              [class.is-empty]="!d.hasTasks"></span>
-      </button>
-    </section>
+    <!-- Calendar block: nav row + week strip OR month grid -->
+    <section class="pmob-cal">
+      <header class="pmob-cal__nav">
+        <button class="pmob-cal__arrow" (click)="prevPeriod()" aria-label="上一個">
+          <span class="material-icons" style="font-size: 20px;">chevron_left</span>
+        </button>
+        <button class="pmob-cal__title" (click)="resetToToday()">{{ periodTitle() }}</button>
+        <button class="pmob-cal__arrow" (click)="nextPeriod()" aria-label="下一個">
+          <span class="material-icons" style="font-size: 20px;">chevron_right</span>
+        </button>
+        <button class="pmob-cal__toggle"
+                (click)="toggleCalExpanded()"
+                [title]="calExpanded() ? '收起為週' : '展開為月'">
+          <span class="material-icons" style="font-size: 20px;">
+            {{ calExpanded() ? 'unfold_less' : 'unfold_more' }}
+          </span>
+        </button>
+      </header>
 
-    <!-- "Open month calendar" link -->
-    <button class="pmob-home__monthlink" (click)="openMonth()">
-      <span class="material-icons" style="font-size: 18px;">calendar_month</span>
-      查看月曆
-      <span class="material-icons" style="font-size: 18px; margin-left: auto;">chevron_right</span>
-    </button>
+      <!-- Week strip view (default) -->
+      <div *ngIf="!calExpanded()" class="pmob-week-strip">
+        <button *ngFor="let d of weekStrip()"
+                class="pmob-week-strip__day"
+                [class.is-today]="d.isToday"
+                [class.is-selected]="d.isSelected"
+                (click)="selectCalendarDay(d.dateStr)">
+          <span class="pmob-week-strip__name">{{ d.dayName }}</span>
+          <span class="pmob-week-strip__num">{{ d.dayNum }}</span>
+          <span class="pmob-week-strip__dot"
+                [class.is-urgent]="d.hasUrgent"
+                [class.is-empty]="!d.hasTasks"></span>
+        </button>
+      </div>
+
+      <!-- Full month grid (expanded) -->
+      <div *ngIf="calExpanded()" class="pmob-month-grid">
+        <div class="pmob-month-grid__weekheader">
+          <span *ngFor="let day of ['一','二','三','四','五','六','日']">{{ day }}</span>
+        </div>
+        <div class="pmob-month-grid__cells">
+          <button *ngFor="let d of monthCells()"
+                  class="pmob-month-grid__day"
+                  [class.is-other-month]="!d.isCurrentMonth"
+                  [class.is-today]="d.isToday"
+                  [class.is-selected]="d.isSelected"
+                  (click)="selectCalendarDay(d.dateStr)">
+            <span class="pmob-month-grid__num">{{ d.dayNum }}</span>
+            <span *ngIf="d.hasTasks" class="pmob-month-grid__dot"
+                  [class.is-urgent]="d.hasUrgent"></span>
+          </button>
+        </div>
+      </div>
+    </section>
 
     <!-- Smart list cards (2x2) -->
     <section class="pmob-cards">
@@ -153,8 +185,8 @@
            inputmode="text">
     <button class="pmob-quickadd__btn"
             [class.is-ready]="quickAddTitle().trim().length > 0"
-            (click)="openCreateFromQuick()"
-            [title]="quickAddTitle().trim() ? '展開填寫細節' : '新增代辦'">
+            (click)="onQuickAddButton()"
+            [title]="quickAddTitle().trim() ? '送出' : '新增代辦'">
       <span class="material-icons" style="font-size: 20px;">{{ quickAddTitle().trim() ? 'arrow_upward' : 'add' }}</span>
     </button>
   </div>

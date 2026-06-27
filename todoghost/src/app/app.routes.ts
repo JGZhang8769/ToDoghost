@@ -12,8 +12,6 @@ export const routes: Routes = [
   { path: 'pro/task/:id', loadComponent: () => import('./features/pro-mobile-task/pro-mobile-task.component').then(m => m.ProMobileTaskComponent) },
   // List view, scope is a string like 'today', 'unscheduled', 'cat-:id', 'date-YYYY-MM-DD', etc.
   { path: 'pro/list/:scope', loadComponent: () => import('./features/pro-mobile-list/pro-mobile-list.component').then(m => m.ProMobileListComponent) },
-  // Full-screen month / week calendar.
-  { path: 'pro/month', loadComponent: () => import('./features/pro-mobile-month/pro-mobile-month.component').then(m => m.ProMobileMonthComponent) },
   { path: 'settings', loadComponent: () => import('./features/settings/settings.component').then(m => m.SettingsComponent) },
   { path: '', redirectTo: 'login', pathMatch: 'full' },
   { path: '**', redirectTo: 'login' }

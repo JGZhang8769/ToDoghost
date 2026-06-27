@@ -141,6 +141,11 @@
     box-sizing: border-box;
     width: 100%;
     min-width: 0;
+    /* Reserve enough vertical room for the iOS toggle (26px) and native
+       time/date inputs (~32px). Without this, rows in edit mode got
+       squashed by their siblings — create mode lacked the extra 「已完成」
+       row so the bug only surfaced when editing. */
+    min-height: 52px;
 }
 .pmt-row + .pmt-row {
     border-top: 1px solid rgba(120, 100, 80, 0.08);
