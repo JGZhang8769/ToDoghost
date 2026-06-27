@@ -225,6 +225,10 @@
                       <span *ngIf="cat.icon && isEmoji(cat.icon)" class="pro-day__catico">{{ cat.icon }}</span>
                     </ng-container>
                     <span class="pro-day__title">{{ t.title }}</span>
+                    <div *cdkDragPreview class="pro-drag-preview">
+                      <span class="material-icons">drag_indicator</span>
+                      <span>{{ t.title }}</span>
+                    </div>
                   </div>
                 </ng-container>
                 <div *ngIf="d.tasks.length > 4" class="pro-day__more">+{{ d.tasks.length - 4 }} 更多</div>
@@ -270,6 +274,10 @@
                   <span *ngIf="cat.icon && isEmoji(cat.icon)" class="pro-week__chip-ico">{{ cat.icon }}</span>
                 </ng-container>
                 {{ t.title }}
+                <div *cdkDragPreview class="pro-drag-preview">
+                  <span class="material-icons">drag_indicator</span>
+                  <span>{{ t.title }}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -308,6 +316,10 @@
                 </div>
                 <div class="pro-week__event-time tabular-nums" *ngIf="block.task.startTime">
                   {{ block.task.startTime }}<span *ngIf="block.task.endTime"> - {{ block.task.endTime }}</span>
+                </div>
+                <div *cdkDragPreview class="pro-drag-preview">
+                  <span class="material-icons">drag_indicator</span>
+                  <span>{{ block.task.title }}</span>
                 </div>
               </div>
               <!-- Now line on today -->

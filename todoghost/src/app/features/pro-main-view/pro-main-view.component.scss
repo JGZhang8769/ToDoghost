@@ -1598,18 +1598,36 @@
     box-shadow: inset 0 0 0 2px rgba(212, 166, 74, 0.5);
 }
 
-/* Sidebar 未排程 drop zone */
+/* Sidebar 未排程 drop zone.
+   Keep the wrapper exactly the same size as the underlying button — no
+   padding, no min-height tricks. Receive feedback is applied to the inner
+   pro-nav button itself so neighbours don't shift. Also: CDK appends the
+   dragged ghost into this droplist's DOM by default, which made the
+   sidebar "expand downwards". Hide any direct cdk-drag children here so
+   the wrap never grows. */
 .pro-nav-wrap {
     border-radius: 10px;
-    transition: all 0.15s ease;
     margin: 0;
+    /* Treat this wrap as a layout sandbox: nothing inside (including a CDK
+       drag clone) can push its size. */
+    contain: layout;
 }
-.pro-dragging .pro-nav-wrap {
-    background: rgba(196, 181, 253, 0.18);
+.pro-nav-wrap > .cdk-drag,
+.pro-nav-wrap > .cdk-drag-placeholder,
+.pro-nav-wrap > .cdk-drag-preview {
+    display: none !important;
 }
-.pro-dragging .pro-nav-wrap.cdk-drop-list-receiving {
-    background: rgba(139, 92, 246, 0.3);
-    box-shadow: inset 0 0 0 2px rgba(139, 92, 246, 0.6);
+
+/* Only the button itself receives visual feedback. The button is the
+   actual target the user is aiming for, and styling it (not the wrap)
+   means width/height never change. */
+.pro-nav-wrap.cdk-drop-list-receiving .pro-nav {
+    background: rgba(139, 92, 246, 0.25);
+    box-shadow: inset 0 0 0 2px rgba(139, 92, 246, 0.55);
+}
+.pro-nav-wrap.cdk-drop-list-receiving .pro-nav__label {
+    color: #6d28d9;
+    font-weight: 700;
 }
 
 /* Drag preview / placeholder polish */
@@ -1618,23 +1636,19 @@
 }
 
 /* The source element that's currently being dragged.
-   Stay in place at 30% opacity instead of hiding entirely — that way:
-     1. The "ghost" stays grounded so users see exactly where the drag
-        started; no visual hole opens up to the right of it (which the
-        user saw as "the cell pulled apart a bit").
-     2. siblings don't even attempt to reflow, because the source still
-        occupies the same flex/grid slot.
-     3. transform: none defeats CDK's translate3d on the source — only the
-        preview clone (.cdk-drag-preview) should move with the cursor. */
+   Keep the same box (so siblings don't shift), but render fully invisible
+   — user only sees the floating preview while dragging, and 0% opacity
+   beats 30% for "totally clean" feel without an obvious ghost still in
+   the original spot. transform: none defeats CDK's translate3d so the
+   source can't be pushed off its slot. */
 .pro-row.is-drag-source,
 .pro-day__task.is-drag-source,
 .pro-week__chip.is-drag-source,
 .pro-week__event.is-drag-source,
 .cdk-drag-placeholder {
-    opacity: 0.3 !important;
+    opacity: 0 !important;
     transform: none !important;
     pointer-events: none !important;
-    transition: opacity 0.12s ease !important;
 }
 
 /* sortingDisabled (PR #53) removed the in-list reorder preview, so the
