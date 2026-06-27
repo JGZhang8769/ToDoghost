@@ -1,0 +1,117 @@
+<div class="pml-shell">
+  <div class="pml-bg" aria-hidden="true"></div>
+
+  <!-- Nav bar -->
+  <header class="pml-nav">
+    <button class="pml-back" (click)="back()">
+      <span class="material-icons" style="font-size: 22px;">chevron_left</span>
+      <span>返回</span>
+    </button>
+    <span class="pml-nav__title">{{ scopeTitle }}</span>
+    <button class="pml-iconbtn" (click)="openCreate()" aria-label="新增">
+      <span class="material-icons" style="font-size: 22px;">add</span>
+    </button>
+  </header>
+
+  <!-- Body -->
+  <main class="pml-body ios-scroll">
+    <div class="pml-subtitle">{{ scopeSubtitle }}</div>
+
+    <!-- Main scope list -->
+    <div class="pml-list" *ngIf="scopeTasks.length > 0">
+      <button *ngFor="let t of scopeTasks"
+              class="pml-row"
+              [class.is-urgent]="t.isUrgent && t.status !== 'completed'"
+              [class.is-done]="t.status === 'completed'"
+              [style.--user-bar]="userColor(t.createdBy)?.bar"
+              (click)="openTask(t)">
+        <button class="pml-check"
+                (click)="toggleCompletion(t, $event)"
+                [class.is-checked]="t.status === 'completed'">
+          <span *ngIf="t.status === 'completed'" class="material-icons" style="font-size: 14px;">check</span>
+        </button>
+        <div class="pml-row__main">
+          <div class="pml-row__title">
+            <ng-container *ngIf="categoryFor(t.categoryId) as cat">
+              <span *ngIf="cat.icon && !isEmoji(cat.icon)" class="material-icons pml-row__catico">{{ cat.icon }}</span>
+              <span *ngIf="cat.icon && isEmoji(cat.icon)" class="pml-row__catico">{{ cat.icon }}</span>
+            </ng-container>
+            <span class="pml-row__titletext">{{ t.title }}</span>
+            <span *ngIf="t.isUrgent" class="material-icons pml-row__urg">priority_high</span>
+          </div>
+          <div class="pml-row__meta" *ngIf="t.date || t.startTime || t.description || (t.tags?.length && t.tags.length > 0)">
+            <span *ngIf="t.date && !scope().startsWith('date-')" class="tabular-nums">{{ t.date }}</span>
+            <span *ngIf="t.startTime" class="tabular-nums">{{ t.startTime }}<span *ngIf="t.endTime"> - {{ t.endTime }}</span></span>
+            <span *ngFor="let tag of (t.tags || [])" class="pml-row__tag">#{{ tag }}</span>
+            <span *ngIf="t.description" class="pml-row__desc">{{ t.description }}</span>
+          </div>
+        </div>
+        <span class="material-icons pml-row__chev">chevron_right</span>
+      </button>
+    </div>
+
+    <div *ngIf="scopeTasks.length === 0" class="pml-empty">
+      <span class="material-icons" style="font-size: 40px;">checklist</span>
+      <p>沒有代辦事項</p>
+      <p class="pml-empty__hint">點右上 + 新增一個</p>
+    </div>
+
+    <!-- Unscheduled section docked at the bottom of scheduled scopes -->
+    <section class="pml-unscheduled" *ngIf="unscheduledTasks.length > 0">
+      <header class="pml-unscheduled__head">
+        <span class="material-icons" style="font-size: 16px; color: #8b5cf6;">event_busy</span>
+        <h4>未排程 ({{ unscheduledTasks.length }})</h4>
+      </header>
+      <div class="pml-unscheduled__list">
+        <div *ngFor="let t of unscheduledTasks"
+             class="pml-uprow"
+             [class.is-urgent]="t.isUrgent && t.status !== 'completed'"
+             [style.--user-bar]="userColor(t.createdBy)?.bar"
+             (click)="openTask(t)">
+          <button class="pml-check"
+                  (click)="toggleCompletion(t, $event)"
+                  [class.is-checked]="t.status === 'completed'">
+            <span *ngIf="t.status === 'completed'" class="material-icons" style="font-size: 14px;">check</span>
+          </button>
+          <div class="pml-uprow__main">
+            <div class="pml-uprow__title">
+              <ng-container *ngIf="categoryFor(t.categoryId) as cat">
+                <span *ngIf="cat.icon && !isEmoji(cat.icon)" class="material-icons pml-row__catico">{{ cat.icon }}</span>
+                <span *ngIf="cat.icon && isEmoji(cat.icon)" class="pml-row__catico">{{ cat.icon }}</span>
+              </ng-container>
+              <span class="pml-row__titletext">{{ t.title }}</span>
+            </div>
+          </div>
+          <button class="pml-schedule-btn"
+                  (click)="startScheduling(t.id, $event)">
+            <span class="material-icons" style="font-size: 16px;">event</span>
+            安排
+          </button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ============ Inline scheduling dialog ============ -->
+  <div *ngIf="schedulingTaskId()" class="pml-sched-scrim" (click)="cancelScheduling()">
+    <div class="pml-sched" (click)="$event.stopPropagation()">
+      <div class="pml-sched__head">
+        <h3>安排日期</h3>
+        <p>{{ schedulingTaskTitle }}</p>
+      </div>
+      <div class="pml-sched__presets">
+        <button class="pml-sched__preset" (click)="schedulePreset('today')">今天</button>
+        <button class="pml-sched__preset" (click)="schedulePreset('tomorrow')">明天</button>
+        <button class="pml-sched__preset" (click)="schedulePreset('next-mon')">下週一</button>
+      </div>
+      <input type="date"
+             class="pml-sched__input"
+             [value]="pickerDate()"
+             (input)="pickerDate.set($any($event.target).value)">
+      <div class="pml-sched__actions">
+        <button class="pml-sched__btn pml-sched__btn--cancel" (click)="cancelScheduling()">取消</button>
+        <button class="pml-sched__btn pml-sched__btn--confirm" (click)="confirmScheduling()">確認</button>
+      </div>
+    </div>
+  </div>
+</div>
