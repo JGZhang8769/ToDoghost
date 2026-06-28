@@ -303,6 +303,9 @@ export class ProMobileViewComponent implements OnInit, OnDestroy {
   }
 
   backToWorkspaces() {
+    // See pro-main-view.backToWorkspaces — workspace-list re-routes to /pro
+    // on any non-null currentWorkspace, so clear it before navigating.
+    this.workspaceService.setCurrentWorkspace(null);
     this.router.navigate(['/workspaces']);
   }
 

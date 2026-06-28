@@ -1203,6 +1203,11 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
   }
 
   backToWorkspaces() {
+    // Clearing the current workspace is required: workspace-list subscribes
+    // to currentWorkspace$ and immediately routes back to /pro whenever it
+    // sees a non-null workspace (which is also persisted in localStorage),
+    // so without this the user gets bounced back here.
+    this.workspaceService.setCurrentWorkspace(null);
     this.router.navigate(['/workspaces']);
   }
 }
