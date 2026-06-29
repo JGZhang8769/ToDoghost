@@ -97,36 +97,85 @@
       </div>
     </section>
 
-    <!-- Smart list cards (2x2) -->
-    <section class="pmob-cards">
-      <button class="pmob-card pmob-card--today" (click)="openSmartList('today')">
-        <span class="pmob-card__icon">
-          <span class="material-icons" style="font-size: 22px;">wb_sunny</span>
-        </span>
-        <span class="pmob-card__count">{{ smartListCount('today') }}</span>
-        <span class="pmob-card__label">今日</span>
-      </button>
-      <button class="pmob-card pmob-card--week" (click)="openSmartList('week')">
-        <span class="pmob-card__icon">
-          <span class="material-icons" style="font-size: 22px;">date_range</span>
-        </span>
-        <span class="pmob-card__count">{{ smartListCount('week') }}</span>
-        <span class="pmob-card__label">本週</span>
-      </button>
-      <button class="pmob-card pmob-card--urgent" (click)="openSmartList('urgent')">
-        <span class="pmob-card__icon">
-          <span class="material-icons" style="font-size: 22px;">priority_high</span>
-        </span>
-        <span class="pmob-card__count">{{ smartListCount('urgent') }}</span>
-        <span class="pmob-card__label">緊急</span>
-      </button>
-      <button class="pmob-card pmob-card--unscheduled" (click)="openSmartList('unscheduled')">
-        <span class="pmob-card__icon">
-          <span class="material-icons" style="font-size: 22px;">event_busy</span>
-        </span>
-        <span class="pmob-card__count">{{ smartListCount('unscheduled') }}</span>
-        <span class="pmob-card__label">未排程</span>
-      </button>
+    <!-- Smart list quick access. Two display modes: compact rows (default,
+         space-efficient) vs expanded 2x2 tiles (visually richer). Toggle
+         icon mirrors the cal expand control so it feels familiar. -->
+    <section class="pmob-cards" [class.is-expanded]="cardsExpanded()">
+      <header class="pmob-cards__head">
+        <h4 class="pmob-cards__title">快速清單</h4>
+        <button class="pmob-cards__toggle"
+                (click)="toggleCardsExpanded()"
+                [title]="cardsExpanded() ? '收合' : '展開為大卡片'"
+                [attr.aria-label]="cardsExpanded() ? '收合快速清單' : '展開快速清單'">
+          <span class="material-icons" style="font-size: 18px;">
+            {{ cardsExpanded() ? 'unfold_less' : 'unfold_more' }}
+          </span>
+        </button>
+      </header>
+
+      <!-- Expanded: 2x2 large tiles -->
+      <div *ngIf="cardsExpanded()" class="pmob-cards__grid">
+        <button class="pmob-card pmob-card--today" (click)="openSmartList('today')">
+          <span class="pmob-card__icon">
+            <span class="material-icons" style="font-size: 22px;">wb_sunny</span>
+          </span>
+          <span class="pmob-card__count">{{ smartListCount('today') }}</span>
+          <span class="pmob-card__label">今日</span>
+        </button>
+        <button class="pmob-card pmob-card--week" (click)="openSmartList('week')">
+          <span class="pmob-card__icon">
+            <span class="material-icons" style="font-size: 22px;">date_range</span>
+          </span>
+          <span class="pmob-card__count">{{ smartListCount('week') }}</span>
+          <span class="pmob-card__label">本週</span>
+        </button>
+        <button class="pmob-card pmob-card--urgent" (click)="openSmartList('urgent')">
+          <span class="pmob-card__icon">
+            <span class="material-icons" style="font-size: 22px;">priority_high</span>
+          </span>
+          <span class="pmob-card__count">{{ smartListCount('urgent') }}</span>
+          <span class="pmob-card__label">緊急</span>
+        </button>
+        <button class="pmob-card pmob-card--unscheduled" (click)="openSmartList('unscheduled')">
+          <span class="pmob-card__icon">
+            <span class="material-icons" style="font-size: 22px;">event_busy</span>
+          </span>
+          <span class="pmob-card__count">{{ smartListCount('unscheduled') }}</span>
+          <span class="pmob-card__label">未排程</span>
+        </button>
+      </div>
+
+      <!-- Compact (default): narrow rows, similar to the grouprow style -->
+      <div *ngIf="!cardsExpanded()" class="pmob-cards__strip">
+        <button class="pmob-cardrow pmob-cardrow--today" (click)="openSmartList('today')">
+          <span class="pmob-cardrow__icon">
+            <span class="material-icons" style="font-size: 16px;">wb_sunny</span>
+          </span>
+          <span class="pmob-cardrow__label">今日</span>
+          <span class="pmob-cardrow__count">{{ smartListCount('today') }}</span>
+        </button>
+        <button class="pmob-cardrow pmob-cardrow--week" (click)="openSmartList('week')">
+          <span class="pmob-cardrow__icon">
+            <span class="material-icons" style="font-size: 16px;">date_range</span>
+          </span>
+          <span class="pmob-cardrow__label">本週</span>
+          <span class="pmob-cardrow__count">{{ smartListCount('week') }}</span>
+        </button>
+        <button class="pmob-cardrow pmob-cardrow--urgent" (click)="openSmartList('urgent')">
+          <span class="pmob-cardrow__icon">
+            <span class="material-icons" style="font-size: 16px;">priority_high</span>
+          </span>
+          <span class="pmob-cardrow__label">緊急</span>
+          <span class="pmob-cardrow__count">{{ smartListCount('urgent') }}</span>
+        </button>
+        <button class="pmob-cardrow pmob-cardrow--unscheduled" (click)="openSmartList('unscheduled')">
+          <span class="pmob-cardrow__icon">
+            <span class="material-icons" style="font-size: 16px;">event_busy</span>
+          </span>
+          <span class="pmob-cardrow__label">未排程</span>
+          <span class="pmob-cardrow__count">{{ smartListCount('unscheduled') }}</span>
+        </button>
+      </div>
     </section>
 
     <!-- Categories list -->

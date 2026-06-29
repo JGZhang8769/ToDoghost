@@ -83,6 +83,10 @@ export class ProMobileViewComponent implements OnInit, OnDestroy {
   monthCells = signal<MonthCell[]>([]);
   /** When true, the home shows the full month grid; otherwise just the week strip. */
   calExpanded = signal(false);
+  /** When true, smart-list cards render as a 2x2 grid of large tiles; when
+   *  false (the default) they render as a compact stack of narrow rows so
+   *  the page leaves more vertical room for the calendar & categories. */
+  cardsExpanded = signal(false);
   /** Anchor date for the visible week / month (advances with prev/next arrows). */
   anchorDate = signal(new Date());
   /** Headline date the user is "viewing" — drives the highlighted cell. */
@@ -112,9 +116,10 @@ export class ProMobileViewComponent implements OnInit, OnDestroy {
 
   // ----- Lifecycle -----
   ngOnInit() {
-    // Restore last expanded preference so the home stays consistent
+    // Restore last expanded preferences so the home stays consistent
     // across reloads.
     this.calExpanded.set(localStorage.getItem('pmob-home:calExpanded') === '1');
+    this.cardsExpanded.set(localStorage.getItem('pmob-home:cardsExpanded') === '1');
 
     this.workspaceService.currentWorkspace$.pipe(takeUntil(this.destroy$)).subscribe(ws => {
       if (!ws) { this.router.navigate(['/workspaces']); return; }
@@ -201,6 +206,12 @@ export class ProMobileViewComponent implements OnInit, OnDestroy {
     }
     this.monthCells.set(cells);
     this.periodTitle.set(format(anchor, 'yyyy 年 M 月'));
+  }
+
+  toggleCardsExpanded() {
+    const next = !this.cardsExpanded();
+    this.cardsExpanded.set(next);
+    localStorage.setItem('pmob-home:cardsExpanded', next ? '1' : '0');
   }
 
   // ----- Calendar navigation -----
