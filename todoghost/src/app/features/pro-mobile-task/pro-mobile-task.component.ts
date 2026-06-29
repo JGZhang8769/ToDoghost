@@ -400,7 +400,17 @@ export class ProMobileTaskComponent implements OnInit, OnDestroy {
   cancelDelete() { this.showDeleteConfirm.set(false); }
   async confirmDelete() {
     if (!this.editingTaskId) return;
-    await this.taskService.deleteTask(this.editingTaskId);
+    const seriesId = this.seriesIdForFooter();
+    if (seriesId && this.date()) {
+      // Record exception so re-extending the range doesn't resurrect.
+      await this.recurringTaskService.deleteOccurrence({
+        id: this.editingTaskId,
+        recurringId: seriesId,
+        date: this.date(),
+      } as any);
+    } else {
+      await this.taskService.deleteTask(this.editingTaskId);
+    }
     this.showDeleteConfirm.set(false);
     this.back();
   }
