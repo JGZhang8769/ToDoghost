@@ -49,26 +49,9 @@
       </label>
     </div>
 
-    <!-- Schedule group -->
+    <!-- Schedule (date + time). When the task is recurring, the date row
+         hides — the series itself drives the dates. -->
     <div class="pmt-card">
-      <!-- "Repeat" toggle: only when creating (converting an existing task
-           into a series is out of scope — see toggleRecurEnabled). When
-           editing a recurring series, the toggle stays on (locked). -->
-      <label class="pmt-row" *ngIf="isCreating() || editingRecurringId">
-        <span class="pmt-row__label">
-          <span class="material-icons" style="font-size: 18px; color: #7a6850;">repeat</span>
-          重複
-        </span>
-        <span class="pmt-toggle">
-          <input type="checkbox"
-                 [checked]="recurEnabled()"
-                 [disabled]="!!editingRecurringId"
-                 (change)="toggleRecurEnabled()">
-          <span class="pmt-toggle__slider"></span>
-        </span>
-      </label>
-
-      <!-- Single-task date row (hidden when recurring) -->
       <label class="pmt-row" *ngIf="!recurEnabled()">
         <span class="pmt-row__label">日期</span>
         <input type="date"
@@ -94,54 +77,72 @@
       </label>
     </div>
 
-    <!-- Recurrence rule (only when recurring) -->
-    <div class="pmt-card" *ngIf="recurEnabled()">
+    <!-- Recurrence card: toggle is always visible while creating so the user
+         can opt in; the rule fields slide in below once the toggle is on.
+         Editing existing single task: hide the whole card (we don't let
+         users convert a one-off into a series, and they shouldn't see noise).
+         Editing a task that belongs to a series: hide too — the series
+         footer further down handles changes to rule / rangeEnd. -->
+    <div class="pmt-card" *ngIf="isCreating()">
       <label class="pmt-row">
-        <span class="pmt-row__label">頻率</span>
-        <select class="pmt-input"
-                [value]="recurRule()"
-                (change)="recurRule.set($any($event.target).value)">
-          <option value="daily">每天</option>
-          <option value="weekly">每週</option>
-          <option value="monthly">每月</option>
-        </select>
+        <span class="pmt-row__label">
+          <span class="material-icons" style="font-size: 18px; color: #7a6850;">repeat</span>
+          重複
+        </span>
+        <span class="pmt-toggle">
+          <input type="checkbox"
+                 [checked]="recurEnabled()"
+                 (change)="toggleRecurEnabled()">
+          <span class="pmt-toggle__slider"></span>
+        </span>
       </label>
 
-      <!-- Weekly: weekday picker -->
-      <div class="pmt-row pmt-row--block" *ngIf="recurRule() === 'weekly'">
-        <span class="pmt-row__label">星期</span>
-        <div class="pmt-weekdays">
-          <button *ngFor="let w of weekdayOptions"
-                  type="button"
-                  class="pmt-weekday"
-                  [class.is-active]="isWeekdaySelected(w.val)"
-                  (click)="toggleWeekday(w.val)">{{ w.label }}</button>
+      <ng-container *ngIf="recurEnabled()">
+        <label class="pmt-row">
+          <span class="pmt-row__label">頻率</span>
+          <select class="pmt-input"
+                  [value]="recurRule()"
+                  (change)="recurRule.set($any($event.target).value)">
+            <option value="daily">每天</option>
+            <option value="weekly">每週</option>
+            <option value="monthly">每月</option>
+          </select>
+        </label>
+
+        <div class="pmt-row pmt-row--block" *ngIf="recurRule() === 'weekly'">
+          <span class="pmt-row__label">星期</span>
+          <div class="pmt-weekdays">
+            <button *ngFor="let w of weekdayOptions"
+                    type="button"
+                    class="pmt-weekday"
+                    [class.is-active]="isWeekdaySelected(w.val)"
+                    (click)="toggleWeekday(w.val)">{{ w.label }}</button>
+          </div>
         </div>
-      </div>
 
-      <!-- Monthly: day-of-month -->
-      <label class="pmt-row" *ngIf="recurRule() === 'monthly'">
-        <span class="pmt-row__label">每月幾號</span>
-        <input type="number" min="1" max="31"
-               class="pmt-input"
-               [value]="recurMonthDay()"
-               (input)="recurMonthDay.set(+$any($event.target).value || 1)">
-      </label>
+        <label class="pmt-row" *ngIf="recurRule() === 'monthly'">
+          <span class="pmt-row__label">每月幾號</span>
+          <input type="number" min="1" max="31"
+                 class="pmt-input"
+                 [value]="recurMonthDay()"
+                 (input)="recurMonthDay.set(+$any($event.target).value || 1)">
+        </label>
 
-      <label class="pmt-row">
-        <span class="pmt-row__label">開始日期</span>
-        <input type="date"
-               class="pmt-input"
-               [value]="recurRangeStart()"
-               (input)="recurRangeStart.set($any($event.target).value)">
-      </label>
-      <label class="pmt-row">
-        <span class="pmt-row__label">結束日期</span>
-        <input type="date"
-               class="pmt-input"
-               [value]="recurRangeEnd()"
-               (input)="recurRangeEnd.set($any($event.target).value)">
-      </label>
+        <label class="pmt-row">
+          <span class="pmt-row__label">開始日期</span>
+          <input type="date"
+                 class="pmt-input"
+                 [value]="recurRangeStart()"
+                 (input)="recurRangeStart.set($any($event.target).value)">
+        </label>
+        <label class="pmt-row">
+          <span class="pmt-row__label">結束日期</span>
+          <input type="date"
+                 class="pmt-input"
+                 [value]="recurRangeEnd()"
+                 (input)="recurRangeEnd.set($any($event.target).value)">
+        </label>
+      </ng-container>
     </div>
 
     <!-- Category chips -->
@@ -206,10 +207,63 @@
                 placeholder="輸入備註、細節、相關連結…"></textarea>
     </div>
 
+    <!-- 系列設定 footer: shown only while editing a task tied to a recurring
+         series. The user can adjust the rule (頻率 / 星期 / 每月幾號) and
+         shorten or extend rangeEnd. rangeStart is read-only — moving the
+         start retroactively is confusing and tends to orphan past
+         occurrences. Per-platform behaviour: this saves with the main 儲存
+         button (mobile pattern). -->
+    <div class="pmt-block" *ngIf="!isCreating() && seriesIdForFooter()">
+      <span class="pmt-block__label">
+        <span class="material-icons" style="font-size: 14px; vertical-align: -2px;">repeat</span>
+        系列設定
+      </span>
+      <div class="pmt-card">
+        <label class="pmt-row">
+          <span class="pmt-row__label">頻率</span>
+          <select class="pmt-input"
+                  [value]="recurRule()"
+                  (change)="recurRule.set($any($event.target).value)">
+            <option value="daily">每天</option>
+            <option value="weekly">每週</option>
+            <option value="monthly">每月</option>
+          </select>
+        </label>
+        <div class="pmt-row pmt-row--block" *ngIf="recurRule() === 'weekly'">
+          <span class="pmt-row__label">星期</span>
+          <div class="pmt-weekdays">
+            <button *ngFor="let w of weekdayOptions"
+                    type="button"
+                    class="pmt-weekday"
+                    [class.is-active]="isWeekdaySelected(w.val)"
+                    (click)="toggleWeekday(w.val)">{{ w.label }}</button>
+          </div>
+        </div>
+        <label class="pmt-row" *ngIf="recurRule() === 'monthly'">
+          <span class="pmt-row__label">每月幾號</span>
+          <input type="number" min="1" max="31"
+                 class="pmt-input"
+                 [value]="recurMonthDay()"
+                 (input)="recurMonthDay.set(+$any($event.target).value || 1)">
+        </label>
+        <label class="pmt-row">
+          <span class="pmt-row__label">結束日期</span>
+          <input type="date"
+                 class="pmt-input"
+                 [value]="recurRangeEnd()"
+                 (input)="recurRangeEnd.set($any($event.target).value)">
+        </label>
+        <div class="pmt-row">
+          <span class="pmt-row__label">開始日期</span>
+          <span class="pmt-row__readonly">{{ recurRangeStart() }}</span>
+        </div>
+      </div>
+    </div>
+
     <!-- Delete action (only when editing) -->
     <button *ngIf="!isCreating()" class="pmt-delete" (click)="requestDelete()">
       <span class="material-icons" style="font-size: 18px;">delete</span>
-      刪除代辦
+      {{ virtualSeriesId ? '取消這一次' : '刪除代辦' }}
     </button>
   </main>
 

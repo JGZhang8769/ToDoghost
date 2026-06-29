@@ -828,6 +828,29 @@
     background: transparent;
 }
 
+/* Read-only value on the right of a .pro-field row (e.g. immutable series
+   start date in 系列設定 footer). */
+.pro-field__readonly {
+    font-size: 13px;
+    color: #a3917a;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    margin-left: auto;
+}
+
+/* A .pro-field row that contains a toggle on the right instead of an input.
+   Sits inside .pro-field-card and shares its divider styling. */
+.pro-field--toggle {
+    .pro-field__label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .ios-toggle {
+        margin-left: auto;
+    }
+}
+
 /* Recurrence weekday picker (sits inside .pro-field as a full-width grid) */
 .pro-field--block {
     flex-direction: column;

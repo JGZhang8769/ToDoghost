@@ -168,6 +168,15 @@
     flex-shrink: 0;
     min-width: 0;
 }
+/* Read-only value shown on the right side of a row (e.g. the immutable
+   series start date in 系列設定 footer). Faded so users see it's not a
+   control. */
+.pmt-row__readonly {
+    font-size: 13px;
+    color: #a3917a;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+}
 .pmt-row > input,
 .pmt-row > select,
 .pmt-row > .pmt-input {

@@ -108,13 +108,18 @@ export class RecurringTaskService {
 
   /**
    * After shrinking a series' rangeEnd, delete every materialised task whose
-   * occurrenceDate is strictly after the new end. We deliberately leave past
-   * materialised tasks alone — completed history must stay intact.
+   * occurrenceDate is strictly after the new end. Tasks on the new end date
+   * itself are KEPT — semantically the user said "end on this day", so
+   * that day is still inclusive. Past occurrences (including already
+   * completed ones) are also kept regardless: they're history, not future.
    *
    * Returns the count of deleted docs so callers can confirm to the user.
    */
   async pruneFutureMaterialised(recurringId: string, newRangeEnd: string): Promise<number> {
     const ref = collection(this.firestore, 'tasks');
+    // Strict greater-than: newRangeEnd day is preserved, only later dates
+    // get dropped. Don't change this to >= without re-checking the
+    // expander's `ds <= rangeEnd` boundary — they must agree.
     const q = query(
       ref,
       where('recurringId', '==', recurringId),
