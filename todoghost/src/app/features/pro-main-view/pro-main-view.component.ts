@@ -927,11 +927,15 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     this.loadFooterForSelected();
   }
 
-  /** Populate the 系列設定 footer state from whatever task is currently
-   *  selected. Virtual occurrences carry the series id directly; real tasks
-   *  carry it on a `recurringId` field set at materialise-time. Anything
-   *  else clears the footer. */
+  /** Populate the 系列資訊 footer state for the currently selected task.
+   *  Always cancels any pending debounced footer save first — otherwise a
+   *  half-typed value from the previously-selected task could fire after
+   *  the user has switched to a different task / series. */
   private loadFooterForSelected() {
+    if (this.footerSaveTimer) {
+      clearTimeout(this.footerSaveTimer);
+      this.footerSaveTimer = null;
+    }
     const t = this.selectedTask as any;
     const seriesId: string | undefined = t?.recurringId;
     if (!seriesId) {

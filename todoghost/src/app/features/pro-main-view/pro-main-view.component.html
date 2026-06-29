@@ -679,10 +679,17 @@
               </div>
               <div class="pro-field">
                 <span class="pro-field__label">結束日</span>
+                <!-- One-way [value] binding: when selectedTask changes,
+                     loadFooterForSelected sets footerRangeEnd and the
+                     browser reflows the input. Two-way [ngModel] would
+                     leave the user's in-progress draft visible across
+                     task switches (Chrome buffers raw date-input text
+                     until commit), which manifested as the previous
+                     task's typed-but-not-saved value bleeding into the
+                     newly-selected series' footer. -->
                 <input type="date"
-                       [ngModel]="footerRangeEnd"
-                       (ngModelChange)="footerRangeEnd = $event"
-                       (change)="setFooterRangeEnd(footerRangeEnd)"
+                       [value]="footerRangeEnd"
+                       (change)="setFooterRangeEnd($any($event.target).value)"
                        [min]="footerRangeEndMin"
                        [max]="footerRangeEndMax">
               </div>
