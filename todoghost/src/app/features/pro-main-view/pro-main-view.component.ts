@@ -954,14 +954,29 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     this.footerOriginalRangeEnd = rec.rangeEnd;
   }
 
-  /** Minimum rangeEnd for the footer / create-form: max(today, rangeStart).
-   *  Past dates would either no-op (past occurrences are sacrosanct) or
-   *  delete future occurrences leaving the series effectively empty, both
-   *  of which surprise users. Block at the input level. */
+  /** Human-readable summary of the footer's rule for read-only display. */
+  get footerRuleLabel(): string {
+    if (this.footerRule === 'daily') return '每天';
+    if (this.footerRule === 'weekly') {
+      if (!this.footerWeekdays.length) return '每週';
+      const names = ['日', '一', '二', '三', '四', '五', '六'];
+      const sorted = [...this.footerWeekdays].sort((a, b) => a - b);
+      return '每週 ' + sorted.map(d => names[d]).join('、');
+    }
+    if (this.footerRule === 'monthly') return `每月 ${this.footerMonthDay} 日`;
+    return '';
+  }
+
+  /** Footer rangeEnd input bounds: can only shrink. Min is max(today,
+   *  rangeStart) — past dates are immutable history. Max is the current
+   *  rangeEnd — extending is no longer supported (per simplified spec). */
   get footerRangeEndMin(): string {
     const today = format(new Date(), 'yyyy-MM-dd');
     const start = this.footerRangeStart;
     return start && start > today ? start : today;
+  }
+  get footerRangeEndMax(): string {
+    return this.footerOriginalRangeEnd ?? this.footerRangeEnd;
   }
   get createFormRangeEndMin(): string {
     const today = format(new Date(), 'yyyy-MM-dd');
@@ -969,13 +984,16 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     return start && start > today ? start : today;
   }
 
-  /** Clamp user-entered rangeEnd to its min. Called from (change) on the
-   *  date input — the [min] attribute alone isn't reliable for typed /
-   *  pasted values on some browsers. */
+  /** Clamp user-entered rangeEnd into [min, oldEnd]. Called from (change)
+   *  on the date input. */
   setFooterRangeEnd(value: string) {
     if (!value) return;
     const min = this.footerRangeEndMin;
-    this.footerRangeEnd = value < min ? min : value;
+    const max = this.footerRangeEndMax;
+    let clamped = value;
+    if (clamped < min) clamped = min;
+    if (clamped > max) clamped = max;
+    this.footerRangeEnd = clamped;
     this.saveFooterSeries();
   }
   setCreateFormRangeEnd(value: string) {
@@ -984,99 +1002,37 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     this.createForm.recurRangeEnd = value < min ? min : value;
   }
 
-  /** Toggle weekday in the footer's rule. */
-  toggleFooterWeekday(day: number) {
-    if (this.footerWeekdays.includes(day)) {
-      this.footerWeekdays = this.footerWeekdays.filter(d => d !== day);
-    } else {
-      this.footerWeekdays = [...this.footerWeekdays, day].sort((a, b) => a - b);
-    }
-    this.saveFooterSeries();
-  }
-  isFooterWeekdayActive(day: number): boolean {
-    return this.footerWeekdays.includes(day);
-  }
-
-  /** Debounce timer for footer (change)s. We don't fire a Firestore write
-   *  until the user has been idle for 500ms — prevents the cascade of
-   *  reconciles that would otherwise run on every keystroke of a date
-   *  picker drag, and gives the user a chance to "undo" by dragging back
-   *  before the reconcile actually deletes anything. */
+  /** Debounce timer for footer rangeEnd changes — only field that's
+   *  editable post-creation. 500ms idle then commit. */
   private footerSaveTimer: any = null;
-  /** Sequential write chain. Both saveSelectedTask and saveFooterSeries
-   *  push onto this, so the footer never reconciles before a concurrent
-   *  main-form materialise has committed. Without this chain, a footer
-   *  rangeEnd change racing against a virtual→real materialise would let
-   *  reconcile's getDocs snapshot miss the just-written task. */
+  /** Sequential write chain. saveSelectedTask + saveFooterSeries both
+   *  push onto this so they never race. */
   private pendingSaveChain: Promise<void> = Promise.resolve();
 
-  /** Schedule a debounced footer save. Called by the template's (change)
-   *  handlers — see saveFooterSeriesImmediate for the actual writes.
-   *  Captures series id and values at scheduling time so a later selection
-   *  change can't redirect this write to a different series. */
+  /** Schedule a debounced footer save. Captures seriesId + new rangeEnd
+   *  at scheduling time so a later selection change can't redirect the
+   *  write to a different series. */
   saveFooterSeries() {
     const seriesId = this.footerSeriesId;
     if (!seriesId) return;
     if (this.footerSaveTimer) clearTimeout(this.footerSaveTimer);
-    const snapshot = {
-      rule: this.footerRule,
-      weekdays: [...this.footerWeekdays],
-      monthDay: this.footerMonthDay,
-      rangeEnd: this.footerRangeEnd,
-    };
+    const newRangeEnd = this.footerRangeEnd;
     this.footerSaveTimer = setTimeout(() => {
       this.footerSaveTimer = null;
-      this.pendingSaveChain = this.pendingSaveChain.then(() => this.saveFooterSeriesImmediate(seriesId, snapshot));
+      this.pendingSaveChain = this.pendingSaveChain.then(() => this.saveFooterSeriesImmediate(seriesId, newRangeEnd));
     }, 500);
   }
 
-  /** Actual footer save. Picks the right service method based on what
-   *  changed:
-   *   - rule change → applyRuleChange (deletes non-completed future, rebuilds)
-   *   - range change → applyRangeChange (shrink trims, extend adds)
-   *   - both → rule first (resets future), then range against post-rule series
-   *  Past occurrences (date < today) and completed-future are kept by both
-   *  methods. */
-  private async saveFooterSeriesImmediate(
-    seriesId: string,
-    snap: { rule: 'daily' | 'weekly' | 'monthly'; weekdays: number[]; monthDay: number; rangeEnd: string },
-  ) {
-    if (!this.currentUser) return;
+  /** Actual footer save — only rangeEnd is editable, and only downward.
+   *  Service-side validation will reject invalid inputs as a no-op even if
+   *  this layer's clamping ever misses one. */
+  private async saveFooterSeriesImmediate(seriesId: string, newRangeEnd: string) {
     const series = this.recurringTasks.find(r => r.id === seriesId);
     if (!series) return;
-
-    const ruleChanged =
-      series.rule !== snap.rule ||
-      !sameArr(series.weekdays ?? [], snap.weekdays) ||
-      (series.monthDay ?? 1) !== snap.monthDay;
-    const rangeChanged = series.rangeEnd !== snap.rangeEnd;
-
-    if (ruleChanged) {
-      await this.recurringTaskService.applyRuleChange(
-        seriesId, series,
-        {
-          rule: snap.rule,
-          weekdays: snap.rule === 'weekly' ? snap.weekdays : undefined,
-          monthDay: snap.rule === 'monthly' ? snap.monthDay : undefined,
-        },
-        this.currentUser.id,
-      );
-    }
-    if (rangeChanged) {
-      // Reload the latest series doc so applyRangeChange diffs against the
-      // post-rule state, not the stale captured snapshot.
-      const latest = this.recurringTasks.find(r => r.id === seriesId) ?? series;
-      const seriesForRange: RecurringTask = ruleChanged
-        ? { ...latest, rule: snap.rule, weekdays: snap.weekdays, monthDay: snap.monthDay }
-        : latest;
-      await this.recurringTaskService.applyRangeChange(
-        seriesId, seriesForRange,
-        seriesForRange.rangeStart, snap.rangeEnd,
-        this.currentUser.id,
-      );
-    }
+    if (newRangeEnd === series.rangeEnd) return;
+    await this.recurringTaskService.shrinkRangeEnd(seriesId, series, newRangeEnd);
     if (this.footerSeriesId === seriesId) {
-      this.footerOriginalRangeEnd = snap.rangeEnd;
+      this.footerOriginalRangeEnd = newRangeEnd;
     }
   }
 
@@ -1222,11 +1178,7 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
       title: '刪除代辦',
       message: `確定要刪除「${task.title}」嗎？此操作無法復原。`,
       action: async () => {
-        if (task.recurringId) {
-          await this.recurringTaskService.deleteOccurrence(task);
-        } else {
-          await this.taskService.deleteTask(task.id);
-        }
+        await this.taskService.deleteTask(task.id);
         if (this.selectedTaskId === task.id) {
           this.selectedTaskId = null;
           this.inspectorMode = 'day';
@@ -1470,11 +1422,4 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     this.workspaceService.setCurrentWorkspace(null);
     this.router.navigate(['/workspaces']);
   }
-}
-
-function sameArr(a: number[], b: number[]): boolean {
-  if (a.length !== b.length) return false;
-  const sa = [...a].sort((x, y) => x - y);
-  const sb = [...b].sort((x, y) => x - y);
-  return sa.every((v, i) => v === sb[i]);
 }

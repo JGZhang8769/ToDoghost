@@ -659,36 +659,23 @@
                       placeholder="輸入備註、細節、相關連結…"></textarea>
           </div>
 
-          <!-- 系列設定 footer: only when this task is part of a recurring
-               series. Live-saves to the series doc on every change. -->
+          <!-- 系列資訊 footer: read-only summary of the series rule, plus a
+               single editable field — 結束日 — which can only shrink. To
+               change the rule or extend the range, delete the series and
+               create a new one. -->
           <div class="pro-field-block" *ngIf="footerSeriesId">
             <span class="pro-field__label">
               <span class="material-icons" style="font-size: 14px; vertical-align: -2px;">repeat</span>
-              系列設定
+              系列資訊
             </span>
             <div class="pro-field-card">
-              <div class="pro-field">
+              <div class="pro-field pro-field--readonly">
                 <span class="pro-field__label">頻率</span>
-                <select [(ngModel)]="footerRule" (change)="saveFooterSeries()">
-                  <option value="daily">每天</option>
-                  <option value="weekly">每週</option>
-                  <option value="monthly">每月</option>
-                </select>
+                <span class="pro-field__readonly">{{ footerRuleLabel }}</span>
               </div>
-              <div class="pro-field pro-field--block" *ngIf="footerRule === 'weekly'">
-                <span class="pro-field__label">星期</span>
-                <div class="pro-weekdays">
-                  <button *ngFor="let w of weekdayOptions"
-                          type="button"
-                          class="pro-weekday"
-                          [class.is-active]="isFooterWeekdayActive(w.val)"
-                          (click)="toggleFooterWeekday(w.val)">{{ w.label }}</button>
-                </div>
-              </div>
-              <div class="pro-field" *ngIf="footerRule === 'monthly'">
-                <span class="pro-field__label">每月幾號</span>
-                <input type="number" min="1" max="31"
-                       [(ngModel)]="footerMonthDay" (change)="saveFooterSeries()">
+              <div class="pro-field pro-field--readonly">
+                <span class="pro-field__label">開始日</span>
+                <span class="pro-field__readonly">{{ footerRangeStart }}</span>
               </div>
               <div class="pro-field">
                 <span class="pro-field__label">結束日</span>
@@ -696,11 +683,8 @@
                        [ngModel]="footerRangeEnd"
                        (ngModelChange)="footerRangeEnd = $event"
                        (change)="setFooterRangeEnd(footerRangeEnd)"
-                       [min]="footerRangeEndMin">
-              </div>
-              <div class="pro-field pro-field--readonly">
-                <span class="pro-field__label">開始日</span>
-                <span class="pro-field__readonly">{{ footerRangeStart }}</span>
+                       [min]="footerRangeEndMin"
+                       [max]="footerRangeEndMax">
               </div>
             </div>
           </div>

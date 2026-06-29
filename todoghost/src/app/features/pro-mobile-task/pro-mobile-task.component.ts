@@ -73,6 +73,10 @@ export class ProMobileTaskComponent implements OnInit, OnDestroy {
   recurMonthDay = signal<number>(1);
   recurRangeStart = signal<string>(format(new Date(), 'yyyy-MM-dd'));
   recurRangeEnd = signal<string>(format(addMonths(new Date(), 1), 'yyyy-MM-dd'));
+  /** Original rangeEnd as loaded from the series (footer mode only). The
+   *  footer's date input clamps to ≤ this so users can only shrink. Stays
+   *  null while creating a new series. */
+  recurRangeEndMax = signal<string | null>(null);
   readonly weekdayOptions = [
     { val: 1, label: '一' },
     { val: 2, label: '二' },
@@ -167,6 +171,7 @@ export class ProMobileTaskComponent implements OnInit, OnDestroy {
       this.recurMonthDay.set(r.monthDay ?? 1);
       this.recurRangeStart.set(r.rangeStart);
       this.recurRangeEnd.set(r.rangeEnd);
+      this.recurRangeEndMax.set(r.rangeEnd);
     };
     if (preloaded) { apply(preloaded); return; }
     this.workspaceService.currentWorkspace$.pipe(
@@ -209,13 +214,34 @@ export class ProMobileTaskComponent implements OnInit, OnDestroy {
     return start > today ? start : today;
   }
 
-  /** Setter that clamps user-entered rangeEnd to the min. The browser's
-   *  native [min] attribute prevents most invalid picks but mobile Safari
-   *  in particular still lets some values through (typed input, paste). */
+  /** Setter that clamps user-entered rangeEnd into [min, max]. The native
+   *  [min]/[max] attributes prevent most invalid picks but mobile Safari
+   *  still lets some values through (typed input, paste). When editing an
+   *  existing series, max = original rangeEnd so users can only shrink. */
   setRecurRangeEnd(value: string) {
     if (!value) return;
     const min = this.rangeEndMin;
-    this.recurRangeEnd.set(value < min ? min : value);
+    const max = this.recurRangeEndMax();
+    let clamped = value;
+    if (clamped < min) clamped = min;
+    if (max && clamped > max) clamped = max;
+    this.recurRangeEnd.set(clamped);
+  }
+
+  /** Human-readable summary of the series rule for read-only display in the
+   *  footer (mobile editing existing series). */
+  get seriesRuleLabel(): string {
+    const r = this.recurRule();
+    if (r === 'daily') return '每天';
+    if (r === 'weekly') {
+      const wd = this.recurWeekdays();
+      if (wd.length === 0) return '每週';
+      const names = ['日', '一', '二', '三', '四', '五', '六'];
+      const sorted = [...wd].sort((a, b) => a - b);
+      return '每週 ' + sorted.map(d => names[d]).join('、');
+    }
+    if (r === 'monthly') return `每月 ${this.recurMonthDay()} 日`;
+    return '';
   }
 
   ngOnDestroy() {
@@ -327,46 +353,18 @@ export class ProMobileTaskComponent implements OnInit, OnDestroy {
     this.back();
   }
 
-  /** Persist series-footer changes if this edit is tied to a series. Splits
-   *  the work into "rule change" vs "range change" — the diff each
-   *  produces is different and they're driven by different methods on
-   *  the service. If both changed at once, apply rule first (resets the
-   *  future) and range second (extends or trims). */
+  /** Persist series-footer changes if this edit is tied to a series.
+   *  Simplified spec: only rangeEnd is editable post-creation and only
+   *  downward, so this is a single shrink call. Rule + rangeStart are
+   *  immutable; to change them users delete the series and create a new
+   *  one. */
   private async maybeSaveSeriesFooter() {
     const seriesId = this.seriesIdForFooter();
-    if (!seriesId || !this.currentUser) return;
+    if (!seriesId) return;
     const series = await this.loadSeriesOnce(seriesId);
     if (!series) return;
-
-    const ruleChanged =
-      series.rule !== this.recurRule() ||
-      !sameNumberArray(series.weekdays ?? [], this.recurWeekdays()) ||
-      (series.monthDay ?? 1) !== this.recurMonthDay();
-    const rangeChanged = series.rangeEnd !== this.recurRangeEnd();
-
-    if (ruleChanged) {
-      await this.recurringTaskService.applyRuleChange(
-        seriesId, series,
-        {
-          rule: this.recurRule(),
-          weekdays: this.recurRule() === 'weekly' ? this.recurWeekdays() : undefined,
-          monthDay: this.recurRule() === 'monthly' ? this.recurMonthDay() : undefined,
-        },
-        this.currentUser.id,
-      );
-    }
-    if (rangeChanged) {
-      // applyRangeChange needs the post-rule series doc as `oldSeries` so it
-      // diffs against the latest rule rather than the original. Reload.
-      const reloaded = ruleChanged ? (await this.loadSeriesOnce(seriesId)) : series;
-      if (reloaded) {
-        await this.recurringTaskService.applyRangeChange(
-          seriesId, reloaded,
-          this.recurRangeStart(), this.recurRangeEnd(),
-          this.currentUser.id,
-        );
-      }
-    }
+    if (this.recurRangeEnd() === series.rangeEnd) return;
+    await this.recurringTaskService.shrinkRangeEnd(seriesId, series, this.recurRangeEnd());
   }
 
   private async loadSeriesOnce(seriesId: string): Promise<RecurringTask | null> {
@@ -400,25 +398,8 @@ export class ProMobileTaskComponent implements OnInit, OnDestroy {
   cancelDelete() { this.showDeleteConfirm.set(false); }
   async confirmDelete() {
     if (!this.editingTaskId) return;
-    const seriesId = this.seriesIdForFooter();
-    if (seriesId && this.date()) {
-      // Record exception so re-extending the range doesn't resurrect.
-      await this.recurringTaskService.deleteOccurrence({
-        id: this.editingTaskId,
-        recurringId: seriesId,
-        date: this.date(),
-      } as any);
-    } else {
-      await this.taskService.deleteTask(this.editingTaskId);
-    }
+    await this.taskService.deleteTask(this.editingTaskId);
     this.showDeleteConfirm.set(false);
     this.back();
   }
-}
-
-function sameNumberArray(a: number[], b: number[]): boolean {
-  if (a.length !== b.length) return false;
-  const sa = [...a].sort((x, y) => x - y);
-  const sb = [...b].sort((x, y) => x - y);
-  return sa.every((v, i) => v === sb[i]);
 }
