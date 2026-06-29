@@ -9,6 +9,7 @@ import { addDays, addMonths, addWeeks, endOfMonth, endOfWeek, format, isSameMont
 import { getLunar } from 'chinese-lunar-calendar';
 
 import { TaskService, Task } from '../../core/services/task.service';
+import { RecurringTaskService, RecurringTask, DisplayTask } from '../../core/services/recurring-task.service';
 import { CategoryService, Category } from '../../core/services/category.service';
 import { WorkspaceService, Workspace } from '../../core/services/workspace.service';
 import { UserService, User } from '../../core/services/user.service';
@@ -81,6 +82,14 @@ interface NewTaskForm {
   tags: string[];
   reminderOffset: number | null;
   description: string;
+  // Recurrence — when recurEnabled is true the form saves as a RecurringTask
+  // (date is ignored — the series defines its own date range).
+  recurEnabled: boolean;
+  recurRule: 'daily' | 'weekly' | 'monthly';
+  recurWeekdays: number[];
+  recurMonthDay: number;
+  recurRangeStart: string;
+  recurRangeEnd: string;
 }
 
 @Component({
@@ -92,6 +101,7 @@ interface NewTaskForm {
 })
 export class ProMainViewComponent implements OnInit, OnDestroy {
   private taskService = inject(TaskService);
+  private recurringTaskService = inject(RecurringTaskService);
   private categoryService = inject(CategoryService);
   private workspaceService = inject(WorkspaceService);
   private userService = inject(UserService);
@@ -125,6 +135,15 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
   // Data
   currentWorkspace: Workspace | null = null;
   currentUser: User | null = null;
+  /** Real tasks from tasks/ collection. Used for new-order calculations and
+   *  whenever a write target must be a real id. */
+  realTasks: Task[] = [];
+  recurringTasks: RecurringTask[] = [];
+  /** Real + virtual occurrences merged in a year-wide window. Calendar,
+   *  smart lists, and counts all read from here. VirtualOccurrence is a
+   *  structural subtype of Task so they fit the existing reads transparently;
+   *  the only special-case is action handlers that mutate Firestore — those
+   *  must materialiseOccurrence() first because virtual ids aren't real. */
   tasks: Task[] = [];
   categories: Category[] = [];
   workspaceUsers: User[] = [];
@@ -406,8 +425,37 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     return '';
   }
 
+  /** Expand recurring rules into virtual occurrences for a year-wide window
+   *  and merge with real tasks. The desktop calendar happily navigates years
+   *  in either direction, so we pick ±365 days from today which covers
+   *  typical browsing without exploding memory. */
+  private recomputeMergedTasks() {
+    const start = format(addDays(new Date(), -365), 'yyyy-MM-dd');
+    const end = format(addDays(new Date(), 365), 'yyyy-MM-dd');
+    // VirtualOccurrence is structurally a Task — cast is safe; the special
+    // fields (isVirtual, recurringId, occurrenceDate) survive on the object
+    // and are picked up by action handlers that need to materialise.
+    this.tasks = this.recurringTaskService.expandMerged(
+      this.realTasks, this.recurringTasks, start, end,
+    ) as Task[];
+  }
+
+  /** Materialise a virtual occurrence into a real task and return its id,
+   *  or just return the existing id for real tasks. Action handlers that
+   *  mutate Firestore (toggleCompletion, deleteTask, openInspector edits)
+   *  must call this before invoking taskService.updateTask/deleteTask
+   *  because virtual ids look like "virtual:xxx:yyy" and aren't real docs. */
+  async ensureRealId(task: Task): Promise<string> {
+    if ((task as any).isVirtual) {
+      return this.recurringTaskService.materialiseOccurrence(task as any);
+    }
+    return task.id;
+  }
+
   // ---------- Create form helpers ----------
   blankCreateForm(): NewTaskForm {
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const oneYearOut = format(addDays(new Date(), 365), 'yyyy-MM-dd');
     return {
       title: '',
       date: this.selectedDateStr,
@@ -417,7 +465,30 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
       tags: [],
       reminderOffset: null,
       description: '',
+      recurEnabled: false,
+      recurRule: 'weekly',
+      recurWeekdays: [1],
+      recurMonthDay: 1,
+      recurRangeStart: today,
+      recurRangeEnd: oneYearOut,
     };
+  }
+
+  // Recurrence helpers used by the create form
+  readonly weekdayOptions = [
+    { val: 1, label: '一' }, { val: 2, label: '二' }, { val: 3, label: '三' },
+    { val: 4, label: '四' }, { val: 5, label: '五' }, { val: 6, label: '六' },
+    { val: 0, label: '日' },
+  ];
+  toggleCreateFormWeekday(day: number) {
+    if (this.createForm.recurWeekdays.includes(day)) {
+      this.createForm.recurWeekdays = this.createForm.recurWeekdays.filter(d => d !== day);
+    } else {
+      this.createForm.recurWeekdays = [...this.createForm.recurWeekdays, day].sort((a, b) => a - b);
+    }
+  }
+  isCreateFormWeekdayActive(day: number): boolean {
+    return this.createForm.recurWeekdays.includes(day);
   }
 
   openCreateForm(prefill?: Partial<NewTaskForm>) {
@@ -449,7 +520,33 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
   async submitCreateForm() {
     const title = this.createForm.title.trim();
     if (!title || !this.currentWorkspace || !this.currentUser) return;
-    const maxOrder = this.tasks.reduce((m, t) => Math.max(m, t.order ?? 0), 0);
+
+    // Recurring branch: save to recurring_tasks/, skip task creation.
+    if (this.createForm.recurEnabled) {
+      await this.recurringTaskService.addRecurringTask({
+        workspaceId: this.currentWorkspace.id,
+        categoryId: this.createForm.categoryId,
+        title,
+        description: this.createForm.description || undefined,
+        startTime: this.createForm.startTime,
+        endTime: this.createForm.endTime,
+        tags: this.createForm.tags,
+        isUrgent: this.createForm.isUrgent,
+        createdBy: this.currentUser.id,
+        reminderOffset: this.createForm.reminderOffset,
+        rule: this.createForm.recurRule,
+        weekdays: this.createForm.recurRule === 'weekly' ? this.createForm.recurWeekdays : undefined,
+        monthDay: this.createForm.recurRule === 'monthly' ? this.createForm.recurMonthDay : undefined,
+        rangeStart: this.createForm.recurRangeStart,
+        rangeEnd: this.createForm.recurRangeEnd,
+        status: 'active',
+      });
+      this.showCreateForm = false;
+      this.inspectorMode = 'day';
+      return;
+    }
+
+    const maxOrder = this.realTasks.reduce((m, t) => Math.max(m, t.order ?? 0), 0);
     const id = await this.taskService.addTask({
       workspaceId: this.currentWorkspace.id,
       title,
@@ -508,7 +605,14 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
       if (!ws) { this.router.navigate(['/workspaces']); return; }
       this.currentWorkspace = ws;
       this.taskService.getTasks(ws.id).pipe(takeUntil(this.destroy$)).subscribe(tasks => {
-        this.tasks = tasks;
+        this.realTasks = tasks;
+        this.recomputeMergedTasks();
+        this.buildCalendar();
+        this.buildWeek();
+      });
+      this.recurringTaskService.getRecurringTasks(ws.id).pipe(takeUntil(this.destroy$)).subscribe(rts => {
+        this.recurringTasks = rts;
+        this.recomputeMergedTasks();
         this.buildCalendar();
         this.buildWeek();
       });
@@ -829,6 +933,14 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
 
   // ---------- Selection ----------
   selectTask(taskId: string) {
+    // Virtual occurrence ids (virtual:{recId}:{date}) can't be loaded as
+    // real task docs. Route the user to the series edit page instead so
+    // they can change rule / range / metadata for the whole series.
+    if (taskId.startsWith('virtual:')) {
+      const recId = taskId.split(':')[1];
+      this.router.navigate(['/pro/recurring', recId]);
+      return;
+    }
     this.selectedTaskId = taskId;
     this.inspectorMode = 'edit';
     this.showInspector = true;
@@ -901,8 +1013,9 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
 
   // ---------- Task mutations ----------
   async toggleCompletion(task: Task) {
+    const id = await this.ensureRealId(task);
     const next = task.status === 'completed' ? 'pending' : 'completed';
-    await this.taskService.updateTask(task.id, { status: next });
+    await this.taskService.updateTask(id, { status: next });
   }
 
   async quickAdd() {
@@ -951,7 +1064,7 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     if (!this.currentWorkspace || !this.currentUser) return;
     const title = window.prompt(`新增到 ${dateStr ?? '無日期'}${startTime ? ' ' + startTime : ''}`, '');
     if (!title || !title.trim()) return;
-    const maxOrder = this.tasks.reduce((m, t) => Math.max(m, t.order ?? 0), 0);
+    const maxOrder = this.realTasks.reduce((m, t) => Math.max(m, t.order ?? 0), 0);
     const id = await this.taskService.addTask({
       workspaceId: this.currentWorkspace.id,
       title: title.trim(),
@@ -974,7 +1087,14 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
       title: '刪除代辦',
       message: `確定要刪除「${task.title}」嗎？此操作無法復原。`,
       action: async () => {
-        await this.taskService.deleteTask(task.id);
+        if ((task as any).isVirtual) {
+          // See pro-mobile-list.confirmDelete — materialise + mark completed
+          // so the expander knows this date is already accounted for.
+          const id = await this.recurringTaskService.materialiseOccurrence(task as any);
+          await this.taskService.updateTask(id, { status: 'completed' });
+        } else {
+          await this.taskService.deleteTask(task.id);
+        }
         if (this.selectedTaskId === task.id) {
           this.selectedTaskId = null;
           this.inspectorMode = 'day';
@@ -1018,7 +1138,8 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
   async saveSelectedTask() {
     if (!this.selectedTask) return;
     const t = this.selectedTask;
-    await this.taskService.updateTask(t.id, {
+    const id = await this.ensureRealId(t);
+    await this.taskService.updateTask(id, {
       title: t.title,
       description: t.description,
       date: t.date,
@@ -1044,7 +1165,8 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     } else {
       this.selectedTask.categoryId = categoryId;
     }
-    await this.taskService.updateTask(this.selectedTask.id, { categoryId: categoryId as any });
+    const id = await this.ensureRealId(this.selectedTask);
+    await this.taskService.updateTask(id, { categoryId: categoryId as any });
   }
 
   // ---------- Drag & drop ----------
@@ -1094,7 +1216,8 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     if (!task) return;
     if (task.date !== dateStr) {
       this.patchLocalTask(task.id, { date: dateStr });
-      await this.taskService.updateTask(task.id, { date: dateStr });
+      const id = await this.ensureRealId(task);
+      await this.taskService.updateTask(id, { date: dateStr });
       this.recentlyDroppedDate = dateStr;
       if (this.pulseTimer) clearTimeout(this.pulseTimer);
       this.pulseTimer = setTimeout(() => { this.recentlyDroppedDate = null; }, 600);
@@ -1116,7 +1239,8 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
       reminderOffset: null, // reminder anchored to startTime — strip when becoming all-day
     };
     this.patchLocalTask(task.id, patch);
-    await this.taskService.updateTask(task.id, patch);
+    const id = await this.ensureRealId(task);
+    await this.taskService.updateTask(id, patch);
     this.recentlyDroppedDate = dateStr;
     if (this.pulseTimer) clearTimeout(this.pulseTimer);
     this.pulseTimer = setTimeout(() => { this.recentlyDroppedDate = null; }, 600);
@@ -1159,7 +1283,8 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
 
     const patch: Partial<Task> = { date: dateStr, startTime, endTime };
     this.patchLocalTask(task.id, patch);
-    await this.taskService.updateTask(task.id, patch);
+    const realId = await this.ensureRealId(task);
+    await this.taskService.updateTask(realId, patch);
 
     this.recentlyDroppedDate = dateStr;
     if (this.pulseTimer) clearTimeout(this.pulseTimer);
@@ -1173,7 +1298,8 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     const task: Task = event.item.data;
     if (!task || task.date === null) return;
     this.patchLocalTask(task.id, { date: null });
-    await this.taskService.updateTask(task.id, { date: null });
+    const id = await this.ensureRealId(task);
+    await this.taskService.updateTask(id, { date: null });
   }
 
   /**
@@ -1188,6 +1314,10 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     const items = [...this.listPaneTasks];
     moveItemInArray(items, event.previousIndex, event.currentIndex);
     items.forEach((t, i) => {
+      // Virtual occurrences don't carry user-defined order. Skip writes to
+      // them — when the user actually edits or completes one it will
+      // materialise and get its own real id.
+      if ((t as any).isVirtual) return;
       this.taskService.updateTask(t.id, { order: i + 1 } as any);
     });
   }

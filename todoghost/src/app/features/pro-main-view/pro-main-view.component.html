@@ -708,7 +708,20 @@
             </label>
           </div>
 
-          <div class="pro-field-card">
+          <!-- Recurrence toggle (lives alongside other on/off rows for symmetry) -->
+          <div class="pro-field-row">
+            <span class="pro-field-row__label">
+              <span class="material-icons pro-field-row__icon" style="font-size: 16px; color: #7a6850;">repeat</span>
+              重複
+            </span>
+            <label class="ios-toggle">
+              <input type="checkbox" [(ngModel)]="createForm.recurEnabled">
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <!-- Date + time block (single-task mode) -->
+          <div class="pro-field-card" *ngIf="!createForm.recurEnabled">
             <div class="pro-field">
               <span class="pro-field__label">日期</span>
               <input type="date" [(ngModel)]="createForm.date">
@@ -719,6 +732,49 @@
             </div>
             <div class="pro-field">
               <span class="pro-field__label">結束</span>
+              <input type="time" [(ngModel)]="createForm.endTime" [disabled]="!createForm.startTime">
+            </div>
+          </div>
+
+          <!-- Recurrence rule + range (only when 重複 is on). Time fields
+               keep their meaning across occurrences. -->
+          <div class="pro-field-card" *ngIf="createForm.recurEnabled">
+            <div class="pro-field">
+              <span class="pro-field__label">頻率</span>
+              <select [(ngModel)]="createForm.recurRule">
+                <option value="daily">每天</option>
+                <option value="weekly">每週</option>
+                <option value="monthly">每月</option>
+              </select>
+            </div>
+            <div class="pro-field pro-field--block" *ngIf="createForm.recurRule === 'weekly'">
+              <span class="pro-field__label">星期</span>
+              <div class="pro-weekdays">
+                <button *ngFor="let w of weekdayOptions"
+                        type="button"
+                        class="pro-weekday"
+                        [class.is-active]="isCreateFormWeekdayActive(w.val)"
+                        (click)="toggleCreateFormWeekday(w.val)">{{ w.label }}</button>
+              </div>
+            </div>
+            <div class="pro-field" *ngIf="createForm.recurRule === 'monthly'">
+              <span class="pro-field__label">每月幾號</span>
+              <input type="number" min="1" max="31" [(ngModel)]="createForm.recurMonthDay">
+            </div>
+            <div class="pro-field">
+              <span class="pro-field__label">開始日</span>
+              <input type="date" [(ngModel)]="createForm.recurRangeStart">
+            </div>
+            <div class="pro-field">
+              <span class="pro-field__label">結束日</span>
+              <input type="date" [(ngModel)]="createForm.recurRangeEnd">
+            </div>
+            <div class="pro-field">
+              <span class="pro-field__label">開始時間</span>
+              <input type="time" [(ngModel)]="createForm.startTime">
+            </div>
+            <div class="pro-field">
+              <span class="pro-field__label">結束時間</span>
               <input type="time" [(ngModel)]="createForm.endTime" [disabled]="!createForm.startTime">
             </div>
           </div>

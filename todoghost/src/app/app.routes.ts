@@ -10,6 +10,8 @@ export const routes: Routes = [
   // Pro Mobile-only full-screen detail / edit / create views.
   { path: 'pro/new', loadComponent: () => import('./features/pro-mobile-task/pro-mobile-task.component').then(m => m.ProMobileTaskComponent) },
   { path: 'pro/task/:id', loadComponent: () => import('./features/pro-mobile-task/pro-mobile-task.component').then(m => m.ProMobileTaskComponent) },
+  // Edit existing recurring series — same form as task, but saves to recurring_tasks/
+  { path: 'pro/recurring/:id', loadComponent: () => import('./features/pro-mobile-task/pro-mobile-task.component').then(m => m.ProMobileTaskComponent) },
   // List view, scope is a string like 'today', 'unscheduled', 'cat-:id', 'date-YYYY-MM-DD', etc.
   { path: 'pro/list/:scope', loadComponent: () => import('./features/pro-mobile-list/pro-mobile-list.component').then(m => m.ProMobileListComponent) },
   { path: 'settings', loadComponent: () => import('./features/settings/settings.component').then(m => m.SettingsComponent) },
