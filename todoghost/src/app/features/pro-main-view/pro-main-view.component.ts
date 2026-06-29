@@ -1012,6 +1012,36 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     this.footerOriginalRangeEnd = rec.rangeEnd;
   }
 
+  /** Minimum rangeEnd for the footer / create-form: max(today, rangeStart).
+   *  Past dates would either no-op (past occurrences are sacrosanct) or
+   *  delete future occurrences leaving the series effectively empty, both
+   *  of which surprise users. Block at the input level. */
+  get footerRangeEndMin(): string {
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const start = this.footerRangeStart;
+    return start && start > today ? start : today;
+  }
+  get createFormRangeEndMin(): string {
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const start = this.createForm?.recurRangeStart;
+    return start && start > today ? start : today;
+  }
+
+  /** Clamp user-entered rangeEnd to its min. Called from (change) on the
+   *  date input — the [min] attribute alone isn't reliable for typed /
+   *  pasted values on some browsers. */
+  setFooterRangeEnd(value: string) {
+    if (!value) return;
+    const min = this.footerRangeEndMin;
+    this.footerRangeEnd = value < min ? min : value;
+    this.saveFooterSeries();
+  }
+  setCreateFormRangeEnd(value: string) {
+    if (!value) return;
+    const min = this.createFormRangeEndMin;
+    this.createForm.recurRangeEnd = value < min ? min : value;
+  }
+
   /** Toggle weekday in the footer's rule. */
   toggleFooterWeekday(day: number) {
     if (this.footerWeekdays.includes(day)) {
@@ -1025,23 +1055,61 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     return this.footerWeekdays.includes(day);
   }
 
-  /** Live-save footer state to the series. Called on every (change) since
-   *  desktop Inspector is live-edit. If the user shrunk rangeEnd, also
-   *  prune materialised future tasks. */
-  async saveFooterSeries() {
-    if (!this.footerSeriesId) return;
-    await this.recurringTaskService.updateRecurringTask(this.footerSeriesId, {
+  /** Debounce timer for footer (change)s. We don't fire a Firestore write
+   *  until the user has been idle for 500ms — prevents the cascade of
+   *  reconciles that would otherwise run on every keystroke of a date
+   *  picker drag, and gives the user a chance to "undo" by dragging back
+   *  before the reconcile actually deletes anything. */
+  private footerSaveTimer: any = null;
+  /** Sequential write chain. Both saveSelectedTask and saveFooterSeries
+   *  push onto this, so the footer never reconciles before a concurrent
+   *  main-form materialise has committed. Without this chain, a footer
+   *  rangeEnd change racing against a virtual→real materialise would let
+   *  reconcile's getDocs snapshot miss the just-written task. */
+  private pendingSaveChain: Promise<void> = Promise.resolve();
+
+  /** Schedule a debounced footer save. Called by the template's (change)
+   *  handlers — see saveFooterSeriesImmediate for the actual writes.
+   *  Captures series id and values at scheduling time so a later selection
+   *  change can't redirect this write to a different series. */
+  saveFooterSeries() {
+    const seriesId = this.footerSeriesId;
+    if (!seriesId) return;
+    if (this.footerSaveTimer) clearTimeout(this.footerSaveTimer);
+    const snapshot = {
       rule: this.footerRule,
-      weekdays: this.footerRule === 'weekly' ? this.footerWeekdays : undefined,
-      monthDay: this.footerRule === 'monthly' ? this.footerMonthDay : undefined,
+      weekdays: [...this.footerWeekdays],
+      monthDay: this.footerMonthDay,
       rangeEnd: this.footerRangeEnd,
+    };
+    this.footerSaveTimer = setTimeout(() => {
+      this.footerSaveTimer = null;
+      this.pendingSaveChain = this.pendingSaveChain.then(() => this.saveFooterSeriesImmediate(seriesId, snapshot));
+    }, 500);
+  }
+
+  /** Actual footer save: write the series, then reconcile materialised
+   *  tasks so persistent state matches the new rule. Reconcile takes care
+   *  of both rangeEnd shrinks and rule changes (per-user spec: past
+   *  occurrences never touched; future occurrences that the new rule
+   *  wouldn't fire on are deleted, regardless of completion status). */
+  private async saveFooterSeriesImmediate(
+    seriesId: string,
+    snap: { rule: 'daily' | 'weekly' | 'monthly'; weekdays: number[]; monthDay: number; rangeEnd: string },
+  ) {
+    await this.recurringTaskService.updateRecurringTask(seriesId, {
+      rule: snap.rule,
+      weekdays: snap.rule === 'weekly' ? snap.weekdays : undefined,
+      monthDay: snap.rule === 'monthly' ? snap.monthDay : undefined,
+      rangeEnd: snap.rangeEnd,
     });
-    if (this.footerOriginalRangeEnd && this.footerRangeEnd < this.footerOriginalRangeEnd) {
-      await this.recurringTaskService.pruneFutureMaterialised(
-        this.footerSeriesId, this.footerRangeEnd,
-      );
+    await this.recurringTaskService.reconcileMaterialised(seriesId);
+    // Only update footerOriginalRangeEnd if the still-selected task belongs
+    // to this same series; otherwise we'd stomp on the freshly-loaded
+    // values of whatever is now selected.
+    if (this.footerSeriesId === seriesId) {
+      this.footerOriginalRangeEnd = snap.rangeEnd;
     }
-    this.footerOriginalRangeEnd = this.footerRangeEnd;
   }
 
   backToDayPane() {
@@ -1233,7 +1301,15 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     this.newCategoryName = '';
   }
 
-  async saveSelectedTask() {
+  /** Wrapper that pipes the actual write through pendingSaveChain so any
+   *  in-flight footer save runs after this one completes. Without this
+   *  serialisation a footer reconcile fired while the main-form write is
+   *  still pending would miss the just-written task in its snapshot. */
+  saveSelectedTask() {
+    this.pendingSaveChain = this.pendingSaveChain.then(() => this.saveSelectedTaskImmediate());
+    return this.pendingSaveChain;
+  }
+  private async saveSelectedTaskImmediate() {
     if (!this.selectedTask) return;
     const t = this.selectedTask;
     const wasVirtual = (t as any).isVirtual === true;

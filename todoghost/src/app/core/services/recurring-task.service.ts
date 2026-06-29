@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import {
   Firestore, collection, collectionData, doc, addDoc, updateDoc, deleteDoc,
-  query, where, getDocs, serverTimestamp,
+  query, where, getDoc, getDocs, serverTimestamp,
 } from '@angular/fire/firestore';
 import { TaskService } from './task.service';
 import { Observable } from 'rxjs';
@@ -23,7 +23,7 @@ import { Task } from './task.service';
  *
  * If the user shrinks rangeEnd, any tasks already materialised after the
  * new end date must be deleted so the calendar visually drops them — see
- * pruneFutureMaterialised().
+ * reconcileMaterialised().
  */
 export interface RecurringTask {
   id: string;
@@ -107,32 +107,64 @@ export class RecurringTaskService {
   }
 
   /**
-   * After shrinking a series' rangeEnd, delete every materialised task whose
-   * occurrenceDate is strictly after the new end — including completed ones.
-   * The user's intent when dragging rangeEnd back is "stop this series at
-   * this date", and they expect the calendar to reflect that even for
-   * occurrences they previously checked off. If they want history they can
-   * use 已完成 smart list before shrinking.
+   * Re-align all materialised tasks of a series against the series' current
+   * rule. Call this *after* any series rule / range change so the persisted
+   * tasks match what the rule says should exist.
    *
-   * On-date occurrences (occurrenceDate == newRangeEnd) are preserved —
-   * "end on this day" is inclusive.
+   * Cutoff: today (inclusive of today goes through rule checks). The user
+   * explicitly asked for "past time unchanged, future time obeys rule" —
+   * past occurrenceDates are history and never touched, regardless of
+   * completion status or rule mismatch.
    *
-   * Implementation note: query by recurringId only and filter client-side.
-   * The two-field where (recurringId == AND occurrenceDate >) would need a
-   * composite Firestore index; doing it client-side keeps deploys simple
-   * and the number of materialised tasks per series is small enough that
-   * pulling them all is cheap.
+   * For occurrenceDate >= today we delete the task when any of:
+   *   - occurrenceDate > rangeEnd   → rangeEnd was shrunk past it
+   *   - occurrenceDate < rangeStart → rangeStart was pushed forward
+   *   - rule no longer fires that day (weekly weekday removed, monthly day
+   *     changed, daily → weekly with a different day, etc.)
+   *
+   * Important: this assumes the series doc is already updated in Firestore
+   * when called. Callers must `await updateRecurringTask(...)` before
+   * `await reconcileMaterialised(...)`. The getDocs snapshot below will
+   * also see any tasks recently committed in the same call chain, since
+   * Firestore SDK reflects local writes immediately.
+   *
+   * Query by recurringId only and filter client-side to avoid a composite
+   * index requirement — series typically have at most dozens of
+   * materialised tasks so this is cheap.
+   *
+   * Returns the count of deleted docs.
    */
-  async pruneFutureMaterialised(recurringId: string, newRangeEnd: string): Promise<number> {
-    const ref = collection(this.firestore, 'tasks');
-    const q = query(ref, where('recurringId', '==', recurringId));
-    const snap = await getDocs(q);
-    const toDelete = snap.docs.filter(d => {
+  async reconcileMaterialised(recurringId: string): Promise<number> {
+    // Re-read the series freshly so we use whatever was just written.
+    const seriesRef = doc(this.firestore, `recurring_tasks/${recurringId}`);
+    const seriesSnap = await getDoc(seriesRef);
+    if (!seriesSnap.exists()) return 0;
+    const series = { id: seriesSnap.id, ...(seriesSnap.data() as any) } as RecurringTask;
+
+    const today = format(new Date(), 'yyyy-MM-dd');
+
+    const tasksRef = collection(this.firestore, 'tasks');
+    const tasksSnap = await getDocs(query(tasksRef, where('recurringId', '==', recurringId)));
+
+    const toDelete = tasksSnap.docs.filter(d => {
       const od = (d.data() as any).occurrenceDate as string | undefined;
-      return !!od && od > newRangeEnd;
+      if (!od) return false;
+      // Past occurrences are sacrosanct — they're history. The user's
+      // explicit rule: 過去的時間不改.
+      if (od < today) return false;
+      // Future / today: delete if it falls outside the (possibly new)
+      // range, or if the (possibly new) rule wouldn't have fired on it.
+      return !this.firesOn(series, od);
     });
     await Promise.all(toDelete.map(d => deleteDoc(d.ref)));
     return toDelete.length;
+  }
+
+  /** Public wrapper around the private `fires` check — takes a date string
+   *  instead of a Date object. Useful for callers that work with the
+   *  yyyy-MM-dd string form everywhere (no Date arithmetic). */
+  firesOn(rec: RecurringTask, ds: string): boolean {
+    return this.fires(rec, parseDate(ds), ds);
   }
 
   // ====================================================================
