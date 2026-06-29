@@ -351,12 +351,98 @@
 }
 .pmob-month-grid__dot.is-urgent { background: #ef4444; }
 
-/* ---------- Smart-list 2x2 cards ---------- */
+/* ---------- Smart-list cards (compact rows / expanded 2x2) ---------- */
 .pmob-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.pmob-cards__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0 4px;
+}
+.pmob-cards__title {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 700;
+    color: #a3917a;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.pmob-cards__toggle {
+    width: 28px;
+    height: 28px;
+    border: 0;
+    border-radius: 8px;
+    background: rgba(120, 100, 80, 0.1);
+    color: #4a3a22;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+.pmob-cards__toggle:active { background: rgba(120, 100, 80, 0.22); }
+
+/* Expanded 2x2 grid (the original look) */
+.pmob-cards__grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 10px;
 }
+
+/* Compact stack of narrow rows.
+   Uses the glass card surface and wraps the four rows in one shared card
+   so dividers feel native, similar to .pmob-group__card. */
+.pmob-cards__strip {
+    background: rgba(255, 255, 255, 0.6);
+    border-radius: 14px;
+    overflow: hidden;
+}
+.pmob-cardrow {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    color: #2a1f10;
+    font-family: inherit;
+}
+.pmob-cardrow + .pmob-cardrow {
+    border-top: 1px solid rgba(120, 100, 80, 0.08);
+}
+.pmob-cardrow:active { background: rgba(120, 100, 80, 0.06); }
+.pmob-cardrow__icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.pmob-cardrow__label {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 600;
+}
+.pmob-cardrow__count {
+    font-size: 13px;
+    color: #7a6850;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+}
+
+/* Per-row tints (low saturation, matching the expanded card variants). */
+.pmob-cardrow--today      .pmob-cardrow__icon { background: rgba(212, 166, 74, 0.22); color: #8a5e1a; }
+.pmob-cardrow--week       .pmob-cardrow__icon { background: rgba(150, 130, 90, 0.18); color: #5a4520; }
+.pmob-cardrow--urgent     .pmob-cardrow__icon { background: rgba(180, 90, 60, 0.18);  color: #a14a2a; }
+.pmob-cardrow--unscheduled .pmob-cardrow__icon { background: rgba(120, 100, 80, 0.18); color: #5a4a30; }
 .pmob-card {
     position: relative;
     display: flex;
