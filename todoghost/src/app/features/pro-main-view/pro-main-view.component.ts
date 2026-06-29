@@ -1179,8 +1179,20 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
 
   // ---------- Task mutations ----------
   async toggleCompletion(task: Task) {
-    const id = await this.ensureRealId(task);
+    const wasVirtual = (task as any).isVirtual === true;
+    const wasSelected = this.selectedTaskId === task.id;
     const next = task.status === 'completed' ? 'pending' : 'completed';
+    const id = await this.ensureRealId(task);
+    // Inspector edit pane reads selectedTask via id match against this.tasks.
+    // ensureRealId already patches realTasks with a stub at the new real id,
+    // but if the currently selected task IS this one we also need to swap
+    // selectedTaskId so the getter resolves — otherwise the Inspector
+    // momentarily reads null and blanks out until the Firestore live query
+    // catches up (≈200ms). Symptom report: "點已完成會空白".
+    if (wasVirtual && wasSelected) this.selectedTaskId = id;
+    // Patch the optimistic stub's status so the toggle visually flips
+    // immediately instead of waiting for the Firestore round-trip.
+    this.patchLocalTask(id, { status: next });
     await this.taskService.updateTask(id, { status: next });
   }
 

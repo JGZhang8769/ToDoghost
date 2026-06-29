@@ -2,7 +2,7 @@ import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { CommonModule, Location } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Subject, takeUntil } from 'rxjs';
+import { Subject, takeUntil, take, filter } from 'rxjs';
 
 import { TaskService, Task } from '../../core/services/task.service';
 import { CategoryService, Category } from '../../core/services/category.service';
@@ -133,11 +133,23 @@ export class ProMobileTaskComponent implements OnInit, OnDestroy {
     } else {
       this.isCreating.set(false);
       this.editingTaskId = taskId;
-      this.workspaceService.currentWorkspace$.pipe(takeUntil(this.destroy$)).subscribe(ws => {
-        if (!ws) return;
-        this.taskService.getTasks(ws.id).pipe(takeUntil(this.destroy$)).subscribe(tasks => {
-          const t = tasks.find(x => x.id === taskId);
-          if (!t) return;
+      // Take only the first non-empty emission. If we used a live
+      // subscription, every Firestore update (including the user's own
+      // save) would re-trigger all the .set() calls and clobber the form
+      // values the user was in the middle of typing — which manifested as
+      // "改了儲存沒生效" (the live emit landed between the user's last
+      // keystroke and their tap on 儲存, resetting the field back).
+      this.workspaceService.currentWorkspace$.pipe(
+        filter(ws => !!ws), take(1), takeUntil(this.destroy$),
+      ).subscribe(ws => {
+        this.taskService.getTasks(ws!.id).pipe(
+          // Wait until the task we want is actually in the snapshot, then
+          // unsubscribe — the live query is just for the initial load.
+          filter(tasks => tasks.some(x => x.id === taskId)),
+          take(1),
+          takeUntil(this.destroy$),
+        ).subscribe(tasks => {
+          const t = tasks.find(x => x.id === taskId)!;
           this.title.set(t.title);
           this.description.set(t.description ?? '');
           this.date.set(t.date);
@@ -161,13 +173,22 @@ export class ProMobileTaskComponent implements OnInit, OnDestroy {
 
   /** Fill form values from a series template plus a target occurrence date.
    *  Used when opening a virtual occurrence — the user sees the form as if
-   *  this date were already a real task. */
+   *  this date were already a real task.
+   *
+   *  take(1): one-shot hydration. If we re-emit on every Firestore tick the
+   *  user's in-progress form edits get clobbered (which manifested as
+   *  "改了儲存沒生效" because the live emit lands between keystroke and
+   *  save and resets the signal). */
   private hydrateFromSeries(seriesId: string, date: string) {
-    this.workspaceService.currentWorkspace$.pipe(takeUntil(this.destroy$)).subscribe(ws => {
-      if (!ws) return;
-      this.recurringTaskService.getRecurringTasks(ws.id).pipe(takeUntil(this.destroy$)).subscribe(list => {
-        const r = list.find(x => x.id === seriesId);
-        if (!r) return;
+    this.workspaceService.currentWorkspace$.pipe(
+      filter(ws => !!ws), take(1), takeUntil(this.destroy$),
+    ).subscribe(ws => {
+      this.recurringTaskService.getRecurringTasks(ws!.id).pipe(
+        filter(list => list.some(x => x.id === seriesId)),
+        take(1),
+        takeUntil(this.destroy$),
+      ).subscribe(list => {
+        const r = list.find(x => x.id === seriesId)!;
         this.title.set(r.title);
         this.description.set(r.description ?? '');
         this.date.set(date);
@@ -184,7 +205,9 @@ export class ProMobileTaskComponent implements OnInit, OnDestroy {
 
   /** Pull series-only fields (rule / weekdays / monthDay / range) for the
    *  footer. Doesn't touch main form fields. Accepts a preloaded series so
-   *  callers can avoid a second subscribe. */
+   *  callers can avoid a second subscribe. Same one-shot rationale as
+   *  hydrateFromSeries — without take(1) a live emit overwrites the user's
+   *  in-progress rangeEnd / weekday edits. */
   private hydrateSeriesFieldsOnly(seriesId: string, preloaded?: RecurringTask) {
     const apply = (r: RecurringTask) => {
       this.recurRule.set(r.rule);
@@ -194,9 +217,14 @@ export class ProMobileTaskComponent implements OnInit, OnDestroy {
       this.recurRangeEnd.set(r.rangeEnd);
     };
     if (preloaded) { apply(preloaded); return; }
-    this.workspaceService.currentWorkspace$.pipe(takeUntil(this.destroy$)).subscribe(ws => {
-      if (!ws) return;
-      this.recurringTaskService.getRecurringTasks(ws.id).pipe(takeUntil(this.destroy$)).subscribe(list => {
+    this.workspaceService.currentWorkspace$.pipe(
+      filter(ws => !!ws), take(1), takeUntil(this.destroy$),
+    ).subscribe(ws => {
+      this.recurringTaskService.getRecurringTasks(ws!.id).pipe(
+        filter(list => list.some(x => x.id === seriesId)),
+        take(1),
+        takeUntil(this.destroy$),
+      ).subscribe(list => {
         const r = list.find(x => x.id === seriesId);
         if (r) apply(r);
       });
