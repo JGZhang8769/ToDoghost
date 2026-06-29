@@ -6,6 +6,7 @@ import { Subject, takeUntil } from 'rxjs';
 import { endOfWeek, format, startOfWeek } from 'date-fns';
 
 import { TaskService, Task } from '../../core/services/task.service';
+import { RecurringTaskService } from '../../core/services/recurring-task.service';
 import { CategoryService, Category } from '../../core/services/category.service';
 import { WorkspaceService, Workspace } from '../../core/services/workspace.service';
 import { UserService, User } from '../../core/services/user.service';
@@ -44,6 +45,7 @@ const USER_COLORS = [
 })
 export class ProMobileListComponent implements OnInit, OnDestroy {
   private taskService = inject(TaskService);
+  private recurringTaskService = inject(RecurringTaskService);
   private categoryService = inject(CategoryService);
   private workspaceService = inject(WorkspaceService);
   private userService = inject(UserService);
@@ -206,7 +208,14 @@ export class ProMobileListComponent implements OnInit, OnDestroy {
   async confirmDelete() {
     const t = this.pendingDeleteTask();
     if (!t) return;
-    await this.taskService.deleteTask(t.id);
+    // Tasks tied to a series go through deleteOccurrence so the series'
+    // exceptions list records the date — re-extending the range won't
+    // resurrect this task. Standalone tasks use the plain delete.
+    if (t.recurringId) {
+      await this.recurringTaskService.deleteOccurrence(t);
+    } else {
+      await this.taskService.deleteTask(t.id);
+    }
     this.pendingDeleteTask.set(null);
   }
 

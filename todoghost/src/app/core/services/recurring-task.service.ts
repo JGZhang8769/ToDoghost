@@ -1,10 +1,12 @@
 import { Injectable, inject } from '@angular/core';
 import {
   Firestore, collection, collectionData, doc, addDoc, updateDoc, deleteDoc,
-  query, where, getDoc, getDocs, serverTimestamp, writeBatch,
+  query, where, getDoc, getDocs, serverTimestamp, writeBatch, arrayUnion,
 } from '@angular/fire/firestore';
 import { Observable } from 'rxjs';
 import { addDays, format, isAfter } from 'date-fns';
+
+import { Task } from './task.service';
 
 /**
  * Recurring task: a rule (daily / weekly / monthly) plus a date range. When
@@ -56,6 +58,12 @@ export interface RecurringTask {
   rangeStart: string;   // 'yyyy-MM-dd' inclusive
   rangeEnd: string;     // 'yyyy-MM-dd' inclusive
   status: 'active' | 'archived';
+  /** Dates the user explicitly removed from this series — either by deleting
+   *  the task or by completing it then shrinking past it. Re-extending the
+   *  range past these dates does NOT repopulate them; users said "if I
+   *  killed this day, it stays dead". A rule change clears the list (rule
+   *  change is treated as a fresh slate). */
+  exceptions?: string[];
 
   createdAt?: any;
   updatedAt?: any;
@@ -79,6 +87,25 @@ export class RecurringTaskService {
   async deleteRecurringTask(id: string): Promise<void> {
     const ref = doc(this.firestore, `recurring_tasks/${id}`);
     await deleteDoc(ref);
+  }
+
+  /**
+   * Delete a single occurrence task AND record its date in the series'
+   * exceptions list so that re-extending the range past this date doesn't
+   * resurrect it. Callers should use this (instead of taskService.deleteTask)
+   * any time they delete a task with `recurringId` set.
+   *
+   * If the task has no recurringId or date, falls back to a plain delete.
+   */
+  async deleteOccurrence(task: Task): Promise<void> {
+    if (task.recurringId && task.date) {
+      const seriesRef = doc(this.firestore, `recurring_tasks/${task.recurringId}`);
+      await updateDoc(seriesRef, {
+        exceptions: arrayUnion(task.date),
+        updatedAt: serverTimestamp(),
+      });
+    }
+    await deleteDoc(doc(this.firestore, `tasks/${task.id}`));
   }
 
   // ====================================================================
@@ -162,14 +189,22 @@ export class RecurringTaskService {
       await this.batchDelete(toDelete.map(t => t.id));
     }
 
-    // Extend end: add tasks for (oldEnd, newEnd]. Use updated rule from oldSeries
-    // (caller hasn't changed rule in this code path).
+    // Extend end: add tasks for (oldEnd, newEnd]. Filter out
+    //   (a) dates already occupied by a task of this series (covers the
+    //       case where a previous shrink kept a completed/historic task)
+    //   (b) dates listed in series.exceptions (covers the case where the
+    //       user explicitly deleted that day — see deleteOccurrence)
+    // Without these filters, dragging end back-and-forth re-spawns
+    // tasks the user had completed or removed.
     if (newRangeEnd > oldSeries.rangeEnd) {
       const fromInclusive = this.addOneDay(oldSeries.rangeEnd);
+      const existing = await this.queryTasksOfSeries(seriesId);
+      const occupied = new Set(existing.map(t => t.date).filter((d): d is string => !!d));
+      const exceptions = new Set(oldSeries.exceptions ?? []);
       const dates = this.expandDates(
         { ...oldSeries, rangeStart: newRangeStart, rangeEnd: newRangeEnd },
         fromInclusive, newRangeEnd,
-      );
+      ).filter(d => !occupied.has(d) && !exceptions.has(d));
       await this.writeTasksForDates(seriesId, oldSeries, dates, createdBy);
     }
 
@@ -198,10 +233,14 @@ export class RecurringTaskService {
     newRule: { rule: 'daily' | 'weekly' | 'monthly'; weekdays?: number[]; monthDay?: number },
     createdBy: string,
   ): Promise<void> {
+    // Rule change resets exceptions: per user spec, changing the rule is
+    // treated as a fresh slate for the future. Past completions still
+    // serve as history (we keep them in tasks/).
     await updateDoc(doc(this.firestore, `recurring_tasks/${seriesId}`), {
       rule: newRule.rule,
       weekdays: newRule.rule === 'weekly' ? newRule.weekdays : null,
       monthDay: newRule.rule === 'monthly' ? newRule.monthDay : null,
+      exceptions: [],
       updatedAt: serverTimestamp(),
     });
 

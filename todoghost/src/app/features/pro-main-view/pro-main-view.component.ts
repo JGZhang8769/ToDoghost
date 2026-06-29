@@ -1222,7 +1222,11 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
       title: '刪除代辦',
       message: `確定要刪除「${task.title}」嗎？此操作無法復原。`,
       action: async () => {
-        await this.taskService.deleteTask(task.id);
+        if (task.recurringId) {
+          await this.recurringTaskService.deleteOccurrence(task);
+        } else {
+          await this.taskService.deleteTask(task.id);
+        }
         if (this.selectedTaskId === task.id) {
           this.selectedTaskId = null;
           this.inspectorMode = 'day';
