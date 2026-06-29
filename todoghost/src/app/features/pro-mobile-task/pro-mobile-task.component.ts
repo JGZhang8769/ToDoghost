@@ -80,9 +80,6 @@ export class ProMobileTaskComponent implements OnInit, OnDestroy {
   recurMonthDay = signal<number>(1);
   recurRangeStart = signal<string>(format(new Date(), 'yyyy-MM-dd'));
   recurRangeEnd = signal<string>(format(addMonths(new Date(), 1), 'yyyy-MM-dd'));
-  /** When the original record was a recurring series and the user shrunk
-   *  rangeEnd, we'll prune future materialised tasks on save. */
-  private originalRangeEnd: string | null = null;
   readonly weekdayOptions = [
     { val: 1, label: '一' },
     { val: 2, label: '二' },
@@ -195,7 +192,6 @@ export class ProMobileTaskComponent implements OnInit, OnDestroy {
       this.recurMonthDay.set(r.monthDay ?? 1);
       this.recurRangeStart.set(r.rangeStart);
       this.recurRangeEnd.set(r.rangeEnd);
-      this.originalRangeEnd = r.rangeEnd;
     };
     if (preloaded) { apply(preloaded); return; }
     this.workspaceService.currentWorkspace$.pipe(takeUntil(this.destroy$)).subscribe(ws => {
@@ -222,6 +218,24 @@ export class ProMobileTaskComponent implements OnInit, OnDestroy {
   }
   isWeekdaySelected(day: number): boolean {
     return this.recurWeekdays().includes(day);
+  }
+
+  /** Minimum rangeEnd value: cannot be earlier than today (we never touch
+   *  past materialised tasks, so an end-date in the past would be a no-op
+   *  that just confuses users) and cannot be earlier than rangeStart. */
+  get rangeEndMin(): string {
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const start = this.recurRangeStart();
+    return start > today ? start : today;
+  }
+
+  /** Setter that clamps user-entered rangeEnd to the min. The browser's
+   *  native [min] attribute prevents most invalid picks but mobile Safari
+   *  in particular still lets some values through (typed input, paste). */
+  setRecurRangeEnd(value: string) {
+    if (!value) return;
+    const min = this.rangeEndMin;
+    this.recurRangeEnd.set(value < min ? min : value);
   }
 
   ngOnDestroy() {
@@ -289,8 +303,14 @@ export class ProMobileTaskComponent implements OnInit, OnDestroy {
     }
 
     // Branch B: editing a virtual occurrence → materialise as a real task
-    // tied back to the series via recurringId + occurrenceDate. Subsequent
-    // visits to this date open the real task instead of regenerating.
+    // tied back to the series via recurringId + occurrenceDate.
+    //
+    // Order: materialise FIRST, then save series, then reconcile. Doing it
+    // this way means reconcile sees the just-written task in Firestore and
+    // can delete it correctly if the user concurrently shrunk rangeEnd
+    // past this occurrence date or changed the rule so this weekday no
+    // longer fires. If we wrote the series first and then materialised,
+    // the new task would slip past reconcile's snapshot.
     if (this.virtualSeriesId && this.virtualOccurrenceDate) {
       const maxOrder = await this.peekMaxOrder();
       await this.taskService.addTask({
@@ -353,10 +373,15 @@ export class ProMobileTaskComponent implements OnInit, OnDestroy {
     this.back();
   }
 
-  /** Persist series-footer changes if this edit is tied to a series.
-   *  Always writes the latest values so the user can change them in one go
-   *  with the main 儲存 button. If rangeEnd shrunk vs the originally loaded
-   *  value, also prunes future materialised tasks past the new end. */
+  /** Persist series-footer changes if this edit is tied to a series, then
+   *  reconcile materialised tasks against the (now updated) rule. Order is
+   *  important: series doc must be written first so the reconcile reads
+   *  fresh rule + rangeEnd, and the main-form write upstream must complete
+   *  before this method is called so its task is visible to reconcile.
+   *
+   *  Reconcile handles BOTH rangeEnd shrinks AND rule changes (weekday set
+   *  altered, monthDay changed, etc.). Per user rule, past occurrences
+   *  (occurrenceDate < today) are never touched. */
   private async maybeSaveSeriesFooter() {
     const seriesId = this.seriesIdForFooter();
     if (!seriesId) return;
@@ -366,9 +391,7 @@ export class ProMobileTaskComponent implements OnInit, OnDestroy {
       monthDay: this.recurRule() === 'monthly' ? this.recurMonthDay() : undefined,
       rangeEnd: this.recurRangeEnd(),
     });
-    if (this.originalRangeEnd && this.recurRangeEnd() < this.originalRangeEnd) {
-      await this.recurringTaskService.pruneFutureMaterialised(seriesId, this.recurRangeEnd());
-    }
+    await this.recurringTaskService.reconcileMaterialised(seriesId);
   }
 
   /** Take a snapshot of current task list to derive next order. Cheap because

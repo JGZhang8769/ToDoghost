@@ -140,7 +140,8 @@
           <input type="date"
                  class="pmt-input"
                  [value]="recurRangeEnd()"
-                 (input)="recurRangeEnd.set($any($event.target).value)">
+                 [min]="rangeEndMin"
+                 (input)="setRecurRangeEnd($any($event.target).value)">
         </label>
       </ng-container>
     </div>
@@ -251,7 +252,8 @@
           <input type="date"
                  class="pmt-input"
                  [value]="recurRangeEnd()"
-                 (input)="recurRangeEnd.set($any($event.target).value)">
+                 [min]="rangeEndMin"
+                 (input)="setRecurRangeEnd($any($event.target).value)">
         </label>
         <div class="pmt-row">
           <span class="pmt-row__label">開始日期</span>
