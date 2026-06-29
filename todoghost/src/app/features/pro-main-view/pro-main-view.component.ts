@@ -459,12 +459,38 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
    *  or just return the existing id for real tasks. Action handlers that
    *  mutate Firestore (toggleCompletion, deleteTask, openInspector edits)
    *  must call this before invoking taskService.updateTask/deleteTask
-   *  because virtual ids look like "virtual:xxx:yyy" and aren't real docs. */
+   *  because virtual ids look like "virtual:xxx:yyy" and aren't real docs.
+   *
+   *  Important: also optimistically patches realTasks with a stub of the
+   *  new task so the Inspector / list doesn't see a null gap while the
+   *  Firestore live subscription catches up. Without this, selectedTaskId
+   *  jumps to the new real id but `this.tasks.find(...)` returns nothing
+   *  for ~200ms and the edit pane blanks. */
   async ensureRealId(task: Task): Promise<string> {
-    if ((task as any).isVirtual) {
-      return this.recurringTaskService.materialiseOccurrence(task as any);
-    }
-    return task.id;
+    if (!(task as any).isVirtual) return task.id;
+    const v = task as any;
+    const id = await this.recurringTaskService.materialiseOccurrence(v);
+    const optimistic: Task = {
+      id,
+      workspaceId: v.workspaceId,
+      title: v.title,
+      description: v.description,
+      date: v.date,
+      startTime: v.startTime,
+      endTime: v.endTime,
+      tags: v.tags ?? [],
+      isUrgent: v.isUrgent,
+      createdBy: v.createdBy,
+      status: v.status,
+      reminderOffset: v.reminderOffset,
+      order: 0,
+      categoryId: v.categoryId,
+      recurringId: v.recurringId,
+      occurrenceDate: v.occurrenceDate,
+    };
+    this.realTasks = [...this.realTasks, optimistic];
+    this.recomputeMergedTasks();
+    return id;
   }
 
   // ---------- Create form helpers ----------

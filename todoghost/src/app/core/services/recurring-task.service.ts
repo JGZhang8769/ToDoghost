@@ -108,27 +108,31 @@ export class RecurringTaskService {
 
   /**
    * After shrinking a series' rangeEnd, delete every materialised task whose
-   * occurrenceDate is strictly after the new end. Tasks on the new end date
-   * itself are KEPT — semantically the user said "end on this day", so
-   * that day is still inclusive. Past occurrences (including already
-   * completed ones) are also kept regardless: they're history, not future.
+   * occurrenceDate is strictly after the new end — including completed ones.
+   * The user's intent when dragging rangeEnd back is "stop this series at
+   * this date", and they expect the calendar to reflect that even for
+   * occurrences they previously checked off. If they want history they can
+   * use 已完成 smart list before shrinking.
    *
-   * Returns the count of deleted docs so callers can confirm to the user.
+   * On-date occurrences (occurrenceDate == newRangeEnd) are preserved —
+   * "end on this day" is inclusive.
+   *
+   * Implementation note: query by recurringId only and filter client-side.
+   * The two-field where (recurringId == AND occurrenceDate >) would need a
+   * composite Firestore index; doing it client-side keeps deploys simple
+   * and the number of materialised tasks per series is small enough that
+   * pulling them all is cheap.
    */
   async pruneFutureMaterialised(recurringId: string, newRangeEnd: string): Promise<number> {
     const ref = collection(this.firestore, 'tasks');
-    // Strict greater-than: newRangeEnd day is preserved, only later dates
-    // get dropped. Don't change this to >= without re-checking the
-    // expander's `ds <= rangeEnd` boundary — they must agree.
-    const q = query(
-      ref,
-      where('recurringId', '==', recurringId),
-      where('occurrenceDate', '>', newRangeEnd),
-    );
+    const q = query(ref, where('recurringId', '==', recurringId));
     const snap = await getDocs(q);
-    const deletions = snap.docs.map(d => deleteDoc(d.ref));
-    await Promise.all(deletions);
-    return snap.size;
+    const toDelete = snap.docs.filter(d => {
+      const od = (d.data() as any).occurrenceDate as string | undefined;
+      return !!od && od > newRangeEnd;
+    });
+    await Promise.all(toDelete.map(d => deleteDoc(d.ref)));
+    return toDelete.length;
   }
 
   // ====================================================================
