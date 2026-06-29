@@ -9,7 +9,7 @@ import { addDays, addMonths, addWeeks, endOfMonth, endOfWeek, format, isSameMont
 import { getLunar } from 'chinese-lunar-calendar';
 
 import { TaskService, Task } from '../../core/services/task.service';
-import { RecurringTaskService, RecurringTask, DisplayTask } from '../../core/services/recurring-task.service';
+import { RecurringTaskService, RecurringTask } from '../../core/services/recurring-task.service';
 import { CategoryService, Category } from '../../core/services/category.service';
 import { WorkspaceService, Workspace } from '../../core/services/workspace.service';
 import { UserService, User } from '../../core/services/user.service';
@@ -135,16 +135,14 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
   // Data
   currentWorkspace: Workspace | null = null;
   currentUser: User | null = null;
-  /** Real tasks from tasks/ collection. Used for new-order calculations and
-   *  whenever a write target must be a real id. */
-  realTasks: Task[] = [];
-  recurringTasks: RecurringTask[] = [];
-  /** Real + virtual occurrences merged in a year-wide window. Calendar,
-   *  smart lists, and counts all read from here. VirtualOccurrence is a
-   *  structural subtype of Task so they fit the existing reads transparently;
-   *  the only special-case is action handlers that mutate Firestore — those
-   *  must materialiseOccurrence() first because virtual ids aren't real. */
+  /** All tasks from tasks/ collection. Recurring occurrences are materialised
+   *  at series-creation time and live here as plain Tasks; nothing is virtual
+   *  any more. */
   tasks: Task[] = [];
+  /** Series docs — referenced by the 系列設定 footer to show / edit rule
+   *  state. The tasks themselves carry recurringId so views never need to
+   *  join against this list for display. */
+  recurringTasks: RecurringTask[] = [];
   categories: Category[] = [];
   workspaceUsers: User[] = [];
 
@@ -440,59 +438,6 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     return '';
   }
 
-  /** Expand recurring rules into virtual occurrences for a year-wide window
-   *  and merge with real tasks. The desktop calendar happily navigates years
-   *  in either direction, so we pick ±365 days from today which covers
-   *  typical browsing without exploding memory. */
-  private recomputeMergedTasks() {
-    const start = format(addDays(new Date(), -365), 'yyyy-MM-dd');
-    const end = format(addDays(new Date(), 365), 'yyyy-MM-dd');
-    // VirtualOccurrence is structurally a Task — cast is safe; the special
-    // fields (isVirtual, recurringId, occurrenceDate) survive on the object
-    // and are picked up by action handlers that need to materialise.
-    this.tasks = this.recurringTaskService.expandMerged(
-      this.realTasks, this.recurringTasks, start, end,
-    ) as Task[];
-  }
-
-  /** Materialise a virtual occurrence into a real task and return its id,
-   *  or just return the existing id for real tasks. Action handlers that
-   *  mutate Firestore (toggleCompletion, deleteTask, openInspector edits)
-   *  must call this before invoking taskService.updateTask/deleteTask
-   *  because virtual ids look like "virtual:xxx:yyy" and aren't real docs.
-   *
-   *  Important: also optimistically patches realTasks with a stub of the
-   *  new task so the Inspector / list doesn't see a null gap while the
-   *  Firestore live subscription catches up. Without this, selectedTaskId
-   *  jumps to the new real id but `this.tasks.find(...)` returns nothing
-   *  for ~200ms and the edit pane blanks. */
-  async ensureRealId(task: Task): Promise<string> {
-    if (!(task as any).isVirtual) return task.id;
-    const v = task as any;
-    const id = await this.recurringTaskService.materialiseOccurrence(v);
-    const optimistic: Task = {
-      id,
-      workspaceId: v.workspaceId,
-      title: v.title,
-      description: v.description,
-      date: v.date,
-      startTime: v.startTime,
-      endTime: v.endTime,
-      tags: v.tags ?? [],
-      isUrgent: v.isUrgent,
-      createdBy: v.createdBy,
-      status: v.status,
-      reminderOffset: v.reminderOffset,
-      order: 0,
-      categoryId: v.categoryId,
-      recurringId: v.recurringId,
-      occurrenceDate: v.occurrenceDate,
-    };
-    this.realTasks = [...this.realTasks, optimistic];
-    this.recomputeMergedTasks();
-    return id;
-  }
-
   // ---------- Create form helpers ----------
   blankCreateForm(): NewTaskForm {
     const today = format(new Date(), 'yyyy-MM-dd');
@@ -565,9 +510,10 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     const title = this.createForm.title.trim();
     if (!title || !this.currentWorkspace || !this.currentUser) return;
 
-    // Recurring branch: save to recurring_tasks/, skip task creation.
+    // Recurring branch: write the series + one materialised task per
+    // occurrence date. Skip plain task creation.
     if (this.createForm.recurEnabled) {
-      await this.recurringTaskService.addRecurringTask({
+      await this.recurringTaskService.addSeriesAndOccurrences({
         workspaceId: this.currentWorkspace.id,
         categoryId: this.createForm.categoryId,
         title,
@@ -584,13 +530,13 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
         rangeStart: this.createForm.recurRangeStart,
         rangeEnd: this.createForm.recurRangeEnd,
         status: 'active',
-      });
+      }, this.currentUser.id);
       this.showCreateForm = false;
       this.inspectorMode = 'day';
       return;
     }
 
-    const maxOrder = this.realTasks.reduce((m, t) => Math.max(m, t.order ?? 0), 0);
+    const maxOrder = this.tasks.reduce((m, t) => Math.max(m, t.order ?? 0), 0);
     const id = await this.taskService.addTask({
       workspaceId: this.currentWorkspace.id,
       title,
@@ -649,16 +595,12 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
       if (!ws) { this.router.navigate(['/workspaces']); return; }
       this.currentWorkspace = ws;
       this.taskService.getTasks(ws.id).pipe(takeUntil(this.destroy$)).subscribe(tasks => {
-        this.realTasks = tasks;
-        this.recomputeMergedTasks();
+        this.tasks = tasks;
         this.buildCalendar();
         this.buildWeek();
       });
       this.recurringTaskService.getRecurringTasks(ws.id).pipe(takeUntil(this.destroy$)).subscribe(rts => {
         this.recurringTasks = rts;
-        this.recomputeMergedTasks();
-        this.buildCalendar();
-        this.buildWeek();
         // Keep footer in sync if a series this Inspector cares about changed.
         if (this.selectedTaskId && this.inspectorMode === 'edit') this.loadFooterForSelected();
       });
@@ -1088,25 +1030,51 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     }, 500);
   }
 
-  /** Actual footer save: write the series, then reconcile materialised
-   *  tasks so persistent state matches the new rule. Reconcile takes care
-   *  of both rangeEnd shrinks and rule changes (per-user spec: past
-   *  occurrences never touched; future occurrences that the new rule
-   *  wouldn't fire on are deleted, regardless of completion status). */
+  /** Actual footer save. Picks the right service method based on what
+   *  changed:
+   *   - rule change → applyRuleChange (deletes non-completed future, rebuilds)
+   *   - range change → applyRangeChange (shrink trims, extend adds)
+   *   - both → rule first (resets future), then range against post-rule series
+   *  Past occurrences (date < today) and completed-future are kept by both
+   *  methods. */
   private async saveFooterSeriesImmediate(
     seriesId: string,
     snap: { rule: 'daily' | 'weekly' | 'monthly'; weekdays: number[]; monthDay: number; rangeEnd: string },
   ) {
-    await this.recurringTaskService.updateRecurringTask(seriesId, {
-      rule: snap.rule,
-      weekdays: snap.rule === 'weekly' ? snap.weekdays : undefined,
-      monthDay: snap.rule === 'monthly' ? snap.monthDay : undefined,
-      rangeEnd: snap.rangeEnd,
-    });
-    await this.recurringTaskService.reconcileMaterialised(seriesId);
-    // Only update footerOriginalRangeEnd if the still-selected task belongs
-    // to this same series; otherwise we'd stomp on the freshly-loaded
-    // values of whatever is now selected.
+    if (!this.currentUser) return;
+    const series = this.recurringTasks.find(r => r.id === seriesId);
+    if (!series) return;
+
+    const ruleChanged =
+      series.rule !== snap.rule ||
+      !sameArr(series.weekdays ?? [], snap.weekdays) ||
+      (series.monthDay ?? 1) !== snap.monthDay;
+    const rangeChanged = series.rangeEnd !== snap.rangeEnd;
+
+    if (ruleChanged) {
+      await this.recurringTaskService.applyRuleChange(
+        seriesId, series,
+        {
+          rule: snap.rule,
+          weekdays: snap.rule === 'weekly' ? snap.weekdays : undefined,
+          monthDay: snap.rule === 'monthly' ? snap.monthDay : undefined,
+        },
+        this.currentUser.id,
+      );
+    }
+    if (rangeChanged) {
+      // Reload the latest series doc so applyRangeChange diffs against the
+      // post-rule state, not the stale captured snapshot.
+      const latest = this.recurringTasks.find(r => r.id === seriesId) ?? series;
+      const seriesForRange: RecurringTask = ruleChanged
+        ? { ...latest, rule: snap.rule, weekdays: snap.weekdays, monthDay: snap.monthDay }
+        : latest;
+      await this.recurringTaskService.applyRangeChange(
+        seriesId, seriesForRange,
+        seriesForRange.rangeStart, snap.rangeEnd,
+        this.currentUser.id,
+      );
+    }
     if (this.footerSeriesId === seriesId) {
       this.footerOriginalRangeEnd = snap.rangeEnd;
     }
@@ -1179,21 +1147,10 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
 
   // ---------- Task mutations ----------
   async toggleCompletion(task: Task) {
-    const wasVirtual = (task as any).isVirtual === true;
-    const wasSelected = this.selectedTaskId === task.id;
     const next = task.status === 'completed' ? 'pending' : 'completed';
-    const id = await this.ensureRealId(task);
-    // Inspector edit pane reads selectedTask via id match against this.tasks.
-    // ensureRealId already patches realTasks with a stub at the new real id,
-    // but if the currently selected task IS this one we also need to swap
-    // selectedTaskId so the getter resolves — otherwise the Inspector
-    // momentarily reads null and blanks out until the Firestore live query
-    // catches up (≈200ms). Symptom report: "點已完成會空白".
-    if (wasVirtual && wasSelected) this.selectedTaskId = id;
-    // Patch the optimistic stub's status so the toggle visually flips
-    // immediately instead of waiting for the Firestore round-trip.
-    this.patchLocalTask(id, { status: next });
-    await this.taskService.updateTask(id, { status: next });
+    // Optimistic flip so the UI responds immediately, before Firestore round-trip.
+    this.patchLocalTask(task.id, { status: next });
+    await this.taskService.updateTask(task.id, { status: next });
   }
 
   async quickAdd() {
@@ -1242,7 +1199,7 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     if (!this.currentWorkspace || !this.currentUser) return;
     const title = window.prompt(`新增到 ${dateStr ?? '無日期'}${startTime ? ' ' + startTime : ''}`, '');
     if (!title || !title.trim()) return;
-    const maxOrder = this.realTasks.reduce((m, t) => Math.max(m, t.order ?? 0), 0);
+    const maxOrder = this.tasks.reduce((m, t) => Math.max(m, t.order ?? 0), 0);
     const id = await this.taskService.addTask({
       workspaceId: this.currentWorkspace.id,
       title: title.trim(),
@@ -1265,14 +1222,7 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
       title: '刪除代辦',
       message: `確定要刪除「${task.title}」嗎？此操作無法復原。`,
       action: async () => {
-        if ((task as any).isVirtual) {
-          // See pro-mobile-list.confirmDelete — materialise + mark completed
-          // so the expander knows this date is already accounted for.
-          const id = await this.recurringTaskService.materialiseOccurrence(task as any);
-          await this.taskService.updateTask(id, { status: 'completed' });
-        } else {
-          await this.taskService.deleteTask(task.id);
-        }
+        await this.taskService.deleteTask(task.id);
         if (this.selectedTaskId === task.id) {
           this.selectedTaskId = null;
           this.inspectorMode = 'day';
@@ -1314,9 +1264,9 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
   }
 
   /** Wrapper that pipes the actual write through pendingSaveChain so any
-   *  in-flight footer save runs after this one completes. Without this
-   *  serialisation a footer reconcile fired while the main-form write is
-   *  still pending would miss the just-written task in its snapshot. */
+   *  in-flight footer save runs after this one completes. Footer rule /
+   *  range changes need to see the latest main-form values when computing
+   *  diffs, so we serialise the two write paths against a single chain. */
   saveSelectedTask() {
     this.pendingSaveChain = this.pendingSaveChain.then(() => this.saveSelectedTaskImmediate());
     return this.pendingSaveChain;
@@ -1324,14 +1274,7 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
   private async saveSelectedTaskImmediate() {
     if (!this.selectedTask) return;
     const t = this.selectedTask;
-    const wasVirtual = (t as any).isVirtual === true;
-    const id = await this.ensureRealId(t);
-    // After materialising, the in-memory task still has the virtual id —
-    // swap selectedTaskId to the new real id so subsequent (change)s update
-    // the same task instead of materialising again. The Firestore live
-    // subscription will replace the virtual entry with the real one shortly.
-    if (wasVirtual) this.selectedTaskId = id;
-    await this.taskService.updateTask(id, {
+    await this.taskService.updateTask(t.id, {
       title: t.title,
       description: t.description,
       date: t.date,
@@ -1357,8 +1300,7 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     } else {
       this.selectedTask.categoryId = categoryId;
     }
-    const id = await this.ensureRealId(this.selectedTask);
-    await this.taskService.updateTask(id, { categoryId: categoryId as any });
+    await this.taskService.updateTask(this.selectedTask.id, { categoryId: categoryId as any });
   }
 
   // ---------- Drag & drop ----------
@@ -1408,8 +1350,7 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     if (!task) return;
     if (task.date !== dateStr) {
       this.patchLocalTask(task.id, { date: dateStr });
-      const id = await this.ensureRealId(task);
-      await this.taskService.updateTask(id, { date: dateStr });
+      await this.taskService.updateTask(task.id, { date: dateStr });
       this.recentlyDroppedDate = dateStr;
       if (this.pulseTimer) clearTimeout(this.pulseTimer);
       this.pulseTimer = setTimeout(() => { this.recentlyDroppedDate = null; }, 600);
@@ -1431,8 +1372,7 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
       reminderOffset: null, // reminder anchored to startTime — strip when becoming all-day
     };
     this.patchLocalTask(task.id, patch);
-    const id = await this.ensureRealId(task);
-    await this.taskService.updateTask(id, patch);
+    await this.taskService.updateTask(task.id, patch);
     this.recentlyDroppedDate = dateStr;
     if (this.pulseTimer) clearTimeout(this.pulseTimer);
     this.pulseTimer = setTimeout(() => { this.recentlyDroppedDate = null; }, 600);
@@ -1475,8 +1415,7 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
 
     const patch: Partial<Task> = { date: dateStr, startTime, endTime };
     this.patchLocalTask(task.id, patch);
-    const realId = await this.ensureRealId(task);
-    await this.taskService.updateTask(realId, patch);
+    await this.taskService.updateTask(task.id, patch);
 
     this.recentlyDroppedDate = dateStr;
     if (this.pulseTimer) clearTimeout(this.pulseTimer);
@@ -1490,8 +1429,7 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     const task: Task = event.item.data;
     if (!task || task.date === null) return;
     this.patchLocalTask(task.id, { date: null });
-    const id = await this.ensureRealId(task);
-    await this.taskService.updateTask(id, { date: null });
+    await this.taskService.updateTask(task.id, { date: null });
   }
 
   /**
@@ -1506,10 +1444,6 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     const items = [...this.listPaneTasks];
     moveItemInArray(items, event.previousIndex, event.currentIndex);
     items.forEach((t, i) => {
-      // Virtual occurrences don't carry user-defined order. Skip writes to
-      // them — when the user actually edits or completes one it will
-      // materialise and get its own real id.
-      if ((t as any).isVirtual) return;
       this.taskService.updateTask(t.id, { order: i + 1 } as any);
     });
   }
@@ -1532,4 +1466,11 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
     this.workspaceService.setCurrentWorkspace(null);
     this.router.navigate(['/workspaces']);
   }
+}
+
+function sameArr(a: number[], b: number[]): boolean {
+  if (a.length !== b.length) return false;
+  const sa = [...a].sort((x, y) => x - y);
+  const sb = [...b].sort((x, y) => x - y);
+  return sa.every((v, i) => v === sb[i]);
 }

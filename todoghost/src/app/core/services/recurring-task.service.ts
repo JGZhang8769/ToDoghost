@@ -1,29 +1,37 @@
 import { Injectable, inject } from '@angular/core';
 import {
   Firestore, collection, collectionData, doc, addDoc, updateDoc, deleteDoc,
-  query, where, getDoc, getDocs, serverTimestamp,
+  query, where, getDoc, getDocs, serverTimestamp, writeBatch,
 } from '@angular/fire/firestore';
-import { TaskService } from './task.service';
 import { Observable } from 'rxjs';
-import { addDays, format, isAfter, isBefore } from 'date-fns';
-
-import { Task } from './task.service';
+import { addDays, format, isAfter } from 'date-fns';
 
 /**
- * A recurrence rule. The series defines a template task and a rule that
- * "stamps" copies of it onto specific dates between `rangeStart` and
- * `rangeEnd` (inclusive).
+ * Recurring task: a rule (daily / weekly / monthly) plus a date range. When
+ * a series is created we eagerly materialise every occurrence date in
+ * [rangeStart, rangeEnd] as a real Task linked back via `recurringId`. The
+ * series doc itself stores template fields (title, time, tags, etc) so we
+ * can rebuild future occurrences after a rule change.
  *
- * Choice of data shape: rule + range. We deliberately do NOT pre-materialise
- * every occurrence into the tasks/ collection — for a year-long daily series
- * that would write 365 docs at create time, and changing the rule means
- * batch-updating them all. Instead, occurrences are computed lazily by
- * `expandOccurrences()` and only get written to tasks/ when the user
- * interacts with them (edit, complete, etc) — see materialiseOccurrence().
+ * Eager materialisation, not lazy: every occurrence is a real Task from
+ * day one. This used to be lazy (virtual occurrences synthesised at runtime,
+ * materialised on first edit) but every UI operation produced a race
+ * condition or a respawn loop — delete a virtual, it comes back; complete
+ * a materialised, the source-of-truth becomes ambiguous; reconcile after
+ * rangeEnd shrink, the just-written task can be missed by getDocs. Eager
+ * model is plain CRUD and "delete" actually means deleted.
  *
- * If the user shrinks rangeEnd, any tasks already materialised after the
- * new end date must be deleted so the calendar visually drops them — see
- * reconcileMaterialised().
+ * For rule / range changes we run a small diff against the current
+ * materialised tasks:
+ *   - extend rangeEnd: add tasks for the new region
+ *   - shrink rangeEnd: drop tasks past it (today and later only; past +
+ *     completed history kept)
+ *   - rule change: drop today-and-later non-completed tasks, regenerate
+ *     according to the new rule. Past + completed-future stay as history.
+ *
+ * The diff comparator on date is **strict greater-than** for shrink (i.e.
+ * the new rangeEnd day is inclusive) and **strict less-than today** for
+ * what counts as untouchable history (today itself goes through rule).
  */
 export interface RecurringTask {
   id: string;
@@ -53,24 +61,14 @@ export interface RecurringTask {
   updatedAt?: any;
 }
 
-/**
- * A task as displayed in the UI. Either a real Task (from tasks/) or a
- * virtual occurrence synthesised by the expander. Virtual occurrences carry
- * an `isVirtual: true` flag and use a stable string id of the form
- * `virtual:{recurringId}:{occurrenceDate}` so they survive change detection.
- */
-export interface VirtualOccurrence extends Task {
-  isVirtual: true;
-  recurringId: string;
-  occurrenceDate: string;
-}
-
-export type DisplayTask = Task | VirtualOccurrence;
-
 @Injectable({ providedIn: 'root' })
 export class RecurringTaskService {
   private firestore = inject(Firestore);
-  private taskService = inject(TaskService);
+
+  // ====================================================================
+  // CRUD on the series doc (rare — wrapped by addSeriesAndOccurrences and
+  // applyRule/RangeChange below for normal create/update flows).
+  // ====================================================================
 
   getRecurringTasks(workspaceId: string): Observable<RecurringTask[]> {
     const ref = collection(this.firestore, 'recurring_tasks');
@@ -78,118 +76,192 @@ export class RecurringTaskService {
     return collectionData(q, { idField: 'id' }) as Observable<RecurringTask[]>;
   }
 
-  async addRecurringTask(data: Omit<RecurringTask, 'id'>): Promise<string> {
-    const ref = collection(this.firestore, 'recurring_tasks');
-    const cleaned: Record<string, any> = {};
-    for (const [k, v] of Object.entries(data)) {
-      if (v !== undefined) cleaned[k] = v;
-    }
-    const docRef = await addDoc(ref, {
-      ...cleaned,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-    return docRef.id;
-  }
-
-  async updateRecurringTask(id: string, data: Partial<RecurringTask>): Promise<void> {
-    const ref = doc(this.firestore, `recurring_tasks/${id}`);
-    const cleaned: Record<string, any> = {};
-    for (const [k, v] of Object.entries(data)) {
-      if (v !== undefined) cleaned[k] = v;
-    }
-    await updateDoc(ref, { ...cleaned, updatedAt: serverTimestamp() });
-  }
-
   async deleteRecurringTask(id: string): Promise<void> {
     const ref = doc(this.firestore, `recurring_tasks/${id}`);
     await deleteDoc(ref);
   }
 
+  // ====================================================================
+  // Public ops — these are what UI code should call.
+  // ====================================================================
+
   /**
-   * Re-align all materialised tasks of a series against the series' current
-   * rule. Call this *after* any series rule / range change so the persisted
-   * tasks match what the rule says should exist.
+   * Create a new series and write every occurrence in [rangeStart, rangeEnd]
+   * to tasks/ as a real Task. Returns the new series id.
    *
-   * Cutoff: today (inclusive of today goes through rule checks). The user
-   * explicitly asked for "past time unchanged, future time obeys rule" —
-   * past occurrenceDates are history and never touched, regardless of
-   * completion status or rule mismatch.
-   *
-   * For occurrenceDate >= today we delete the task when any of:
-   *   - occurrenceDate > rangeEnd   → rangeEnd was shrunk past it
-   *   - occurrenceDate < rangeStart → rangeStart was pushed forward
-   *   - rule no longer fires that day (weekly weekday removed, monthly day
-   *     changed, daily → weekly with a different day, etc.)
-   *
-   * Important: this assumes the series doc is already updated in Firestore
-   * when called. Callers must `await updateRecurringTask(...)` before
-   * `await reconcileMaterialised(...)`. The getDocs snapshot below will
-   * also see any tasks recently committed in the same call chain, since
-   * Firestore SDK reflects local writes immediately.
-   *
-   * Query by recurringId only and filter client-side to avoid a composite
-   * index requirement — series typically have at most dozens of
-   * materialised tasks so this is cheap.
-   *
-   * Returns the count of deleted docs.
+   * Uses writeBatch (500-op limit per batch). For ranges that produce more
+   * than ~480 occurrences we split into multiple batches. In practice
+   * users pick rangeEnd ≤ one month so we typically stay under 30 tasks.
    */
-  async reconcileMaterialised(recurringId: string): Promise<number> {
-    // Re-read the series freshly so we use whatever was just written.
-    const seriesRef = doc(this.firestore, `recurring_tasks/${recurringId}`);
-    const seriesSnap = await getDoc(seriesRef);
-    if (!seriesSnap.exists()) return 0;
-    const series = { id: seriesSnap.id, ...(seriesSnap.data() as any) } as RecurringTask;
+  async addSeriesAndOccurrences(
+    seriesData: Omit<RecurringTask, 'id'>,
+    createdBy: string,
+  ): Promise<string> {
+    const cleaned: Record<string, any> = {};
+    for (const [k, v] of Object.entries(seriesData)) {
+      if (v !== undefined) cleaned[k] = v;
+    }
+    const seriesRef = await addDoc(collection(this.firestore, 'recurring_tasks'), {
+      ...cleaned,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    const seriesId = seriesRef.id;
+
+    const dates = this.expandDates(seriesData as RecurringTask, seriesData.rangeStart, seriesData.rangeEnd);
+    await this.writeTasksForDates(seriesId, seriesData as RecurringTask, dates, createdBy);
+
+    return seriesId;
+  }
+
+  /**
+   * Apply a range change to an existing series. Compares the new range
+   * against the old, then:
+   *   - shrink (newEnd < oldEnd): delete tasks with date in (newEnd, oldEnd]
+   *     where date >= today (past kept as history) and status != completed
+   *     OR date < today (history kept) … in practice we just keep past +
+   *     completed.
+   *   - extend (newEnd > oldEnd): add tasks for the (oldEnd, newEnd] window
+   *     that the rule fires on. Does NOT backfill historical gaps the user
+   *     may have manually deleted — only the newly extended range gets
+   *     populated.
+   *
+   * If rangeStart is also being changed it's handled symmetrically (we
+   * don't actually let UI move rangeStart but this is here for safety).
+   *
+   * Callers must await this — it does multiple Firestore writes and the
+   * subsequent footer/UI state must reflect completion.
+   */
+  async applyRangeChange(
+    seriesId: string,
+    oldSeries: RecurringTask,
+    newRangeStart: string,
+    newRangeEnd: string,
+    createdBy: string,
+  ): Promise<void> {
+    await updateDoc(doc(this.firestore, `recurring_tasks/${seriesId}`), {
+      rangeStart: newRangeStart,
+      rangeEnd: newRangeEnd,
+      updatedAt: serverTimestamp(),
+    });
 
     const today = format(new Date(), 'yyyy-MM-dd');
 
-    const tasksRef = collection(this.firestore, 'tasks');
-    const tasksSnap = await getDocs(query(tasksRef, where('recurringId', '==', recurringId)));
+    // Shrink end: delete tasks in (newEnd, oldEnd], keeping past + completed.
+    if (newRangeEnd < oldSeries.rangeEnd) {
+      const tasksSnap = await this.queryTasksOfSeries(seriesId);
+      const toDelete = tasksSnap.filter(t => {
+        const d = t.date;
+        if (!d) return false;
+        if (d <= newRangeEnd) return false;        // still in range
+        if (d > oldSeries.rangeEnd) return false;  // outside old range too — ignore
+        if (d < today) return false;               // history
+        if (t.status === 'completed') return false; // completed future = history
+        return true;
+      });
+      await this.batchDelete(toDelete.map(t => t.id));
+    }
 
-    const toDelete = tasksSnap.docs.filter(d => {
-      const od = (d.data() as any).occurrenceDate as string | undefined;
-      if (!od) return false;
-      // Past occurrences are sacrosanct — they're history. The user's
-      // explicit rule: 過去的時間不改.
-      if (od < today) return false;
-      // Future / today: delete if it falls outside the (possibly new)
-      // range, or if the (possibly new) rule wouldn't have fired on it.
-      return !this.firesOn(series, od);
-    });
-    await Promise.all(toDelete.map(d => deleteDoc(d.ref)));
-    return toDelete.length;
+    // Extend end: add tasks for (oldEnd, newEnd]. Use updated rule from oldSeries
+    // (caller hasn't changed rule in this code path).
+    if (newRangeEnd > oldSeries.rangeEnd) {
+      const fromInclusive = this.addOneDay(oldSeries.rangeEnd);
+      const dates = this.expandDates(
+        { ...oldSeries, rangeStart: newRangeStart, rangeEnd: newRangeEnd },
+        fromInclusive, newRangeEnd,
+      );
+      await this.writeTasksForDates(seriesId, oldSeries, dates, createdBy);
+    }
+
+    // (Shrink/extend rangeStart cases are deliberately left as a no-op for
+    // now since the UI doesn't expose rangeStart editing. Implement if
+    // needed later.)
   }
-
-  /** Public wrapper around the private `fires` check — takes a date string
-   *  instead of a Date object. Useful for callers that work with the
-   *  yyyy-MM-dd string form everywhere (no Date arithmetic). */
-  firesOn(rec: RecurringTask, ds: string): boolean {
-    return this.fires(rec, parseDate(ds), ds);
-  }
-
-  // ====================================================================
-  // Rule expansion (lazy, runtime-only)
-  // ====================================================================
 
   /**
-   * Given a recurring series and a [fromDate, toDate] window, return every
-   * date string within that window where the rule fires AND which falls
-   * inside the series' own range.
+   * Apply a rule change (frequency / weekdays / monthDay) to an existing
+   * series. Updates the series doc, then for all tasks with date >= today
+   * AND status != completed:
+   *   - delete the ones the new rule wouldn't fire on
+   *   - add tasks for new-rule dates that don't already have one
    *
-   * Pass concrete dates (no Date arithmetic surprises): always use
-   * yyyy-MM-dd strings as input and output.
+   * Past tasks (date < today) and completed-future tasks are never touched
+   * — they're history.
+   *
+   * This also re-fills "holes" the user previously created by deleting
+   * specific occurrences, but only if the new rule fires on those dates.
+   * Per user spec: rule change resets the future cleanly.
    */
-  occurrenceDatesIn(rec: RecurringTask, fromDate: string, toDate: string): string[] {
-    if (rec.status !== 'active') return [];
-    // Clip window to the rule's own range so we don't iterate decades.
-    const start = maxDate(rec.rangeStart, fromDate);
-    const end = minDate(rec.rangeEnd, toDate);
-    if (start > end) return [];
+  async applyRuleChange(
+    seriesId: string,
+    oldSeries: RecurringTask,
+    newRule: { rule: 'daily' | 'weekly' | 'monthly'; weekdays?: number[]; monthDay?: number },
+    createdBy: string,
+  ): Promise<void> {
+    await updateDoc(doc(this.firestore, `recurring_tasks/${seriesId}`), {
+      rule: newRule.rule,
+      weekdays: newRule.rule === 'weekly' ? newRule.weekdays : null,
+      monthDay: newRule.rule === 'monthly' ? newRule.monthDay : null,
+      updatedAt: serverTimestamp(),
+    });
 
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const fromDate = today > oldSeries.rangeStart ? today : oldSeries.rangeStart;
+    const newSeriesView: RecurringTask = { ...oldSeries, ...newRule };
+
+    const existingTasks = await this.queryTasksOfSeries(seriesId);
+
+    // Delete future non-completed tasks (clean slate for the new rule).
+    const toDelete = existingTasks.filter(t => {
+      const d = t.date;
+      if (!d) return false;
+      if (d < today) return false;             // history
+      if (t.status === 'completed') return false;
+      return true;
+    });
+    await this.batchDelete(toDelete.map(t => t.id));
+
+    // Generate new occurrences for today..rangeEnd, skipping dates where
+    // a completed-historical task already exists (we keep history).
+    const completedFutureKeys = new Set(
+      existingTasks
+        .filter(t => t.status === 'completed' && (t.date ?? '') >= today)
+        .map(t => t.date!)
+    );
+    const dates = this.expandDates(newSeriesView, fromDate, oldSeries.rangeEnd)
+      .filter(d => !completedFutureKeys.has(d));
+
+    await this.writeTasksForDates(seriesId, newSeriesView, dates, createdBy);
+  }
+
+  /**
+   * Update template-level series metadata (title / time / tags / etc) that
+   * doesn't trigger any task regeneration. Doesn't touch existing tasks
+   * — per design discussion, "title change applies only to this
+   * occurrence" so we never propagate template edits.
+   */
+  async updateSeriesTemplate(seriesId: string, data: Partial<RecurringTask>): Promise<void> {
+    const cleaned: Record<string, any> = {};
+    for (const [k, v] of Object.entries(data)) {
+      if (v !== undefined) cleaned[k] = v;
+    }
+    await updateDoc(doc(this.firestore, `recurring_tasks/${seriesId}`), {
+      ...cleaned,
+      updatedAt: serverTimestamp(),
+    });
+  }
+
+  // ====================================================================
+  // Internal helpers
+  // ====================================================================
+
+  /** Return the dates in [from, to] that the rule fires on. */
+  private expandDates(rec: RecurringTask, from: string, to: string): string[] {
+    if (from > to) return [];
     const out: string[] = [];
-    let d = parseDate(start);
-    const endD = parseDate(end);
-    while (!isAfter(d, endD)) {
+    let d = parseDate(from);
+    const toD = parseDate(to);
+    while (!isAfter(d, toD)) {
       const ds = format(d, 'yyyy-MM-dd');
       if (this.fires(rec, d, ds)) out.push(ds);
       d = addDays(d, 1);
@@ -197,114 +269,96 @@ export class RecurringTaskService {
     return out;
   }
 
-  /** True if the rule fires on the given Date. */
+  /** True iff the rule fires on the given date. Boundary-inclusive against
+   *  rec.rangeStart/rangeEnd. */
   private fires(rec: RecurringTask, d: Date, ds: string): boolean {
     if (ds < rec.rangeStart || ds > rec.rangeEnd) return false;
     switch (rec.rule) {
       case 'daily':
         return true;
-      case 'weekly': {
+      case 'weekly':
         if (!rec.weekdays || rec.weekdays.length === 0) return false;
         return rec.weekdays.includes(d.getDay());
-      }
       case 'monthly':
         if (!rec.monthDay) return false;
-        // Skip months that don't have this day (e.g. monthDay=31 in Feb).
         return d.getDate() === rec.monthDay;
     }
     return false;
   }
 
-  /**
-   * Convert a virtual occurrence into a real task document and return its
-   * new id. Used at the moment the user first interacts with the
-   * occurrence (edit, toggle complete, reschedule, delete) — until then we
-   * keep the series untouched and only synthesise virtuals at runtime.
-   */
-  async materialiseOccurrence(virtual: VirtualOccurrence): Promise<string> {
-    const id = await this.taskService.addTask({
-      workspaceId: virtual.workspaceId,
-      title: virtual.title,
-      description: virtual.description,
-      date: virtual.date,
-      startTime: virtual.startTime,
-      endTime: virtual.endTime,
-      tags: virtual.tags ?? [],
-      isUrgent: virtual.isUrgent,
-      createdBy: virtual.createdBy,
-      status: virtual.status,
-      reminderOffset: virtual.reminderOffset,
-      order: 0,
-      categoryId: virtual.categoryId,
-      recurringId: virtual.recurringId,
-      occurrenceDate: virtual.occurrenceDate,
-    } as any);
-    return id;
+  /** Write one Task doc per date, in writeBatch chunks of 480 (Firestore's
+   *  limit is 500 per batch; we leave headroom). */
+  private async writeTasksForDates(
+    seriesId: string,
+    template: RecurringTask,
+    dates: string[],
+    createdBy: string,
+  ): Promise<void> {
+    if (dates.length === 0) return;
+    const tasksRef = collection(this.firestore, 'tasks');
+    const chunk = 480;
+    for (let i = 0; i < dates.length; i += chunk) {
+      const batch = writeBatch(this.firestore);
+      const slice = dates.slice(i, i + chunk);
+      for (const d of slice) {
+        const newDocRef = doc(tasksRef);
+        const data: Record<string, any> = {
+          workspaceId: template.workspaceId,
+          title: template.title,
+          date: d,
+          startTime: template.startTime,
+          endTime: template.endTime,
+          tags: template.tags ?? [],
+          isUrgent: template.isUrgent,
+          createdBy,
+          status: 'pending',
+          reminderOffset: template.reminderOffset,
+          order: 0,
+          recurringId: seriesId,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        };
+        if (template.description) data['description'] = template.description;
+        if (template.categoryId) data['categoryId'] = template.categoryId;
+        batch.set(newDocRef, data);
+      }
+      await batch.commit();
+    }
   }
 
-  /**
-   * Build a virtual Task object for showing in lists / calendar / counts.
-   * The id is deterministic ("virtual:{recId}:{date}") so when the user
-   * later materialises it, the UI can swap the real id in without flicker.
-   */
-  buildVirtualOccurrence(rec: RecurringTask, date: string): VirtualOccurrence {
-    return {
-      id: `virtual:${rec.id}:${date}`,
-      workspaceId: rec.workspaceId,
-      categoryId: rec.categoryId,
-      title: rec.title,
-      description: rec.description,
-      date,
-      startTime: rec.startTime,
-      endTime: rec.endTime,
-      tags: rec.tags ?? [],
-      isUrgent: rec.isUrgent,
-      createdBy: rec.createdBy,
-      status: 'pending',
-      reminderOffset: rec.reminderOffset,
-      order: 0,
-      isVirtual: true,
-      recurringId: rec.id,
-      occurrenceDate: date,
-    };
+  /** Pull every task that belongs to this series (any date / status). */
+  private async queryTasksOfSeries(seriesId: string): Promise<Array<{ id: string; date: string | null; status: string }>> {
+    const snap = await getDocs(query(
+      collection(this.firestore, 'tasks'),
+      where('recurringId', '==', seriesId),
+    ));
+    return snap.docs.map(d => {
+      const data = d.data() as any;
+      return { id: d.id, date: data.date ?? null, status: data.status };
+    });
   }
 
-  /**
-   * Merge a list of real tasks with virtual occurrences from a set of
-   * recurring series, within [fromDate, toDate]. Real tasks "win": if a
-   * task with `recurringId === rec.id && occurrenceDate === d` exists in
-   * `tasks`, we keep the real one and skip the virtual.
-   *
-   * This is the function views should call before filtering for date /
-   * urgent / category / etc.
-   */
-  expandMerged(
-    realTasks: Task[],
-    recurrings: RecurringTask[],
-    fromDate: string,
-    toDate: string,
-  ): DisplayTask[] {
-    const materialisedKey = new Set<string>();
-    for (const t of realTasks) {
-      if ((t as any).recurringId && (t as any).occurrenceDate) {
-        materialisedKey.add(`${(t as any).recurringId}:${(t as any).occurrenceDate}`);
+  /** Batch-delete a set of task ids. Splits across multiple batches if
+   *  needed. */
+  private async batchDelete(ids: string[]): Promise<void> {
+    if (ids.length === 0) return;
+    const chunk = 480;
+    for (let i = 0; i < ids.length; i += chunk) {
+      const batch = writeBatch(this.firestore);
+      for (const id of ids.slice(i, i + chunk)) {
+        batch.delete(doc(this.firestore, `tasks/${id}`));
       }
+      await batch.commit();
     }
-    const virtuals: VirtualOccurrence[] = [];
-    for (const rec of recurrings) {
-      for (const ds of this.occurrenceDatesIn(rec, fromDate, toDate)) {
-        if (materialisedKey.has(`${rec.id}:${ds}`)) continue;
-        virtuals.push(this.buildVirtualOccurrence(rec, ds));
-      }
-    }
-    return [...realTasks, ...virtuals];
+  }
+
+  /** yyyy-MM-dd + 1 day, same form. */
+  private addOneDay(ds: string): string {
+    return format(addDays(parseDate(ds), 1), 'yyyy-MM-dd');
   }
 }
 
-// -------- date helpers (no external deps so this stays self-contained) --------
 function parseDate(ds: string): Date {
   const [y, m, d] = ds.split('-').map(Number);
   return new Date(y, m - 1, d);
 }
-function maxDate(a: string, b: string): string { return a > b ? a : b; }
-function minDate(a: string, b: string): string { return a < b ? a : b; }
