@@ -182,6 +182,21 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
   // Inline confirm dialog (replaces window.confirm for delete)
   confirmDialog: null | { title: string; message: string; action: () => void } = null;
 
+  // ---------- 系列設定 footer state (edit pane) ----------
+  /** Series id this Inspector edit pane is currently editing the footer
+   *  for. Null when the selected task isn't tied to a series. Drives
+   *  whether the 系列設定 block renders. */
+  footerSeriesId: string | null = null;
+  footerRule: 'daily' | 'weekly' | 'monthly' = 'weekly';
+  footerWeekdays: number[] = [];
+  footerMonthDay = 1;
+  footerRangeStart = '';
+  footerRangeEnd = '';
+  /** rangeEnd as loaded from the series — used to detect "user shrank end"
+   *  and prune future materialised tasks accordingly. Refreshed every time
+   *  the footer reloads or successfully saves. */
+  private footerOriginalRangeEnd: string | null = null;
+
   // Calendar data
   calendarDays: CalendarDay[] = [];
   weekDays: WeekDay[] = [];
@@ -455,7 +470,10 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
   // ---------- Create form helpers ----------
   blankCreateForm(): NewTaskForm {
     const today = format(new Date(), 'yyyy-MM-dd');
-    const oneYearOut = format(addDays(new Date(), 365), 'yyyy-MM-dd');
+    // Default series window is one month — long enough to feel useful for
+    // recurring tasks, short enough that users notice and pick an
+    // intentional end instead of letting it run for years.
+    const oneMonthOut = format(addDays(new Date(), 30), 'yyyy-MM-dd');
     return {
       title: '',
       date: this.selectedDateStr,
@@ -470,7 +488,7 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
       recurWeekdays: [1],
       recurMonthDay: 1,
       recurRangeStart: today,
-      recurRangeEnd: oneYearOut,
+      recurRangeEnd: oneMonthOut,
     };
   }
 
@@ -615,6 +633,8 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
         this.recomputeMergedTasks();
         this.buildCalendar();
         this.buildWeek();
+        // Keep footer in sync if a series this Inspector cares about changed.
+        if (this.selectedTaskId && this.inspectorMode === 'edit') this.loadFooterForSelected();
       });
       this.categoryService.getCategories(ws.id).pipe(takeUntil(this.destroy$)).subscribe(cats => {
         this.categories = cats.sort((a, b) => a.order - b.order);
@@ -933,17 +953,69 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
 
   // ---------- Selection ----------
   selectTask(taskId: string) {
-    // Virtual occurrence ids (virtual:{recId}:{date}) can't be loaded as
-    // real task docs. Route the user to the series edit page instead so
-    // they can change rule / range / metadata for the whole series.
-    if (taskId.startsWith('virtual:')) {
-      const recId = taskId.split(':')[1];
-      this.router.navigate(['/pro/recurring', recId]);
-      return;
-    }
     this.selectedTaskId = taskId;
     this.inspectorMode = 'edit';
     this.showInspector = true;
+    this.loadFooterForSelected();
+  }
+
+  /** Populate the 系列設定 footer state from whatever task is currently
+   *  selected. Virtual occurrences carry the series id directly; real tasks
+   *  carry it on a `recurringId` field set at materialise-time. Anything
+   *  else clears the footer. */
+  private loadFooterForSelected() {
+    const t = this.selectedTask as any;
+    const seriesId: string | undefined = t?.recurringId;
+    if (!seriesId) {
+      this.footerSeriesId = null;
+      this.footerOriginalRangeEnd = null;
+      return;
+    }
+    const rec = this.recurringTasks.find(r => r.id === seriesId);
+    if (!rec) {
+      this.footerSeriesId = null;
+      this.footerOriginalRangeEnd = null;
+      return;
+    }
+    this.footerSeriesId = seriesId;
+    this.footerRule = rec.rule;
+    this.footerWeekdays = [...(rec.weekdays ?? [])];
+    this.footerMonthDay = rec.monthDay ?? 1;
+    this.footerRangeStart = rec.rangeStart;
+    this.footerRangeEnd = rec.rangeEnd;
+    this.footerOriginalRangeEnd = rec.rangeEnd;
+  }
+
+  /** Toggle weekday in the footer's rule. */
+  toggleFooterWeekday(day: number) {
+    if (this.footerWeekdays.includes(day)) {
+      this.footerWeekdays = this.footerWeekdays.filter(d => d !== day);
+    } else {
+      this.footerWeekdays = [...this.footerWeekdays, day].sort((a, b) => a - b);
+    }
+    this.saveFooterSeries();
+  }
+  isFooterWeekdayActive(day: number): boolean {
+    return this.footerWeekdays.includes(day);
+  }
+
+  /** Live-save footer state to the series. Called on every (change) since
+   *  desktop Inspector is live-edit. If the user shrunk rangeEnd, also
+   *  prune materialised future tasks. */
+  async saveFooterSeries() {
+    if (!this.footerSeriesId) return;
+    await this.recurringTaskService.updateRecurringTask(this.footerSeriesId, {
+      rule: this.footerRule,
+      weekdays: this.footerRule === 'weekly' ? this.footerWeekdays : undefined,
+      monthDay: this.footerRule === 'monthly' ? this.footerMonthDay : undefined,
+      rangeEnd: this.footerRangeEnd,
+    });
+    if (this.footerOriginalRangeEnd && this.footerRangeEnd < this.footerOriginalRangeEnd) {
+      await this.recurringTaskService.pruneFutureMaterialised(
+        this.footerSeriesId, this.footerRangeEnd,
+      );
+    }
+    this.footerOriginalRangeEnd = this.footerRangeEnd;
   }
 
   backToDayPane() {
@@ -1138,7 +1210,13 @@ export class ProMainViewComponent implements OnInit, OnDestroy {
   async saveSelectedTask() {
     if (!this.selectedTask) return;
     const t = this.selectedTask;
+    const wasVirtual = (t as any).isVirtual === true;
     const id = await this.ensureRealId(t);
+    // After materialising, the in-memory task still has the virtual id —
+    // swap selectedTaskId to the new real id so subsequent (change)s update
+    // the same task instead of materialising again. The Firestore live
+    // subscription will replace the virtual entry with the real one shortly.
+    if (wasVirtual) this.selectedTaskId = id;
     await this.taskService.updateTask(id, {
       title: t.title,
       description: t.description,

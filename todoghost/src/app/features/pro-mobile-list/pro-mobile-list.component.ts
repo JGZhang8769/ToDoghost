@@ -204,16 +204,11 @@ export class ProMobileListComponent implements OnInit, OnDestroy {
   // ----- Actions -----
   back() { this.location.back(); }
 
-  /** Virtual occurrences open the series edit page; real tasks open the
-   *  single-task edit page. Materialising on tap would be surprising
-   *  (the user just wanted to view it), so we keep them virtual until the
-   *  user actually changes something. */
+  /** Virtual or real, the row opens /pro/task/:id. Virtual ids look like
+   *  "virtual:{recId}:{date}" and the task page hydrates them from the
+   *  series template, materialising on save. */
   openTask(task: DisplayTask) {
-    if ((task as any).isVirtual) {
-      this.router.navigate(['/pro/recurring', (task as any).recurringId]);
-    } else {
-      this.router.navigate(['/pro/task', task.id]);
-    }
+    this.router.navigate(['/pro/task', task.id]);
   }
 
   openCreate() {
