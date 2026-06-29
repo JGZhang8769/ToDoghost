@@ -17,6 +17,13 @@ export interface Task {
   status: 'pending' | 'completed';
   reminderOffset: number | null; // minutes before start time to notify
   order: number;
+  /** When set, this task was materialised from a RecurringTask series.
+   *  Combined with occurrenceDate it acts as a stable identity for a single
+   *  occurrence of the series — used by RecurringTaskService to know which
+   *  virtual occurrences are already real, and to prune future ones when
+   *  the series end date shrinks. */
+  recurringId?: string;
+  occurrenceDate?: string; // 'yyyy-MM-dd' — the calendar slot this occurrence sits in
   createdAt?: any;
   updatedAt?: any;
 }

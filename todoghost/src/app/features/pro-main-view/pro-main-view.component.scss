@@ -827,6 +827,38 @@
     cursor: not-allowed;
     background: transparent;
 }
+
+/* Recurrence weekday picker (sits inside .pro-field as a full-width grid) */
+.pro-field--block {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+}
+.pro-field--block .pro-field__label {
+    align-self: flex-start;
+}
+.pro-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+}
+.pro-weekday {
+    aspect-ratio: 1;
+    border: 1px solid rgba(120, 100, 80, 0.18);
+    background: rgba(255, 255, 255, 0.7);
+    color: #4a3a22;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    padding: 0;
+    font-family: inherit;
+}
+.pro-weekday.is-active {
+    background: linear-gradient(135deg, #d4a64a, #b58535);
+    color: #fff;
+    border-color: #b58535;
+}
 /* select needs an explicit chevron because we killed the native arrow */
 .pro-field select {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='none' stroke='%237a6850' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round' d='M2 4l3 3 3-3'/%3E%3C/svg%3E");

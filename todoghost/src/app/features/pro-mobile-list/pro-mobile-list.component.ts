@@ -6,11 +6,13 @@ import { Subject, takeUntil } from 'rxjs';
 import { endOfWeek, format, startOfWeek } from 'date-fns';
 
 import { TaskService, Task } from '../../core/services/task.service';
+import { RecurringTaskService, RecurringTask, DisplayTask } from '../../core/services/recurring-task.service';
 import { CategoryService, Category } from '../../core/services/category.service';
 import { WorkspaceService, Workspace } from '../../core/services/workspace.service';
 import { UserService, User } from '../../core/services/user.service';
 import { SwipeRowDirective } from '../../core/directives/swipe-row.directive';
 import { SwipeBackDirective } from '../../core/directives/swipe-back.directive';
+import { addDays } from 'date-fns';
 
 const USER_COLORS = [
   { bar: '#3b82f6', avatar: '#dbeafe', text: '#1d4ed8' },
@@ -44,6 +46,7 @@ const USER_COLORS = [
 })
 export class ProMobileListComponent implements OnInit, OnDestroy {
   private taskService = inject(TaskService);
+  private recurringTaskService = inject(RecurringTaskService);
   private categoryService = inject(CategoryService);
   private workspaceService = inject(WorkspaceService);
   private userService = inject(UserService);
@@ -54,7 +57,11 @@ export class ProMobileListComponent implements OnInit, OnDestroy {
 
   // ----- Data -----
   currentWorkspace: Workspace | null = null;
-  tasks: Task[] = [];
+  realTasks: Task[] = [];
+  recurringTasks: RecurringTask[] = [];
+  /** Merged: real + virtual occurrences in a wide window. Filter/scope logic
+   *  reads from this. */
+  tasks: DisplayTask[] = [];
   categories: Category[] = [];
   workspaceUsers: User[] = [];
 
@@ -66,7 +73,7 @@ export class ProMobileListComponent implements OnInit, OnDestroy {
   pickerDate = signal<string>(format(new Date(), 'yyyy-MM-dd'));
 
   /** Task currently waiting for delete confirmation (triggered by left swipe). */
-  pendingDeleteTask = signal<Task | null>(null);
+  pendingDeleteTask = signal<DisplayTask | null>(null);
 
   ngOnInit() {
     this.scope.set(this.route.snapshot.paramMap.get('scope') ?? 'inbox');
@@ -75,7 +82,12 @@ export class ProMobileListComponent implements OnInit, OnDestroy {
       if (!ws) { this.router.navigate(['/workspaces']); return; }
       this.currentWorkspace = ws;
       this.taskService.getTasks(ws.id).pipe(takeUntil(this.destroy$)).subscribe(tasks => {
-        this.tasks = tasks;
+        this.realTasks = tasks;
+        this.recomputeMergedTasks();
+      });
+      this.recurringTaskService.getRecurringTasks(ws.id).pipe(takeUntil(this.destroy$)).subscribe(rts => {
+        this.recurringTasks = rts;
+        this.recomputeMergedTasks();
       });
       this.categoryService.getCategories(ws.id).pipe(takeUntil(this.destroy$)).subscribe(cats => {
         this.categories = cats.sort((a, b) => a.order - b.order);
@@ -92,6 +104,15 @@ export class ProMobileListComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  /** Window large enough for any scope this list could show. */
+  private recomputeMergedTasks() {
+    const start = format(addDays(new Date(), -365), 'yyyy-MM-dd');
+    const end = format(addDays(new Date(), 365), 'yyyy-MM-dd');
+    this.tasks = this.recurringTaskService.expandMerged(
+      this.realTasks, this.recurringTasks, start, end,
+    );
   }
 
   // ----- Scope titles & filtering -----
@@ -121,14 +142,16 @@ export class ProMobileListComponent implements OnInit, OnDestroy {
     return `${n} 件代辦`;
   }
 
-  /** Tasks matching the current scope, sorted by date / startTime / order. */
-  get scopeTasks(): Task[] {
+  /** Tasks matching the current scope, sorted by date / startTime / order.
+   *  Returns DisplayTask so virtual occurrences are included; row actions
+   *  materialise on demand via materialiseIfVirtual(). */
+  get scopeTasks(): DisplayTask[] {
     const s = this.scope();
     const today = format(new Date(), 'yyyy-MM-dd');
     const ws = format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd');
     const we = format(endOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd');
 
-    let filtered: Task[];
+    let filtered: DisplayTask[];
     if (s === 'today') {
       filtered = this.tasks.filter(t => t.date === today && t.status !== 'completed');
     } else if (s === 'week') {
@@ -180,10 +203,20 @@ export class ProMobileListComponent implements OnInit, OnDestroy {
 
   // ----- Actions -----
   back() { this.location.back(); }
-  openTask(task: Task) { this.router.navigate(['/pro/task', task.id]); }
+
+  /** Virtual occurrences open the series edit page; real tasks open the
+   *  single-task edit page. Materialising on tap would be surprising
+   *  (the user just wanted to view it), so we keep them virtual until the
+   *  user actually changes something. */
+  openTask(task: DisplayTask) {
+    if ((task as any).isVirtual) {
+      this.router.navigate(['/pro/recurring', (task as any).recurringId]);
+    } else {
+      this.router.navigate(['/pro/task', task.id]);
+    }
+  }
 
   openCreate() {
-    // Pre-fill the create form with a sensible date based on the scope.
     let date: string | null = null;
     const s = this.scope();
     if (s === 'today') date = format(new Date(), 'yyyy-MM-dd');
@@ -191,26 +224,41 @@ export class ProMobileListComponent implements OnInit, OnDestroy {
     this.router.navigate(['/pro/new'], { queryParams: date ? { date } : {} });
   }
 
-  async toggleCompletion(task: Task, ev?: Event) {
+  async toggleCompletion(task: DisplayTask, ev?: Event) {
     if (ev) { ev.stopPropagation(); ev.preventDefault(); }
+    const id = await this.ensureRealId(task);
     const next = task.status === 'completed' ? 'pending' : 'completed';
-    await this.taskService.updateTask(task.id, { status: next });
+    await this.taskService.updateTask(id, { status: next });
   }
 
-  /**
-   * Left-swipe → show an iOS-style confirm dialog before actually deleting.
-   * Swipe distance alone isn't conclusive enough for a destructive action;
-   * users wanted a safety net.
-   */
-  onSwipeDelete(task: Task) {
+  onSwipeDelete(task: DisplayTask) {
     this.pendingDeleteTask.set(task);
   }
   cancelDelete() { this.pendingDeleteTask.set(null); }
   async confirmDelete() {
     const t = this.pendingDeleteTask();
     if (!t) return;
-    await this.taskService.deleteTask(t.id);
+    if ((t as any).isVirtual) {
+      // Virtual occurrence: dropping it without materialising would just
+      // bring it back next render. Materialise + immediately delete so the
+      // tasks/ collection records the exception, and the rule expander
+      // skips this date afterwards (it sees a real task with the same
+      // recurringId+occurrenceDate already exists).
+      const id = await this.recurringTaskService.materialiseOccurrence(t as any);
+      await this.taskService.updateTask(id, { status: 'completed' });
+    } else {
+      await this.taskService.deleteTask(t.id);
+    }
     this.pendingDeleteTask.set(null);
+  }
+
+  /** Materialise a virtual occurrence into a real task and return its id;
+   *  for real tasks just returns the existing id. */
+  private async ensureRealId(task: DisplayTask): Promise<string> {
+    if ((task as any).isVirtual) {
+      return this.recurringTaskService.materialiseOccurrence(task as any);
+    }
+    return task.id;
   }
 
   // ----- Schedule unscheduled task -----
