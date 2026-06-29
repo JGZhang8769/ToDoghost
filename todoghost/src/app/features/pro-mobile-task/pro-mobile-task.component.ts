@@ -44,18 +44,11 @@ export class ProMobileTaskComponent implements OnInit, OnDestroy {
 
   /** True when route is /pro/new — we add instead of update on save. */
   isCreating = signal(false);
-  /** Real task id when editing an existing single task. Stays null while
-   *  editing a virtual occurrence — set after the user saves and the
-   *  occurrence is materialised. */
+  /** Real task id when editing an existing task (one-off or from a series). */
   editingTaskId: string | null = null;
-  /** Virtual occurrence parsed from /pro/task/virtual:recId:date. When set,
-   *  save() materialises by creating a real task linked to the series and
-   *  using the form values; the series document itself is not touched. */
-  virtualSeriesId: string | null = null;
-  virtualOccurrenceDate: string | null = null;
-  /** Recurring series id this edit is tied to — either parsed from a virtual
-   *  occurrence url, or read from the real task's recurringId field. Drives
-   *  whether the 系列設定 footer renders. */
+  /** Recurring series id this edit is tied to, read from the task's
+   *  recurringId field at hydrate time. Drives whether the 系列設定 footer
+   *  renders. */
   seriesIdForFooter = signal<string | null>(null);
 
   // Form fields. Mirror Task shape minus IDs / timestamps.
@@ -113,23 +106,14 @@ export class ProMobileTaskComponent implements OnInit, OnDestroy {
     });
 
     // Routes:
-    //   /pro/new                            → create
-    //   /pro/task/:id                       → edit real task
-    //   /pro/task/virtual:{recId}:{date}    → hydrate from series template;
-    //                                         materialises on save
+    //   /pro/new           → create (optional ?date= prefill)
+    //   /pro/task/:id      → edit existing task (one-off or from a series)
     const taskId = this.route.snapshot.paramMap.get('id');
 
     if (!taskId) {
       this.isCreating.set(true);
       const presetDate = this.route.snapshot.queryParamMap.get('date');
       this.date.set(presetDate);
-    } else if (taskId.startsWith('virtual:')) {
-      this.isCreating.set(false);
-      const parts = taskId.split(':');
-      this.virtualSeriesId = parts[1] ?? null;
-      this.virtualOccurrenceDate = parts[2] ?? null;
-      this.seriesIdForFooter.set(this.virtualSeriesId);
-      this.hydrateFromSeries(this.virtualSeriesId!, this.virtualOccurrenceDate!);
     } else {
       this.isCreating.set(false);
       this.editingTaskId = taskId;
@@ -169,38 +153,6 @@ export class ProMobileTaskComponent implements OnInit, OnDestroy {
         });
       });
     }
-  }
-
-  /** Fill form values from a series template plus a target occurrence date.
-   *  Used when opening a virtual occurrence — the user sees the form as if
-   *  this date were already a real task.
-   *
-   *  take(1): one-shot hydration. If we re-emit on every Firestore tick the
-   *  user's in-progress form edits get clobbered (which manifested as
-   *  "改了儲存沒生效" because the live emit lands between keystroke and
-   *  save and resets the signal). */
-  private hydrateFromSeries(seriesId: string, date: string) {
-    this.workspaceService.currentWorkspace$.pipe(
-      filter(ws => !!ws), take(1), takeUntil(this.destroy$),
-    ).subscribe(ws => {
-      this.recurringTaskService.getRecurringTasks(ws!.id).pipe(
-        filter(list => list.some(x => x.id === seriesId)),
-        take(1),
-        takeUntil(this.destroy$),
-      ).subscribe(list => {
-        const r = list.find(x => x.id === seriesId)!;
-        this.title.set(r.title);
-        this.description.set(r.description ?? '');
-        this.date.set(date);
-        this.startTime.set(r.startTime);
-        this.endTime.set(r.endTime);
-        this.isUrgent.set(r.isUrgent);
-        this.categoryId.set(r.categoryId);
-        this.reminderOffset.set(r.reminderOffset);
-        this.tags.set([...(r.tags ?? [])]);
-        this.hydrateSeriesFieldsOnly(seriesId, r);
-      });
-    });
   }
 
   /** Pull series-only fields (rule / weekdays / monthDay / range) for the
@@ -304,11 +256,12 @@ export class ProMobileTaskComponent implements OnInit, OnDestroy {
     const title = this.title().trim();
     if (!title || !this.currentWorkspace || !this.currentUser) return;
 
-    // Branch A: create-mode + recur toggled on → write a new series.
-    // Editing existing tasks never enters this branch — the footer below
-    // handles series rule changes separately.
+    // Branch A: creating a new series. addSeriesAndOccurrences writes the
+    // series doc plus one materialised task per occurrence date in the
+    // chosen range. Doesn't touch tasks/ after that — series and tasks are
+    // independent collections.
     if (this.isCreating() && this.recurEnabled()) {
-      await this.recurringTaskService.addRecurringTask({
+      await this.recurringTaskService.addSeriesAndOccurrences({
         workspaceId: this.currentWorkspace.id,
         categoryId: this.categoryId(),
         title,
@@ -325,46 +278,12 @@ export class ProMobileTaskComponent implements OnInit, OnDestroy {
         rangeStart: this.recurRangeStart(),
         rangeEnd: this.recurRangeEnd(),
         status: 'active',
-      });
+      }, this.currentUser.id);
       this.back();
       return;
     }
 
-    // Branch B: editing a virtual occurrence → materialise as a real task
-    // tied back to the series via recurringId + occurrenceDate.
-    //
-    // Order: materialise FIRST, then save series, then reconcile. Doing it
-    // this way means reconcile sees the just-written task in Firestore and
-    // can delete it correctly if the user concurrently shrunk rangeEnd
-    // past this occurrence date or changed the rule so this weekday no
-    // longer fires. If we wrote the series first and then materialised,
-    // the new task would slip past reconcile's snapshot.
-    if (this.virtualSeriesId && this.virtualOccurrenceDate) {
-      const maxOrder = await this.peekMaxOrder();
-      await this.taskService.addTask({
-        workspaceId: this.currentWorkspace.id,
-        title,
-        description: this.description() || undefined,
-        date: this.date(),
-        startTime: this.startTime(),
-        endTime: this.endTime(),
-        tags: this.tags(),
-        isUrgent: this.isUrgent(),
-        createdBy: this.currentUser.id,
-        status: this.isCompleted() ? 'completed' : 'pending',
-        reminderOffset: this.reminderOffset(),
-        order: maxOrder + 1,
-        categoryId: this.categoryId(),
-        recurringId: this.virtualSeriesId,
-        occurrenceDate: this.virtualOccurrenceDate,
-      } as any);
-      await this.maybeSaveSeriesFooter();
-      this.back();
-      return;
-    }
-
-    // Branch C: editing a real task (one-off or already materialised from
-    // a series). Series footer changes save independently.
+    // Branch B: creating a one-off task.
     if (this.isCreating()) {
       const maxOrder = await this.peekMaxOrder();
       await this.taskService.addTask({
@@ -382,7 +301,14 @@ export class ProMobileTaskComponent implements OnInit, OnDestroy {
         order: maxOrder + 1,
         categoryId: this.categoryId(),
       } as any);
-    } else if (this.editingTaskId) {
+      this.back();
+      return;
+    }
+
+    // Branch C: editing an existing task. Update the task itself first,
+    // then if footer changed apply rule/range diffs (which may delete this
+    // very task if it now falls outside the range / rule).
+    if (this.editingTaskId) {
       await this.taskService.updateTask(this.editingTaskId, {
         title,
         description: this.description() || undefined,
@@ -393,7 +319,7 @@ export class ProMobileTaskComponent implements OnInit, OnDestroy {
         isUrgent: this.isUrgent(),
         status: this.isCompleted() ? 'completed' : 'pending',
         reminderOffset: this.reminderOffset(),
-        categoryId: this.categoryId() ?? null as any, // null → deleteField in service
+        categoryId: this.categoryId() ?? null as any,
       });
       await this.maybeSaveSeriesFooter();
     }
@@ -401,25 +327,57 @@ export class ProMobileTaskComponent implements OnInit, OnDestroy {
     this.back();
   }
 
-  /** Persist series-footer changes if this edit is tied to a series, then
-   *  reconcile materialised tasks against the (now updated) rule. Order is
-   *  important: series doc must be written first so the reconcile reads
-   *  fresh rule + rangeEnd, and the main-form write upstream must complete
-   *  before this method is called so its task is visible to reconcile.
-   *
-   *  Reconcile handles BOTH rangeEnd shrinks AND rule changes (weekday set
-   *  altered, monthDay changed, etc.). Per user rule, past occurrences
-   *  (occurrenceDate < today) are never touched. */
+  /** Persist series-footer changes if this edit is tied to a series. Splits
+   *  the work into "rule change" vs "range change" — the diff each
+   *  produces is different and they're driven by different methods on
+   *  the service. If both changed at once, apply rule first (resets the
+   *  future) and range second (extends or trims). */
   private async maybeSaveSeriesFooter() {
     const seriesId = this.seriesIdForFooter();
-    if (!seriesId) return;
-    await this.recurringTaskService.updateRecurringTask(seriesId, {
-      rule: this.recurRule(),
-      weekdays: this.recurRule() === 'weekly' ? this.recurWeekdays() : undefined,
-      monthDay: this.recurRule() === 'monthly' ? this.recurMonthDay() : undefined,
-      rangeEnd: this.recurRangeEnd(),
+    if (!seriesId || !this.currentUser) return;
+    const series = await this.loadSeriesOnce(seriesId);
+    if (!series) return;
+
+    const ruleChanged =
+      series.rule !== this.recurRule() ||
+      !sameNumberArray(series.weekdays ?? [], this.recurWeekdays()) ||
+      (series.monthDay ?? 1) !== this.recurMonthDay();
+    const rangeChanged = series.rangeEnd !== this.recurRangeEnd();
+
+    if (ruleChanged) {
+      await this.recurringTaskService.applyRuleChange(
+        seriesId, series,
+        {
+          rule: this.recurRule(),
+          weekdays: this.recurRule() === 'weekly' ? this.recurWeekdays() : undefined,
+          monthDay: this.recurRule() === 'monthly' ? this.recurMonthDay() : undefined,
+        },
+        this.currentUser.id,
+      );
+    }
+    if (rangeChanged) {
+      // applyRangeChange needs the post-rule series doc as `oldSeries` so it
+      // diffs against the latest rule rather than the original. Reload.
+      const reloaded = ruleChanged ? (await this.loadSeriesOnce(seriesId)) : series;
+      if (reloaded) {
+        await this.recurringTaskService.applyRangeChange(
+          seriesId, reloaded,
+          this.recurRangeStart(), this.recurRangeEnd(),
+          this.currentUser.id,
+        );
+      }
+    }
+  }
+
+  private async loadSeriesOnce(seriesId: string): Promise<RecurringTask | null> {
+    if (!this.currentWorkspace) return null;
+    return new Promise(resolve => {
+      const sub = this.recurringTaskService.getRecurringTasks(this.currentWorkspace!.id).subscribe(list => {
+        const r = list.find(x => x.id === seriesId) ?? null;
+        sub.unsubscribe();
+        resolve(r);
+      });
     });
-    await this.recurringTaskService.reconcileMaterialised(seriesId);
   }
 
   /** Take a snapshot of current task list to derive next order. Cheap because
@@ -441,33 +399,16 @@ export class ProMobileTaskComponent implements OnInit, OnDestroy {
   }
   cancelDelete() { this.showDeleteConfirm.set(false); }
   async confirmDelete() {
-    // Virtual occurrence: materialise + mark completed so the rule expander
-    // skips this date going forward. Hard-delete would just re-spawn the
-    // occurrence on next render.
-    if (this.virtualSeriesId && this.virtualOccurrenceDate && this.currentWorkspace && this.currentUser) {
-      const maxOrder = await this.peekMaxOrder();
-      await this.taskService.addTask({
-        workspaceId: this.currentWorkspace.id,
-        title: this.title().trim() || '(已取消)',
-        date: this.date(),
-        startTime: this.startTime(),
-        endTime: this.endTime(),
-        tags: this.tags(),
-        isUrgent: this.isUrgent(),
-        createdBy: this.currentUser.id,
-        status: 'completed',
-        reminderOffset: this.reminderOffset(),
-        order: maxOrder + 1,
-        categoryId: this.categoryId(),
-        recurringId: this.virtualSeriesId,
-        occurrenceDate: this.virtualOccurrenceDate,
-      } as any);
-    } else if (this.editingTaskId) {
-      await this.taskService.deleteTask(this.editingTaskId);
-    } else {
-      return;
-    }
+    if (!this.editingTaskId) return;
+    await this.taskService.deleteTask(this.editingTaskId);
     this.showDeleteConfirm.set(false);
     this.back();
   }
+}
+
+function sameNumberArray(a: number[], b: number[]): boolean {
+  if (a.length !== b.length) return false;
+  const sa = [...a].sort((x, y) => x - y);
+  const sb = [...b].sort((x, y) => x - y);
+  return sa.every((v, i) => v === sb[i]);
 }

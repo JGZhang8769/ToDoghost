@@ -17,13 +17,12 @@ export interface Task {
   status: 'pending' | 'completed';
   reminderOffset: number | null; // minutes before start time to notify
   order: number;
-  /** When set, this task was materialised from a RecurringTask series.
-   *  Combined with occurrenceDate it acts as a stable identity for a single
-   *  occurrence of the series — used by RecurringTaskService to know which
-   *  virtual occurrences are already real, and to prune future ones when
-   *  the series end date shrinks. */
+  /** When set, this task was generated as part of a recurring series and
+   *  the series doc lives at recurring_tasks/{recurringId}. The link is
+   *  one-way: tasks know their series, the series doc doesn't list its
+   *  tasks (we always discover them via where(recurringId == ?)). Drives
+   *  the 系列設定 footer in the edit page. */
   recurringId?: string;
-  occurrenceDate?: string; // 'yyyy-MM-dd' — the calendar slot this occurrence sits in
   createdAt?: any;
   updatedAt?: any;
 }

@@ -8,7 +8,6 @@ import { addDays, addMonths, addWeeks, endOfMonth, endOfWeek, format, isSameMont
 import { getLunar } from 'chinese-lunar-calendar';
 
 import { TaskService, Task } from '../../core/services/task.service';
-import { RecurringTaskService, RecurringTask, DisplayTask } from '../../core/services/recurring-task.service';
 import { CategoryService, Category } from '../../core/services/category.service';
 import { WorkspaceService, Workspace } from '../../core/services/workspace.service';
 import { UserService, User } from '../../core/services/user.service';
@@ -64,7 +63,6 @@ const USER_COLORS = [
 })
 export class ProMobileViewComponent implements OnInit, OnDestroy {
   private taskService = inject(TaskService);
-  private recurringTaskService = inject(RecurringTaskService);
   private categoryService = inject(CategoryService);
   private workspaceService = inject(WorkspaceService);
   private userService = inject(UserService);
@@ -74,15 +72,7 @@ export class ProMobileViewComponent implements OnInit, OnDestroy {
   // ----- Data -----
   currentWorkspace: Workspace | null = null;
   currentUser: User | null = null;
-  /** Real tasks straight from tasks/. Used by the merge below to detect
-   *  already-materialised occurrences and skip generating virtuals for them. */
-  realTasks: Task[] = [];
-  recurringTasks: RecurringTask[] = [];
-  /** Merged view: real tasks + lazily-expanded virtual occurrences within
-   *  a window that covers everything the home screen displays (this and
-   *  next month for the strip / month grid, plus smart-list counts which
-   *  look at today / this week). 90-day window is generous enough. */
-  tasks: DisplayTask[] = [];
+  tasks: Task[] = [];
   categories: Category[] = [];
   workspaceUsers: User[] = [];
 
@@ -135,13 +125,7 @@ export class ProMobileViewComponent implements OnInit, OnDestroy {
       if (!ws) { this.router.navigate(['/workspaces']); return; }
       this.currentWorkspace = ws;
       this.taskService.getTasks(ws.id).pipe(takeUntil(this.destroy$)).subscribe(tasks => {
-        this.realTasks = tasks;
-        this.recomputeMergedTasks();
-        this.rebuildCalendar();
-      });
-      this.recurringTaskService.getRecurringTasks(ws.id).pipe(takeUntil(this.destroy$)).subscribe(rts => {
-        this.recurringTasks = rts;
-        this.recomputeMergedTasks();
+        this.tasks = tasks;
         this.rebuildCalendar();
       });
       this.categoryService.getCategories(ws.id).pipe(takeUntil(this.destroy$)).subscribe(cats => {
@@ -160,17 +144,6 @@ export class ProMobileViewComponent implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.destroy$.next();
     this.destroy$.complete();
-  }
-
-  /** Expand recurring rules into virtual occurrences for the window that
-   *  covers everything the home actually displays (week strip, month grid,
-   *  smart-list counts). 90 days each side is generous and cheap. */
-  private recomputeMergedTasks() {
-    const start = format(addDays(new Date(), -90), 'yyyy-MM-dd');
-    const end = format(addDays(new Date(), 90), 'yyyy-MM-dd');
-    this.tasks = this.recurringTaskService.expandMerged(
-      this.realTasks, this.recurringTasks, start, end,
-    );
   }
 
   // ----- Calendar build -----
@@ -351,7 +324,7 @@ export class ProMobileViewComponent implements OnInit, OnDestroy {
   async submitQuickAdd() {
     const title = this.quickAddTitle().trim();
     if (!title || !this.currentWorkspace || !this.currentUser) return;
-    const maxOrder = this.realTasks.reduce((m, t) => Math.max(m, t.order ?? 0), 0);
+    const maxOrder = this.tasks.reduce((m, t) => Math.max(m, t.order ?? 0), 0);
     await this.taskService.addTask({
       workspaceId: this.currentWorkspace.id,
       title,
